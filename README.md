@@ -91,18 +91,52 @@ docker run \
 
 # 4. Design
 
-Mongoose and Pravega are using
-[different](https://github.com/emc-mongoose/mongoose/tree/master/doc/design/architecture#1-basic-terms)
-[concepts](http://pravega.io/docs/latest/pravega-concepts/).
-So it's necessary to determine how Pravega-specific terms are mapping to the Mongoose abstractions.
+Mongoose and Pravega are using different concepts. So it's necessary to determine how
+[Pravega-specific terms](http://pravega.io/docs/latest/terminology/) are mapped to the
+[Mongoose abstractions]((https://github.com/emc-mongoose/mongoose/tree/master/doc/design/architecture#1-basic-terms)).
 
 | Pravega | Mongoose |
 |---------|----------|
 | [Stream](http://pravega.io/docs/latest/pravega-concepts/#streams) | *Data Item* |
-| [Stream Segment](http://pravega.io/docs/latest/terminology/) | N/A |
-| [Scope](http://pravega.io/docs/latest/terminology/) | *Storage Path* |
+| Stream Segment | N/A |
+| Scope | *Storage Path* |
 | [Event](http://pravega.io/docs/latest/pravega-concepts/#events) | *Data Item chunk* which may be transferred with a single *Load Operation* |
 
+Mongoose generates a load executing the load operations on the *streams* which are considered as *items*. However, the
+load operations rate is measured as ***events per second*** but not streams per second.
+
+## 4.1. Load Operations
+
+### 4.1.1. Create
+
+1. Initialize a `ClientFactory` instance using the `storage-net-node-addrs` as a part of the *controller URI* and
+    *item path* as a *scope name*.
+2. Invoke `StreamManager.createStream` using *item path* as a *scope name* and *item id* as a *stream name*. Fail the
+    load operation using the status code 14 if the method returns `false`.
+3. Get an `EventStreamWriter<ByteBuffer>` instance using the *item id* as a *stream name*.
+4. Submit the next `ByteBuffer` event writing using a `writeEvent` method with a routing key either without it. Note
+    that it returns the `CompletableFuture` which should be handled somehow.
+5. TODO
+
+### 4.1.2. Read
+
+1. See step #1 for `create`
+2. Get an `EventStreamReader<ByteBuffer>` instance
+3. Read the next event using the method `readNextEvent` using some very small timeout (check if 0 is possible)
+4. TODO
+
+### 4.1.3. Update
+
+Update should work in the same way as `create` but it should fail only if the stream doesn't exist yet.
+
+### 4.1.4. Delete
+
+`StreamManager.deleteStream`
+
+## 4.2. Open Issues
+
+1. The configuration option `item-data-size` will specify the resulting stream size. How to specify the event size?
+2. How to generate the different load operations using the same item (stream)?
 
 # 5. Development
 
