@@ -29,7 +29,6 @@ ext {
             commonsJava: "2.1.3",
             disruptor: "3.4.2",
             dockerJava: "[3.0.14,)",
-            hadoop: "2.9.0",
             log4j: "2.8.2",
             mongoose: "4.0.0"
     ]
@@ -70,10 +69,6 @@ dependencies {
             "com.fasterxml.woodstox:woodstox-core:5.0.3",
             "com.google.guava:guava:19.0",
             "com.google.protobuf:protobuf-java:2.5.0",
-            "org.apache.hadoop:hadoop-annotations:${depVersion.hadoop}",
-            "org.apache.hadoop:hadoop-auth:${depVersion.hadoop}",
-            "org.apache.hadoop:hadoop-common:${depVersion.hadoop}",
-            "org.apache.hadoop:hadoop-hdfs-client:${depVersion.hadoop}",
             "org.apache.htrace:htrace-core4:4.1.0-incubating",
             "org.codehaus.woodstox:stax2-api:4.1",
             "org.glassfish.jersey.core:jersey-common:2.23.1",
@@ -122,19 +117,7 @@ jar {
                 "Implementation-Title": project.description,
         )
     }
-
-    // 1st level dependencies only
-    from configurations
-            .provided
-            .copyRecursive()
-            .setTransitive(false)
-            .collect {
-        it.name.contains("hadoop-common") ?
-                zipTree(it).matching {
-                    exclude "**/org.apache.hadoop.fs.FileSystem"
-                } :
-                zipTree(it)
-    }
+    
 
     exclude "META-INF/*.RSA", "META-INF/*.SF", "META-INF/*.DSA"
 }
