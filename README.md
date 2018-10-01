@@ -91,6 +91,19 @@ docker run \
 
 # 4. Design
 
+Mongoose and Pravega are using
+[different](https://github.com/emc-mongoose/mongoose/tree/master/doc/design/architecture#1-basic-terms)
+[concepts](http://pravega.io/docs/latest/pravega-concepts/).
+So it's necessary to determine how Pravega-specific terms are mapping to the Mongoose abstractions.
+
+| Pravega | Mongoose |
+|---------|----------|
+| [Stream](http://pravega.io/docs/latest/pravega-concepts/#streams) | *Data Item* |
+| [Stream Segment](http://pravega.io/docs/latest/terminology/) | N/A |
+| [Scope](http://pravega.io/docs/latest/terminology/) | *Storage Path* |
+| [Event](http://pravega.io/docs/latest/pravega-concepts/#events) | *Data Item chunk* which may be transferred with a single *Load Operation* |
+
+
 # 5. Development
 
 ## 5.1. Build
