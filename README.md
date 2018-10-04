@@ -28,7 +28,7 @@
 
 # 1. Introduction
 
-The storage driver extends the Mongoose's Abstract NIO Storage Driver and uses the following libraries:
+The storage driver extends the Mongoose's Abstract COOP Storage Driver and uses the following libraries:
 * `pravega-client` version 0.3.2
 
 # 2. Features
