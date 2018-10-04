@@ -12,6 +12,16 @@
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3.2.2.1. [Additional Node](#3221-additional-node)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3.2.2.2. [Entry Node](#3222-entry-node)<br/>
 4. [Design](#4-design)<br/>
+&nbsp;&nbsp;4.1. [Data Item Operations](#41-data-item-operations)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;4.1.1. [Create](#411-create)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;4.1.2. [Read](#412-read)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;4.1.3. [Update](#413-update)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;4.1.4. [Delete](#414-delete)<br/>
+&nbsp;&nbsp;4.2. [Path Item Operations](#42-path-item-operations)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;4.2.1. [Create](#421-create)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;4.2.2. [Read](#422-read)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;4.2.3. [Update](#423-update)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;4.2.4. [Delete](#424-delete)<br/>
 5. [Development](#5-development)<br/>
 &nbsp;&nbsp;5.1. [Build](#51-build)<br/>
 &nbsp;&nbsp;5.2. [Test](#52-test)<br/>
@@ -25,7 +35,7 @@ The storage driver extends the Mongoose's Abstract NIO Storage Driver and uses t
 
 * Authentication: TBD
 * SSL/TLS: TBD
-* Item Types: `data`
+* Item Types: `data`, `path`
 * Supported load operations:
     * `create`
     * `read`
@@ -97,46 +107,70 @@ Mongoose and Pravega are using different concepts. So it's necessary to determin
 
 | Pravega | Mongoose |
 |---------|----------|
-| [Stream](http://pravega.io/docs/latest/pravega-concepts/#streams) | *Data Item* |
+| [Stream](http://pravega.io/docs/latest/pravega-concepts/#streams) | *Path Item* |
+| Scope | *Storage Path* part (*stream name* is the 2nd part) |
+| [Event](http://pravega.io/docs/latest/pravega-concepts/#events) | *Data Item* |
 | Stream Segment | N/A |
-| Scope | *Storage Path* |
-| [Event](http://pravega.io/docs/latest/pravega-concepts/#events) | *Data Item chunk* which may be transferred with a single *Load Operation* |
 
-Mongoose generates a load executing the load operations on the *streams* which are considered as *items*. However, the
-load operations rate is measured as ***events per second*** but not streams per second.
+**Note**:
+> The Pravega storage driver should extend the NIO storage driver base.
 
-## 4.1. Load Operations
+## 4.1. Data Item Operations
+
+Mongoose should perform the load operations on the *events* when the configuration option `item-type` is set to `data`.
 
 ### 4.1.1. Create
 
-1. Initialize a `ClientFactory` instance using the `storage-net-node-addrs` as a part of the *controller URI* and
-    *item path* as a *scope name*.
-2. Invoke `StreamManager.createStream` using *item path* as a *scope name* and *item id* as a *stream name*. Fail the
-    load operation using the status code 14 if the method returns `false`.
-3. Get an `EventStreamWriter<ByteBuffer>` instance using the *item id* as a *stream name*.
-4. Submit the next `ByteBuffer` event writing using a `writeEvent` method with a routing key either without it. Note
-    that it returns the `CompletableFuture` which should be handled somehow.
-5. TODO
+1. Check the corresponding scope if it exists and create it if not.
+2. Check the corresponding stream if it exists and create it if not.
+1. Get an `EventStreamWriter<ByteBuffer>` instance using the *item id* as a *stream name*.
+2. Submit the next `ByteBuffer` event writing using a `writeEvent` method with a routing key either without it. Note
+that it returns the `CompletableFuture` which should be handled properly.
 
 ### 4.1.2. Read
 
-1. See step #1 for `create`
-2. Get an `EventStreamReader<ByteBuffer>` instance
-3. Read the next event using the method `readNextEvent` using some very small timeout (check if 0 is possible)
-4. TODO
+**Note**:
+> Pravega storage doesn't support reading the events in the random order. So the `item-input-file` configuration option
+> couldn't be used also. The only way to specify the items (events) to read is a scope + stream (`item-input-path` in
+> Mongoose terms)
+
+1. Get an `EventStreamReader<ByteBuffer>` instance
+2. Read the next event using the method `readNextEvent` using some very small timeout (check if 0 is possible)
 
 ### 4.1.3. Update
 
-Update should work in the same way as `create` but it should fail only if the stream doesn't exist yet.
+Not supported. Stream append may be performed using `create` load operation type.
 
 ### 4.1.4. Delete
+
+Not supported.
+
+## 4.2. Path Item Operations
+
+Mongoose should perform the load operations on the *streams* when the configuration option `item-type` is set to `path`.
+
+### 4.2.1. Create
+
+1. Check the corresponding scope if it exists and create it if not.
+2. Invoke `StreamManager.createStream` using *item path* as a *scope name* and *item id* as a *stream name*. Fail the
+load operation using the status code *14* if the method returns `false`.
+
+### 4.2.2. Read
+
+For each item read the whole corresponding stream. Unlike events, it's possible to read the streams in the random order
+so both `item-input-path` (scope's streams listing) and `item-input-file` (stream ids list) options should be supported.
+
+### 4.2.3. Update
+
+Not supported
+
+### 4.2.4. Delete
 
 `StreamManager.deleteStream`
 
 ## 4.2. Open Issues
 
-1. The configuration option `item-data-size` will specify the resulting stream size. How to specify the event size?
-2. How to generate the different load operations using the same item (stream)?
+TODO
 
 # 5. Development
 
