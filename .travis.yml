@@ -21,23 +21,23 @@ before_install:
 jobs:
   include:
 
-    - stage: "Integration Tests"
-      script: "./gradlew test --tests com.emc.mongoose.storage.driver.pravega.integration.*"
+  - stage: "Integration Tests"
+    script: "./gradlew test --tests com.emc.mongoose.storage.driver.pravega.integration.*"
 
-    - stage: "System Tests"
-      script:
-      - "./gradlew clean jar"
-      - "./gradlew test --tests com.emc.mongoose.storage.driver.pravega.system.*"
+  - stage: "System Tests"
+    script:
+    - "./gradlew clean jar"
+    - "./gradlew test --tests com.emc.mongoose.storage.driver.pravega.system.*"
 
-    - stage: "Deploy to DockerHub"
-      script:
-      - ./gradlew clean jar
-      - docker login -u $DOCKER_USER -p $DOCKER_PASS
-      - export REPO=emcmongoose/mongoose-storage-driver-pravega
-      - export TAG=`if [ "$TRAVIS_BRANCH" == "master" ]; then echo "latest"; else echo $TRAVIS_BRANCH; fi`
-      - docker build --build-arg MONGOOSE_VERSION=latest -f docker/Dockerfile -t $REPO:$COMMIT .
-      - docker tag $REPO:$COMMIT $REPO:$TAG
-      - docker tag $REPO:$COMMIT $REPO:travis-$TRAVIS_BUILD_NUMBER
-      - docker push $REPO
+  - stage: "Deploy to DockerHub"
+    script:
+    - ./gradlew clean jar
+    - docker login -u $DOCKER_USER -p $DOCKER_PASS
+    - export REPO=emcmongoose/mongoose-storage-driver-pravega
+    - export TAG=`if [ "$TRAVIS_BRANCH" == "master" ]; then echo "latest"; else echo $TRAVIS_BRANCH; fi`
+    - docker build --build-arg MONGOOSE_VERSION=4.0.0 -f docker/Dockerfile -t $REPO:$COMMIT .
+    - docker tag $REPO:$COMMIT $REPO:$TAG
+    - docker tag $REPO:$COMMIT $REPO:travis-$TRAVIS_BUILD_NUMBER
+    - docker push $REPO
 
     # TODO: add the stage to deploy the jar to maven central repo
