@@ -17,9 +17,13 @@ import com.emc.mongoose.storage.Credential;
 import com.emc.mongoose.storage.driver.coop.CoopStorageDriverBase;
 import com.github.akurilov.commons.system.SizeInBytes;
 import com.github.akurilov.confuse.Config;
+import io.pravega.client.admin.StreamManager;
+import io.pravega.client.stream.ScalingPolicy;
+import io.pravega.client.stream.StreamConfiguration;
 import org.apache.logging.log4j.Level;
 
 import java.io.IOException;
+import java.net.URI;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -27,6 +31,8 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
         extends CoopStorageDriverBase<I, O> {
 
     protected final String uriSchema;
+    protected final String scope = "defaultScope";
+    protected final String streamName = "defaultStream";
 
     protected final String[] endpointAddrs;
     protected final int nodePort;
@@ -40,6 +46,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
             final Config storageConfig, final boolean verifyFlag, final int batchSize
     )
             throws OmgShootMyFootException {
+
         super(testStepId, dataInput, storageConfig, verifyFlag, batchSize);
         this.uriSchema = uriSchema;
         final String uid = credential == null ? null : credential.getUid();
@@ -49,6 +56,16 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
         endpointAddrs = endpointAddrList.toArray(new String[endpointAddrList.size()]);
         requestAuthTokenFunc = null; // do not use
         requestNewPathFunc = null; // do not use
+
+        StreamManager streamManager = StreamManager.create(URI.create(uriSchema));
+
+        final boolean scopeIsNew = streamManager.createScope(scope);
+        StreamConfiguration streamConfig = StreamConfiguration.builder()
+                .scalingPolicy(ScalingPolicy.fixed(1))
+                .build();
+
+        final boolean streamIsNew = streamManager.createStream(scope, streamName, streamConfig);
+
     }
 
     @Override
