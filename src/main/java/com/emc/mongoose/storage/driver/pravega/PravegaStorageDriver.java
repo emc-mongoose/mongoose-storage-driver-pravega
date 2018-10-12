@@ -44,7 +44,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 
     private StreamManager streamManager;
     private Map<String, Map<String, Stream>> scopeMap = new HashMap<>();
-
+    		ArrayList==Map<Integer,String>
     public PravegaStorageDriver(
             final String uriSchema, final String testStepId, final DataInput dataInput,
             final Config storageConfig, final boolean verifyFlag, final int batchSize
@@ -134,7 +134,16 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
                         // if(success) return true;
                         break;
                     case READ:
-                        // if(success) return true;
+                    	final String path = pathOp.dstPath();
+						final String scopeName = path.substring(0,path.indexOf("/"));
+						final String streamName = path.substring(path.indexOf("/")+1, path.length());
+						if (scopeMap.get(scopeName).get(streamName)==null) {
+							//putIf or computeIf
+							//probably put inside to avoid code repeat
+						};
+                        if(invokePathRead((PathOperation<? extends PathItem>) op)) {
+                    		return true;
+						};
                         break;
                     case DELETE:
                         //TODO: StreamManager.deleteStream
@@ -176,6 +185,48 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
     protected int submit(List<O> ops) throws InterruptRunException, IllegalStateException {
         return submit(ops, 0, ops.size());
     }
+
+    
+	private boolean invokePathRead(final PathOperation<? extends PathItem> pathOp) {
+		final int READER_TIMEOUT_MS = 100;
+		StreamManager streamManager = StreamManager.create(controllerURI);
+
+		final String path = pathOp.dstPath();
+		final String scope = path.substring(0,path.indexOf("/"));
+		final String streamName = path.substring(path.indexOf("/")+1, path.length());
+
+		final String readerGroup = UUID.randomUUID().toString().replace("-", "");
+		final ReaderGroupConfig readerGroupConfig = ReaderGroupConfig.builder()
+				.stream(Stream.of(scope, streamName))
+				.build();
+		try (ReaderGroupManager readerGroupManager = ReaderGroupManager.withScope(scope, controllerURI)) {
+			readerGroupManager.createReaderGroup(readerGroup, readerGroupConfig);
+		}
+
+		try (ClientFactory clientFactory = ClientFactory.withScope(scope, controllerURI);
+			EventStreamReader<String> reader = clientFactory.createReader("reader",
+					readerGroup,
+					new JavaSerializer<String>(),
+					ReaderConfig.builder().build())) {
+			System.out.format("Reading all the events from %s/%s%n", scope, streamName);
+			EventRead<String> event = null;
+			do {
+				try {
+					event = reader.readNextEvent(READER_TIMEOUT_MS);
+					if (event.getEvent() != null) {
+						System.out.format("Read event '%s'%n", event.getEvent());
+						//should we store events?
+					}
+				} catch (ReinitializationRequiredException e) {
+					//There are certain circumstances where the reader needs to be reinitialized
+					//map it to some internal error of Mongoose?
+					e.printStackTrace();
+				}
+			} while (event.getEvent() != null);
+			System.out.format("No more events from %s/%s%n", scope, streamName);
+		}
+		return true;
+	}
 
     @Override
     protected void doClose()
