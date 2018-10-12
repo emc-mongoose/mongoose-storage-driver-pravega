@@ -17,10 +17,17 @@ import com.emc.mongoose.storage.Credential;
 import com.emc.mongoose.storage.driver.coop.CoopStorageDriverBase;
 import com.github.akurilov.commons.system.SizeInBytes;
 import com.github.akurilov.confuse.Config;
+import io.pravega.client.admin.StreamManager;
+import io.pravega.client.stream.Stream;
+import io.pravega.client.stream.ScalingPolicy;
+import io.pravega.client.stream.StreamConfiguration;
 import org.apache.logging.log4j.Level;
 
 import java.io.IOException;
+import java.net.URI;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
@@ -35,6 +42,9 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
     protected int inBuffSize = BUFF_SIZE_MIN;
     protected int outBuffSize = BUFF_SIZE_MAX;
 
+    private StreamManager streamManager;
+    private Map<String, Map<String, Stream>> scopeMap = new HashMap<>();
+
     public PravegaStorageDriver(
             final String uriSchema, final String testStepId, final DataInput dataInput,
             final Config storageConfig, final boolean verifyFlag, final int batchSize
@@ -42,6 +52,8 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
             throws OmgShootMyFootException {
         super(testStepId, dataInput, storageConfig, verifyFlag, batchSize);
         this.uriSchema = uriSchema;
+        streamManager = StreamManager.create(URI.create(uriSchema));
+
         final String uid = credential == null ? null : credential.getUid();
         final Config nodeConfig = storageConfig.configVal("net-node");
         nodePort = storageConfig.intVal("net-node-port");
@@ -97,45 +109,49 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
                 final DataItem dataItem = dataOp.item();
                 switch (dataOp.type()) {
                     case NOOP:
-
+                        // if(success) return true;
                         break;
                     case CREATE:
                         //TODO: EventStreamWriter<ByteBuffer>  ->  writeEvent
+                        // if(success) return true;
                         break;
                     case READ:
                         //TODO: EventStreamReader<ByteBuffer>  ->  readNextEvent
+                        // if(success) return true;
                         break;
                     default:
-                        throw new AssertionError("Operation isn't supported");
+                        throw new AssertionError("Operation " + op.type() + " isn't supported");
                 }
             } else if (op instanceof PathOperation) {
                 final PathOperation pathOp = (PathOperation) op;
                 final PathItem pathItem = pathOp.item();
                 switch (pathOp.type()) {
                     case NOOP:
-
+                        // if(success) return true;
                         break;
                     case CREATE:
                         //TODO: StreamManager.createStream
+                        // if(success) return true;
                         break;
                     case READ:
-
+                        // if(success) return true;
                         break;
                     case DELETE:
                         //TODO: StreamManager.deleteStream
+                        // if(success) return true;
                         break;
                     default:
-                        throw new AssertionError("Operation isn't supported");
+                        throw new AssertionError("Operation " + op.type() + "  isn't supported");
                 }
             } else {
-                throw new AssertionError("Operation type isn't supported");
+                throw new AssertionError("Operation type " + op.type() + " isn't supported");
             }
         } catch (final RuntimeException e) {
             final Throwable cause = e.getCause();
 
             if (cause instanceof IOException) {
                 LogUtil.exception(
-                        Level.DEBUG, cause, "Failed IO: {}"
+                        Level.DEBUG, cause, "Failed IO"
                 );
             } else if (cause != null) {
                 LogUtil.exception(Level.DEBUG, cause, "Unexpected failure");
@@ -149,18 +165,16 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 
     @Override
     protected int submit(List<O> ops, int from, int to) throws InterruptRunException, IllegalStateException {
-        for (int i = from; i < to; i++) {
-            submit(ops.get(i));
+        int i = from;
+        for (; i < to; i++) {
+            if (!submit(ops.get(i))) break;
         }
-        return to - from;
+        return i - from;
     }
 
     @Override
     protected int submit(List<O> ops) throws InterruptRunException, IllegalStateException {
-        for (final O op : ops) {
-            submit(op);
-        }
-        return ops.size();
+        return submit(ops, 0, ops.size());
     }
 
     @Override
