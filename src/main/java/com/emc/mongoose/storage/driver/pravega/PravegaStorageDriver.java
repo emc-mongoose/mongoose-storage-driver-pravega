@@ -137,8 +137,9 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
                         // if(success) return true;
                         break;
                     case DELETE:
-                        //TODO: StreamManager.deleteStream
-                        // if(success) return true;
+                    	if(invokePathDelete((PathOperation<? extends PathItem>) op)) {
+                    		return true;
+						}
                         break;
                     default:
                         throw new AssertionError("Operation " + op.type() + "  isn't supported");
@@ -176,6 +177,23 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
     protected int submit(List<O> ops) throws InterruptRunException, IllegalStateException {
         return submit(ops, 0, ops.size());
     }
+
+	protected boolean invokePathDelete(final PathOperation<? extends PathItem> pathOp) {
+		final String path = pathOp.dstPath();
+		final String scopeName = path.substring(0,path.indexOf("/"));
+		final String streamName = path.substring(path.indexOf("/")+1, path.length());
+		if(streamManager.sealStream(scopeName, streamName)){
+			if(streamManager.deleteStream(scopeName, streamName)) {
+				return true;
+			}
+			else {
+				pathOp.status(Operation.Status.FAIL_UNKNOWN);
+				return false;
+			}
+		}
+		pathOp.status(Operation.Status.FAIL_UNKNOWN);
+		return false;
+	}
 
     @Override
     protected void doClose()
