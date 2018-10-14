@@ -61,6 +61,10 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 		requestNewPathFunc = null; // do not use
 	}
 
+	protected final String getNextEndpointAddr() {
+		return endpointAddrs[rrc.getAndIncrement() % endpointAddrs.length];
+	}
+
 	@Override
 	protected String requestNewPath(final String path) {
 		throw new AssertionError("Should not be invoked");
