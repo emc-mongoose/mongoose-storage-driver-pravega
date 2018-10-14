@@ -44,7 +44,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 
     private StreamManager streamManager;
     private Map<String, Map<String, Stream>> scopeMap = new HashMap<>();
-    		ArrayList==Map<Integer,String>
+
     public PravegaStorageDriver(
             final String uriSchema, final String testStepId, final DataInput dataInput,
             final Config storageConfig, final boolean verifyFlag, final int batchSize
