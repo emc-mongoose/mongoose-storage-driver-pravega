@@ -92,6 +92,16 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 	}
 
 	@Override
+	protected void prepare(final O operation) {
+		super.prepare(operation);
+		String endpointAddr = operation.nodeAddr();
+		if(endpointAddr == null) {
+			endpointAddr = getNextEndpointAddr();
+			operation.nodeAddr(endpointAddr);
+		}
+	}
+
+	@Override
 	protected String requestNewPath(final String path) {
 		throw new AssertionError("Should not be invoked");
 	}
