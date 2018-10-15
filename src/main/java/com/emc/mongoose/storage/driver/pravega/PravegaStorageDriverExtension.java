@@ -23,7 +23,7 @@ public final class PravegaStorageDriverExtension<
 		extends ExtensionBase
 		implements StorageDriverFactory<I, O, T> {
 
-	private static final String NAME = "pravega";
+	private static final String NAME = "tcp";
 
 	private static final SchemaProvider SCHEMA_PROVIDER = new JsonSchemaProviderBase() {
 
