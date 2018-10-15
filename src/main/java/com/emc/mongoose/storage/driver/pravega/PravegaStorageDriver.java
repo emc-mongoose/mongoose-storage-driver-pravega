@@ -15,9 +15,15 @@ import com.emc.mongoose.logging.LogUtil;
 import com.emc.mongoose.logging.Loggers;
 import com.emc.mongoose.storage.Credential;
 import com.emc.mongoose.storage.driver.coop.CoopStorageDriverBase;
+import com.github.akurilov.commons.system.DirectMemUtil;
 import com.github.akurilov.commons.system.SizeInBytes;
 import com.github.akurilov.confuse.Config;
+
 import io.pravega.client.admin.StreamManager;
+import io.pravega.client.ClientFactory;
+import io.pravega.client.stream.EventStreamWriter;
+import io.pravega.client.stream.EventWriterConfig;
+import io.pravega.client.stream.impl.JavaSerializer;
 import io.pravega.client.stream.Stream;
 import io.pravega.client.stream.ScalingPolicy;
 import io.pravega.client.stream.StreamConfiguration;
@@ -25,10 +31,12 @@ import org.apache.logging.log4j.Level;
 
 import java.io.IOException;
 import java.net.URI;
+import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.CompletableFuture;
 
 public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
         extends CoopStorageDriverBase<I, O> {
@@ -112,9 +120,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
                         // if(success) return true;
                         break;
                     case CREATE:
-                        //TODO: EventStreamWriter<ByteBuffer>  ->  writeEvent
-                        // if(success) return true;
-                        break;
+                        return submitItemCreate(dataOp, dataItem);
                     case READ:
                         //TODO: EventStreamReader<ByteBuffer>  ->  readNextEvent
                         // if(success) return true;
@@ -150,9 +156,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
             final Throwable cause = e.getCause();
 
             if (cause instanceof IOException) {
-                LogUtil.exception(
-                        Level.DEBUG, cause, "Failed IO"
-                );
+                LogUtil.exception(Level.DEBUG, cause, "Failed IO");
             } else if (cause != null) {
                 LogUtil.exception(Level.DEBUG, cause, "Unexpected failure");
             } else {
@@ -162,6 +166,50 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 
         return false;
     }
+
+    protected boolean submitItemCreate(
+        final DataOperation<? extends DataItem> eventOperation, final DataItem eventItem
+    )
+    {
+   
+        final String path = eventOperation.dstPath();
+        final String scope = path.substring(0, path.indexOf("/"));
+        final String streamName = path.substring(path.indexOf("/")+1);
+
+        if (scopeMap.get(scope).get(streamName) == null) {
+            // ...
+            return false;
+        };
+
+        StreamConfiguration streamConfig = StreamConfiguration.builder()
+                .scalingPolicy(ScalingPolicy.fixed(1))
+                .build();
+
+        final boolean streamIsNew = streamManager.createStream(scope, streamName, streamConfig);
+
+        final long eventSize;
+        try {
+            eventSize = eventItem.size();
+        } catch(final IOException e) {
+            throw new AssertionError(e);
+        }
+
+        try (ClientFactory clientFactory = ClientFactory.withScope(scope, URI.create(uriSchema));
+             EventStreamWriter<ByteBuffer> writer = clientFactory.createEventWriter(streamName,
+                                                                                 null,
+                                                                                 EventWriterConfig.builder().build())) {
+            final String routingKey = null;
+            final ByteBuffer inBuff = DirectMemUtil.getThreadLocalReusableBuff(eventSize);
+
+            System.out.format("Writing inBuffer: '%s' to stream '%s / %s'%n",
+                    inBuff, scope, streamName);
+            final CompletableFuture writeFuture = writer.writeEvent(inBuff);
+            return true;
+        }
+    }
+
+
+
 
     @Override
     protected int submit(List<O> ops, int from, int to) throws InterruptRunException, IllegalStateException {
