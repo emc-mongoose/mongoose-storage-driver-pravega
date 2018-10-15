@@ -23,6 +23,7 @@ import org.apache.logging.log4j.Level;
 
 import java.io.IOException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -59,6 +60,31 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 		endpointAddrs = endpointAddrList.toArray(new String[endpointAddrList.size()]);
 		requestAuthTokenFunc = null; // do not use
 		requestNewPathFunc = null; // do not use
+	}
+
+	protected StreamManager getEndpoint(final String nodeAddr) {
+		try {
+			final String addr;
+			final int port;
+			int portSepPos = nodeAddr.lastIndexOf(':');
+			if(portSepPos > 0) {
+				addr = nodeAddr.substring(0, portSepPos);
+				port = Integer.parseInt(nodeAddr.substring(portSepPos + 1));
+			} else {
+				addr = nodeAddr;
+				port = nodePort;
+			}
+			final String uid = credential == null ? null : credential.getUid();
+			final URI endpointUri = new URI(uriSchema, uid, addr, port, "/", null, null);
+			// set the temporary thread's context classloader
+			Thread.currentThread().setContextClassLoader(getClass().getClassLoader());
+			return StreamManager.create(endpointUri);
+		} catch(final URISyntaxException e) {
+			throw new RuntimeException(e);
+		} finally {
+			// set the thread's context classloader back
+			Thread.currentThread().setContextClassLoader(ClassLoader.getSystemClassLoader());
+		}
 	}
 
 	protected final String getNextEndpointAddr() {
