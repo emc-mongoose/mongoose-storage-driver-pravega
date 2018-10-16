@@ -72,7 +72,7 @@ public final class PravegaStorageDriverExtension<
 			final int batchSize
 	) throws OmgShootMyFootException, InterruptedException {
 		return (T) new com.emc.mongoose.storage.driver.pravega.PravegaStorageDriver<I, O>(
-				NAME, stepId, dataInput, storageConfig, verifyFlag, batchSize
+				Constants.DEFAULT_CONTROLLER_URI, stepId, dataInput, storageConfig, verifyFlag, batchSize
 		);
 	}
 }

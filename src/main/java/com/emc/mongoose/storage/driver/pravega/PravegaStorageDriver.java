@@ -19,172 +19,210 @@ import com.github.akurilov.commons.system.SizeInBytes;
 import com.github.akurilov.confuse.Config;
 import io.pravega.client.admin.StreamManager;
 import io.pravega.client.stream.Stream;
-import io.pravega.client.stream.ScalingPolicy;
-import io.pravega.client.stream.StreamConfiguration;
 import org.apache.logging.log4j.Level;
 
 import java.io.IOException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
-        extends CoopStorageDriverBase<I, O> {
+		extends CoopStorageDriverBase<I, O> {
 
-    protected final String uriSchema;
+	protected final String uriSchema;
 
-    protected final String[] endpointAddrs;
-    protected final int nodePort;
-    private final AtomicInteger rrc = new AtomicInteger(0);
+	protected final String[] endpointAddrs;
+	protected final int nodePort;
+	private final AtomicInteger rrc = new AtomicInteger(0);
 
-    protected int inBuffSize = BUFF_SIZE_MIN;
-    protected int outBuffSize = BUFF_SIZE_MAX;
+	protected int inBuffSize = BUFF_SIZE_MIN;
+	protected int outBuffSize = BUFF_SIZE_MAX;
 
-    private StreamManager streamManager;
-    private Map<String, Map<String, Stream>> scopeMap = new HashMap<>();
+	private StreamManager streamManager;
+	private Map<String, Map<String, Stream>> scopeMap = new HashMap<>();
 
-    public PravegaStorageDriver(
-            final String uriSchema, final String testStepId, final DataInput dataInput,
-            final Config storageConfig, final boolean verifyFlag, final int batchSize
-    )
-            throws OmgShootMyFootException {
-        super(testStepId, dataInput, storageConfig, verifyFlag, batchSize);
-        this.uriSchema = uriSchema;
-        streamManager = StreamManager.create(URI.create(uriSchema));
+	public PravegaStorageDriver(
+			final String uriSchema, final String testStepId, final DataInput dataInput,
+			final Config storageConfig, final boolean verifyFlag, final int batchSize
+	)
+			throws OmgShootMyFootException {
+		super(testStepId, dataInput, storageConfig, verifyFlag, batchSize);
+		this.uriSchema = uriSchema;
+		streamManager = StreamManager.create(URI.create(uriSchema));
 
-        final String uid = credential == null ? null : credential.getUid();
-        final Config nodeConfig = storageConfig.configVal("net-node");
-        nodePort = storageConfig.intVal("net-node-port");
-        final List<String> endpointAddrList = nodeConfig.listVal("addrs");
-        endpointAddrs = endpointAddrList.toArray(new String[endpointAddrList.size()]);
-        requestAuthTokenFunc = null; // do not use
-        requestNewPathFunc = null; // do not use
-    }
+		final String uid = credential == null ? null : credential.getUid();
+		final Config nodeConfig = storageConfig.configVal("net-node");
+		nodePort = storageConfig.intVal("net-node-port");
+		final List<String> endpointAddrList = nodeConfig.listVal("addrs");
+		endpointAddrs = endpointAddrList.toArray(new String[endpointAddrList.size()]);
+		requestAuthTokenFunc = null; // do not use
+		requestNewPathFunc = null; // do not use
+	}
 
-    @Override
-    protected String requestNewPath(final String path) {
-        throw new AssertionError("Should not be invoked");
-    }
+	protected StreamManager getEndpoint(final String nodeAddr) {
+		try {
+			final String addr;
+			final int port;
+			int portSepPos = nodeAddr.lastIndexOf(':');
+			if(portSepPos > 0) {
+				addr = nodeAddr.substring(0, portSepPos);
+				port = Integer.parseInt(nodeAddr.substring(portSepPos + 1));
+			} else {
+				addr = nodeAddr;
+				port = nodePort;
+			}
+			final String uid = credential == null ? null : credential.getUid();
+			final URI endpointUri = new URI(uriSchema, uid, addr, port, "/", null, null);
+			// set the temporary thread's context classloader
+			Thread.currentThread().setContextClassLoader(getClass().getClassLoader());
+			return StreamManager.create(endpointUri);
+		} catch(final URISyntaxException e) {
+			throw new RuntimeException(e);
+		} finally {
+			// set the thread's context classloader back
+			Thread.currentThread().setContextClassLoader(ClassLoader.getSystemClassLoader());
+		}
+	}
 
-    @Override
-    protected String requestNewAuthToken(final Credential credential) {
-        throw new AssertionError("Should not be invoked");
-    }
+	protected final String getNextEndpointAddr() {
+		return endpointAddrs[rrc.getAndIncrement() % endpointAddrs.length];
+	}
 
-    @Override
-    public List<I> list(
-            final ItemFactory<I> itemFactory, final String path, final String prefix, final int idRadix,
-            final I lastPrevItem, final int count
-    )
-            throws IOException {
-        return null;
-    }
+	@Override
+	protected void prepare(final O operation) {
+		super.prepare(operation);
+		String endpointAddr = operation.nodeAddr();
+		if(endpointAddr == null) {
+			endpointAddr = getNextEndpointAddr();
+			operation.nodeAddr(endpointAddr);
+		}
+	}
 
-    @Override
-    public void adjustIoBuffers(final long avgTransferSize, final OpType opType) {
-        int size;
-        if (avgTransferSize < BUFF_SIZE_MIN) {
-            size = BUFF_SIZE_MIN;
-        } else if (BUFF_SIZE_MAX < avgTransferSize) {
-            size = BUFF_SIZE_MAX;
-        } else {
-            size = (int) avgTransferSize;
-        }
-        if (OpType.CREATE.equals(opType)) {
-            Loggers.MSG.info("Adjust output buffer size: {}", SizeInBytes.formatFixedSize(size));
-            outBuffSize = size;
-        } else if (OpType.READ.equals(opType)) {
-            Loggers.MSG.info("Adjust input buffer size: {}", SizeInBytes.formatFixedSize(size));
-            inBuffSize = size;
-        }
-    }
+	@Override
+	protected String requestNewPath(final String path) {
+		throw new AssertionError("Should not be invoked");
+	}
 
-    @Override
-    protected boolean submit(O op) throws InterruptRunException, IllegalStateException {
-        try {
-            if (op instanceof DataOperation) {
-                final DataOperation dataOp = (DataOperation) op;
-                final DataItem dataItem = dataOp.item();
-                switch (dataOp.type()) {
-                    case NOOP:
-                        // if(success) return true;
-                        break;
-                    case CREATE:
-                        //TODO: EventStreamWriter<ByteBuffer>  ->  writeEvent
-                        // if(success) return true;
-                        break;
-                    case READ:
-                        //TODO: EventStreamReader<ByteBuffer>  ->  readNextEvent
-                        // if(success) return true;
-                        break;
-                    default:
-                        throw new AssertionError("Operation " + op.type() + " isn't supported");
-                }
-            } else if (op instanceof PathOperation) {
-                final PathOperation pathOp = (PathOperation) op;
-                final PathItem pathItem = pathOp.item();
-                switch (pathOp.type()) {
-                    case NOOP:
-                        // if(success) return true;
-                        break;
-                    case CREATE:
-                        //TODO: StreamManager.createStream
-                        // if(success) return true;
-                        break;
-                    case READ:
-                        // if(success) return true;
-                        break;
-                    case DELETE:
-                        //TODO: StreamManager.deleteStream
-                        // if(success) return true;
-                        break;
-                    default:
-                        throw new AssertionError("Operation " + op.type() + "  isn't supported");
-                }
-            } else {
-                throw new AssertionError("Operation type " + op.type() + " isn't supported");
-            }
-        } catch (final RuntimeException e) {
-            final Throwable cause = e.getCause();
+	@Override
+	protected String requestNewAuthToken(final Credential credential) {
+		throw new AssertionError("Should not be invoked");
+	}
 
-            if (cause instanceof IOException) {
-                LogUtil.exception(
-                        Level.DEBUG, cause, "Failed IO"
-                );
-            } else if (cause != null) {
-                LogUtil.exception(Level.DEBUG, cause, "Unexpected failure");
-            } else {
-                LogUtil.exception(Level.DEBUG, e, "Unexpected failure");
-            }
-        }
+	@Override
+	public List<I> list(
+			final ItemFactory<I> itemFactory, final String path, final String prefix, final int idRadix,
+			final I lastPrevItem, final int count
+	)
+			throws IOException {
+		return null;
+	}
 
-        return false;
-    }
+	@Override
+	public void adjustIoBuffers(final long avgTransferSize, final OpType opType) {
+		int size;
+		if (avgTransferSize < BUFF_SIZE_MIN) {
+			size = BUFF_SIZE_MIN;
+		} else if (BUFF_SIZE_MAX < avgTransferSize) {
+			size = BUFF_SIZE_MAX;
+		} else {
+			size = (int) avgTransferSize;
+		}
+		if (OpType.CREATE.equals(opType)) {
+			Loggers.MSG.info("Adjust output buffer size: {}", SizeInBytes.formatFixedSize(size));
+			outBuffSize = size;
+		} else if (OpType.READ.equals(opType)) {
+			Loggers.MSG.info("Adjust input buffer size: {}", SizeInBytes.formatFixedSize(size));
+			inBuffSize = size;
+		}
+	}
 
-    @Override
-    protected int submit(List<O> ops, int from, int to) throws InterruptRunException, IllegalStateException {
-        int i = from;
-        for (; i < to; i++) {
-            if (!submit(ops.get(i))) break;
-        }
-        return i - from;
-    }
+	@Override
+	protected boolean submit(O op) throws InterruptRunException, IllegalStateException {
+		try {
+			if (op instanceof DataOperation) {
+				final DataOperation dataOp = (DataOperation) op;
+				final DataItem dataItem = dataOp.item();
+				switch (dataOp.type()) {
+					case NOOP:
+						// if(success) return true;
+						break;
+					case CREATE:
+						//TODO: EventStreamWriter<ByteBuffer>  ->  writeEvent
+						// if(success) return true;
+						break;
+					case READ:
+						//TODO: EventStreamReader<ByteBuffer>  ->  readNextEvent
+						// if(success) return true;
+						break;
+					default:
+						throw new AssertionError("Operation " + op.type() + " isn't supported");
+				}
+			} else if (op instanceof PathOperation) {
+				final PathOperation pathOp = (PathOperation) op;
+				final PathItem pathItem = pathOp.item();
+				switch (pathOp.type()) {
+					case NOOP:
+						// if(success) return true;
+						break;
+					case CREATE:
+						//TODO: StreamManager.createStream
+						// if(success) return true;
+						break;
+					case READ:
+						// if(success) return true;
+						break;
+					case DELETE:
+						//TODO: StreamManager.deleteStream
+						// if(success) return true;
+						break;
+					default:
+						throw new AssertionError("Operation " + op.type() + "  isn't supported");
+				}
+			} else {
+				throw new AssertionError("Operation type " + op.type() + " isn't supported");
+			}
+		} catch (final RuntimeException e) {
+			final Throwable cause = e.getCause();
 
-    @Override
-    protected int submit(List<O> ops) throws InterruptRunException, IllegalStateException {
-        return submit(ops, 0, ops.size());
-    }
+			if (cause instanceof IOException) {
+				LogUtil.exception(
+						Level.DEBUG, cause, "Failed IO"
+				);
+			} else if (cause != null) {
+				LogUtil.exception(Level.DEBUG, cause, "Unexpected failure");
+			} else {
+				LogUtil.exception(Level.DEBUG, e, "Unexpected failure");
+			}
+		}
 
-    @Override
-    protected void doClose()
-            throws IOException {
-        super.doClose();
-    }
+		return false;
+	}
 
-    @Override
-    public String toString() {
-        return String.format(super.toString(), "pravega");
-    }
+	@Override
+	protected int submit(List<O> ops, int from, int to) throws InterruptRunException, IllegalStateException {
+		int i = from;
+		for (; i < to; i++) {
+			if (!submit(ops.get(i))) break;
+		}
+		return i - from;
+	}
+
+	@Override
+	protected int submit(List<O> ops) throws InterruptRunException, IllegalStateException {
+		return submit(ops, 0, ops.size());
+	}
+
+	@Override
+	protected void doClose()
+			throws IOException {
+		super.doClose();
+	}
+
+	@Override
+	public String toString() {
+		return String.format(super.toString(), "pravega");
+	}
 }
