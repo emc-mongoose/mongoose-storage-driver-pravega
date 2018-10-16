@@ -187,11 +187,19 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 				return true;
 			}
 			else {
-				pathOp.status(Operation.Status.FAIL_UNKNOWN);
+				Loggers.ERR.debug(
+						"Failed to delete the stream {} in the scope {}", streamName,
+						scopeName);
+				pathOp.status(Operation.Status.RESP_FAIL_UNKNOWN);
 				return false;
 			}
 		}
-		pathOp.status(Operation.Status.FAIL_UNKNOWN);
+		else {
+			Loggers.ERR.debug(
+					"Failed to seal the stream {} in the scope {}", streamName,
+					scopeName);
+		}
+		pathOp.status(Operation.Status.RESP_FAIL_UNKNOWN);
 		return false;
 	}
 
