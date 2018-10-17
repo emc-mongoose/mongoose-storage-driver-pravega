@@ -17,8 +17,11 @@ import com.emc.mongoose.storage.Credential;
 import com.emc.mongoose.storage.driver.coop.CoopStorageDriverBase;
 import com.github.akurilov.commons.system.SizeInBytes;
 import com.github.akurilov.confuse.Config;
+import io.pravega.client.ClientFactory;
+import io.pravega.client.admin.ReaderGroupManager;
 import io.pravega.client.admin.StreamManager;
-import io.pravega.client.stream.Stream;
+import io.pravega.client.stream.*;
+import io.pravega.client.stream.impl.JavaSerializer;
 import org.apache.logging.log4j.Level;
 
 import java.io.IOException;
@@ -27,6 +30,7 @@ import java.net.URISyntaxException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
@@ -161,7 +165,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 						throw new AssertionError("Operation " + op.type() + " isn't supported");
 				}
 			} else if (op instanceof PathOperation) {
-				final PathOperation pathOp = (PathOperation) op;
+				final PathOperation<? extends PathItem> pathOp = (PathOperation<? extends PathItem>) op;
 				final PathItem pathItem = pathOp.item();
 				switch (pathOp.type()) {
 					case NOOP:
@@ -172,7 +176,18 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 						// if(success) return true;
 						break;
 					case READ:
-						// if(success) return true;
+						final String path = pathOp.dstPath();
+						final String scopeName = path.substring(0, path.indexOf("/"));
+						final String streamName = path.substring(path.indexOf("/") + 1);
+						if ((scopeMap.get(scopeName) == null) || (scopeMap.get(scopeName).get(streamName) == null)) {
+							//instead of this check there will be an http request, apparently.
+							Loggers.ERR.debug(
+									"Failed to delete the stream {} in the scope {}", streamName, scopeName);
+							pathOp.status(Operation.Status.RESP_FAIL_UNKNOWN);
+						}
+						if (invokePathRead(pathOp)) {
+							return true;
+						}
 						break;
 					case DELETE:
 						//TODO: StreamManager.deleteStream
@@ -213,6 +228,50 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 	@Override
 	protected int submit(List<O> ops) throws InterruptRunException, IllegalStateException {
 		return submit(ops, 0, ops.size());
+	}
+
+
+	private boolean invokePathRead(final PathOperation<? extends PathItem> pathOp) {
+		//for now we consider that we use one StreamManager only
+		//StreamManager streamManager = StreamManager.create(controllerURI);
+
+		final String path = pathOp.dstPath();
+		final String scope = path.substring(0, path.indexOf("/"));
+		final String streamName = path.substring(path.indexOf("/") + 1);
+		final URI controllerURI = URI.create(uriSchema);
+
+		//it's random for now, but to use offsets we'll need to use the same readerGroup name.
+		final String readerGroup = UUID.randomUUID().toString().replace("-", "");
+		final ReaderGroupConfig readerGroupConfig = ReaderGroupConfig.builder()
+				.stream(Stream.of(scope, streamName))
+				.build();
+		try (final ReaderGroupManager readerGroupManager = ReaderGroupManager.withScope(scope, controllerURI)) {
+			readerGroupManager.createReaderGroup(readerGroup, readerGroupConfig);
+		}
+
+		try (final ClientFactory clientFactory = ClientFactory.withScope(scope, controllerURI);
+			 EventStreamReader<String> reader = clientFactory.createReader("reader",
+					 readerGroup,
+					 new JavaSerializer<String>(),
+					 ReaderConfig.builder().build())) {
+			System.out.format("Reading all the events from %s/%s%n", scope, streamName);
+			EventRead<String> event = null;
+			do {
+				try {
+					event = reader.readNextEvent(Constants.READER_TIMEOUT_MS);
+					if (event.getEvent() != null) {
+						System.out.format("Read event '%s'%n", event.getEvent());
+						//should we store events?
+					}
+				} catch (ReinitializationRequiredException e) {
+					//There are certain circumstances where the reader needs to be reinitialized
+					//map it to some internal error of Mongoose?
+					e.printStackTrace();
+				}
+			} while (event.getEvent() != null);
+			System.out.format("No more events from %s/%s%n", scope, streamName);
+		}
+		return true;
 	}
 
 	@Override

@@ -160,6 +160,9 @@ load operation using the status code *14* if the method returns `false`.
 For each item read the whole corresponding stream. Unlike events, it's possible to read the streams in the random order
 so both `item-input-path` (scope's streams listing) and `item-input-file` (stream ids list) options should be supported.
 
+There is also another option, called `reader-timeout`. Pravega documentation says it only works when there is no available Event 
+in the stream. `readNextEvent()` will block for the specified time in ms. So, in theory 0 and 1 should work just fine. 
+They do not. In practice, this value should be somewhere between 100 and 2000 ms (2000 is Pravega default value).
 ### 4.2.3. Update
 
 Not supported
