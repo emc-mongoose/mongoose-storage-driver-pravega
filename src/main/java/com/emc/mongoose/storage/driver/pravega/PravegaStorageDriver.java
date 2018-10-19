@@ -190,8 +190,9 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 						}
 						break;
 					case DELETE:
-						//TODO: StreamManager.deleteStream
-						// if(success) return true;
+						if(invokePathDelete((PathOperation<? extends PathItem>) op)) {
+							return true;
+						}
 						break;
 					default:
 						throw new AssertionError("Operation " + op.type() + "  isn't supported");
@@ -272,6 +273,31 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 			System.out.format("No more events from %s/%s%n", scope, streamName);
 		}
 		return true;
+	}
+
+	protected boolean invokePathDelete(final PathOperation<? extends PathItem> pathOp) {
+		final String path = pathOp.dstPath();
+		final String scopeName = path.substring(0,path.indexOf("/"));
+		final String streamName = path.substring(path.indexOf("/")+1, path.length());
+		if(streamManager.sealStream(scopeName, streamName)){
+			if(streamManager.deleteStream(scopeName, streamName)) {
+				return true;
+			}
+			else {
+				Loggers.ERR.debug(
+						"Failed to delete the stream {} in the scope {}", streamName,
+						scopeName);
+				pathOp.status(Operation.Status.RESP_FAIL_UNKNOWN);
+				return false;
+			}
+		}
+		else {
+			Loggers.ERR.debug(
+					"Failed to seal the stream {} in the scope {}", streamName,
+					scopeName);
+		}
+		pathOp.status(Operation.Status.RESP_FAIL_UNKNOWN);
+		return false;
 	}
 
 	@Override

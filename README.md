@@ -169,7 +169,7 @@ Not supported
 
 ### 4.2.4. Delete
 
-`StreamManager.deleteStream`
+A deletion of a path composed of a scope and a stream is implemented through `invokePathDelete()` method. Before the deletion, the stream must be sealed because of Pravega concepts. So the sealing of the stream is done in `invokePathDelete()` method too.
 
 ## 4.2. Open Issues
 
