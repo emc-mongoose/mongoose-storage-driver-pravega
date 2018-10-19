@@ -171,22 +171,6 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
         final DataOperation<? extends DataItem> eventOperation, final DataItem eventItem
     )
     {
-   
-        final String path = eventOperation.dstPath();
-        final String scope = path.substring(0, path.indexOf("/"));
-        final String streamName = path.substring(path.indexOf("/")+1);
-
-        if (scopeMap.get(scope).get(streamName) == null) {
-            // ...
-            return false;
-        };
-
-        StreamConfiguration streamConfig = StreamConfiguration.builder()
-                .scalingPolicy(ScalingPolicy.fixed(1))
-                .build();
-
-        final boolean streamIsNew = streamManager.createStream(scope, streamName, streamConfig);
-
         final long eventSize;
         try {
             eventSize = eventItem.size();
@@ -194,16 +178,47 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
             throw new AssertionError(e);
         }
 
+
+        final String path = eventOperation.dstPath();
+        final String scope = path.substring(0, path.indexOf("/"));
+        final String streamName = path.substring(path.indexOf("/")+1);
+
+        if (scopeMap.get(scope).get(streamName) == null) {
+            Loggers.ERR.debug(
+                    "Failed to create event: the stream {} not found in the scope {}", streamName, scope);
+            eventOperation.status(Operation.Status.RESP_FAIL_UNKNOWN);
+            return false;
+        };
+
+        StreamConfiguration streamConfig = StreamConfiguration.builder()
+                .scalingPolicy(ScalingPolicy.fixed(1))
+                .build();
+
+        streamManager.createStream(scope, streamName, streamConfig);
+
         try (ClientFactory clientFactory = ClientFactory.withScope(scope, URI.create(uriSchema));
              EventStreamWriter<ByteBuffer> writer = clientFactory.createEventWriter(streamName,
-                                                                                 null,
-                                                                                 EventWriterConfig.builder().build())) {
+                     null,
+                     EventWriterConfig.builder().build())) {
             final String routingKey = null;
-            final ByteBuffer inBuff = DirectMemUtil.getThreadLocalReusableBuff(eventSize);
+            final DataInput dataInput = eventItem.dataInput();
+            final ByteBuffer outBuff = dataInput.getLayer(eventItem.layer());
 
-            System.out.format("Writing inBuffer: '%s' to stream '%s / %s'%n",
-                    inBuff, scope, streamName);
-            final CompletableFuture writeFuture = writer.writeEvent(inBuff);
+            final CompletableFuture writeFuture = writer.writeEvent(outBuff);
+            try {
+                writeFuture.get();
+            } catch (Exception e){
+                Loggers.ERR.debug("Failed to create event: writeFuture.get()");
+                eventOperation.status(Operation.Status.RESP_FAIL_CLIENT);
+                return false;
+            }
+            if (!writeFuture.isDone()) {
+                Loggers.ERR.debug("Failed to create event: writeFuture.isDone()");
+                eventOperation.status(Operation.Status.RESP_FAIL_CLIENT);
+                return false;
+            }
+            eventOperation.countBytesDone(eventSize);
+            eventOperation.status(Operation.Status.SUCC);
             return true;
         }
     }
