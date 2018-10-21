@@ -145,6 +145,9 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 
 	@Override
 	protected boolean submit(O op) throws InterruptRunException, IllegalStateException {
+		final String path = op.dstPath();
+		final String scopeName = path.substring(0, path.indexOf("/"));
+		final String streamName = path.substring(path.indexOf("/") + 1);
 		try {
 			if (op instanceof DataOperation) {
 				final DataOperation dataOp = (DataOperation) op;
@@ -158,8 +161,15 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 						// if(success) return true;
 						break;
 					case READ:
-						//TODO: EventStreamReader<ByteBuffer>  ->  readNextEvent
-						// if(success) return true;
+						if ((null != scopeMap.get(scopeName) && null != scopeMap.get(scopeName).get(streamName))) {
+							if (invokeDataRead(dataOp, scopeName, streamName)) {
+								return true;
+							}
+						} else {
+							Loggers.ERR.debug(
+									"Failed to read the stream {} in the scope {}", streamName, scopeName);
+							dataOp.status(Operation.Status.RESP_FAIL_UNKNOWN);
+						}
 						break;
 					default:
 						throw new AssertionError("Operation " + op.type() + " isn't supported");
@@ -176,9 +186,6 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 						// if(success) return true;
 						break;
 					case READ:
-						final String path = pathOp.dstPath();
-						final String scopeName = path.substring(0, path.indexOf("/"));
-						final String streamName = path.substring(path.indexOf("/") + 1);
 						if ((scopeMap.get(scopeName) == null) || (scopeMap.get(scopeName).get(streamName) == null)) {
 							//instead of this check there will be an http request, apparently.
 							Loggers.ERR.debug(
@@ -231,6 +238,39 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 		return submit(ops, 0, ops.size());
 	}
 
+
+	private boolean invokeDataRead(final DataOperation<? extends PathItem> dataOp, String scopeName, String streamName) {
+		final URI controllerURI = URI.create(uriSchema);
+
+		final String readerGroup = UUID.randomUUID().toString().replace("-", "");
+		final ReaderGroupConfig readerGroupConfig = ReaderGroupConfig.builder()
+				.stream(Stream.of(scopeName, streamName))
+				.build();
+		try (final ReaderGroupManager readerGroupManager = ReaderGroupManager.withScope(scopeName, controllerURI)) {
+			readerGroupManager.createReaderGroup(readerGroup, readerGroupConfig);
+		}
+
+		try (final ClientFactory clientFactory = ClientFactory.withScope(scopeName, controllerURI);
+		     EventStreamReader<String> reader = clientFactory.createReader("reader",
+				     readerGroup,
+				     new JavaSerializer<String>(),
+				     ReaderConfig.builder().build())) {
+			System.out.format("Reading all the events from %s/%s%n", scopeName, streamName);
+			EventRead<String> event = null;
+			do {
+				try {
+					event = reader.readNextEvent(Constants.READER_TIMEOUT_MS);
+					if (event.getEvent() != null) {
+						System.out.format("Read event '%s'%n", event.getEvent());
+					}
+				} catch (ReinitializationRequiredException e) {
+					e.printStackTrace();
+				}
+			} while (event.getEvent() != null);
+			System.out.format("No more events from %s/%s%n", scopeName, streamName);
+		}
+		return true;
+	}
 
 	private boolean invokePathRead(final PathOperation<? extends PathItem> pathOp) {
 		//for now we consider that we use one StreamManager only
