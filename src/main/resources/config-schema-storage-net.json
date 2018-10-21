@@ -11,6 +11,7 @@
 			"tcpNoDelay": "boolean",
 			"timeoutMilliSec": "int32",
 			"ssl": "boolean",
+			"storage-net-uri-schema":"string",
 			"node": {
 				"addrs": "list",
 				"port": "int32",

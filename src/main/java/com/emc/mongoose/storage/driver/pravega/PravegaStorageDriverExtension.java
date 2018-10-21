@@ -51,6 +51,15 @@ public final class PravegaStorageDriverExtension<
 		return NAME;
 	}
 
+	private final String uriSchema()  {
+		try {
+			return (String) SCHEMA_PROVIDER.schema().get("storage-net-uri-schema");
+		} catch (Exception e) {
+			e.printStackTrace();
+			return Constants.DEFAULT_CONTROLLER_URI ;
+		}
+	}
+
 	@Override
 	protected final String defaultsFileName() {
 		return DEFAULTS_FILE_NAME;
@@ -72,7 +81,7 @@ public final class PravegaStorageDriverExtension<
 			final int batchSize
 	) throws OmgShootMyFootException, InterruptedException {
 		return (T) new com.emc.mongoose.storage.driver.pravega.PravegaStorageDriver<I, O>(
-				Constants.DEFAULT_CONTROLLER_URI, stepId, dataInput, storageConfig, verifyFlag, batchSize
+				uriSchema(), stepId, dataInput, storageConfig, verifyFlag, batchSize
 		);
 	}
 }
