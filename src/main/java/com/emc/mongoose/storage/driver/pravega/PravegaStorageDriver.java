@@ -37,10 +37,10 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 		extends CoopStorageDriverBase<I, O> {
 
 	protected final String uriSchema;
-
 	protected final String[] endpointAddrs;
 	protected final int nodePort;
 	private final AtomicInteger rrc = new AtomicInteger(0);
+	private final URI controllerURI;
 
 	protected int inBuffSize = BUFF_SIZE_MIN;
 	protected int outBuffSize = BUFF_SIZE_MAX;
@@ -52,16 +52,16 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 			final String uriSchema, final String testStepId, final DataInput dataInput,
 			final Config storageConfig, final boolean verifyFlag, final int batchSize
 	)
-			throws OmgShootMyFootException {
+			throws OmgShootMyFootException, URISyntaxException {
 		super(testStepId, dataInput, storageConfig, verifyFlag, batchSize);
 		this.uriSchema = uriSchema;
-		streamManager = StreamManager.create(URI.create(uriSchema));
-
 		final String uid = credential == null ? null : credential.getUid();
 		final Config nodeConfig = storageConfig.configVal("net-node");
 		nodePort = storageConfig.intVal("net-node-port");
 		final List<String> endpointAddrList = nodeConfig.listVal("addrs");
 		endpointAddrs = endpointAddrList.toArray(new String[endpointAddrList.size()]);
+		controllerURI = new URI(uriSchema, uid, endpointAddrList.get(0), String.valueOf(nodePort), "/");
+		streamManager = StreamManager.create(controllerURI);
 		requestAuthTokenFunc = null; // do not use
 		requestNewPathFunc = null; // do not use
 	}
@@ -290,8 +290,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 				pathOp.status(Operation.Status.RESP_FAIL_UNKNOWN);
 				return false;
 			}
-		}
-		else {
+		} else {
 			Loggers.ERR.debug(
 					"Failed to seal the stream {} in the scope {}", streamName,
 					scopeName);
