@@ -42,6 +42,9 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 	protected final int nodePort;
 	private final AtomicInteger rrc = new AtomicInteger(0);
 
+
+	protected final int readerTimeoutMs;
+
 	protected int inBuffSize = BUFF_SIZE_MIN;
 	protected int outBuffSize = BUFF_SIZE_MAX;
 
@@ -61,6 +64,8 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 		final Config nodeConfig = storageConfig.configVal("net-node");
 		nodePort = storageConfig.intVal("net-node-port");
 		final List<String> endpointAddrList = nodeConfig.listVal("addrs");
+		readerTimeoutMs = storageConfig.intVal("storage-item-input-readerTimeout");
+
 		endpointAddrs = endpointAddrList.toArray(new String[endpointAddrList.size()]);
 		requestAuthTokenFunc = null; // do not use
 		requestNewPathFunc = null; // do not use
@@ -259,7 +264,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 			EventRead<String> event = null;
 			do {
 				try {
-					event = reader.readNextEvent(Constants.READER_TIMEOUT_MS);
+					event = reader.readNextEvent(readerTimeoutMs);
 					if (event.getEvent() != null) {
 						System.out.format("Read event '%s'%n", event.getEvent());
 						//should we store events?
