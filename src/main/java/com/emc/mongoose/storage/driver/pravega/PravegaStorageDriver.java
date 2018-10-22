@@ -172,9 +172,10 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 						// if(success) return true;
 						break;
 					case CREATE:
-						//TODO: StreamManager.createStream
-						// if(success) return true;
-						break;
+                        if(invokePathCreateStream((PathOperation<? extends PathItem>) op)) {
+                            return true;
+                        }
+                        break;
 					case READ:
 						final String path = pathOp.dstPath();
 						final String scopeName = path.substring(0, path.indexOf("/"));
@@ -231,6 +232,39 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 		return submit(ops, 0, ops.size());
 	}
 
+
+	private boolean invokePathCreateStream(final PathOperation<? extends PathItem> pathOp){
+	    final String path = pathOp.dstPath();
+	    final String scopeName = path.substring(0, path.indexOf("/"));
+	    final String streamName = path.substring(path.indexOf("/") + 1, path.length());
+
+	    if(scopeMap.get(scopeName) == null) {
+	        if(streamManager.createScope(scopeName)) {
+                scopeMap.put(scopeName, null);
+            }
+            else {
+                return false;
+            }
+
+        }
+
+        if(scopeMap.get(scopeName).get(streamName) == null) {
+            StreamConfiguration streamConfig = StreamConfiguration.builder()
+                    .scalingPolicy(ScalingPolicy.fixed(1))
+                    .build();
+
+            if(streamManager.createStream(scopeName, streamName, streamConfig)){
+                scopeMap.get(scopeName).computeIfAbsent(new HashMap<String, Stream>(streamName, ))
+            }
+
+            return true;
+        }
+        else {
+            System.out.format("Stream with name %s in Scope \"%s\" exists", streamName, scopeName);
+            return false;
+        }
+
+    }
 
 	private boolean invokePathRead(final PathOperation<? extends PathItem> pathOp) {
 		//for now we consider that we use one StreamManager only
