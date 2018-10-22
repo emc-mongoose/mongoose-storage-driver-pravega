@@ -40,7 +40,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 	protected final String[] endpointAddrs;
 	protected final int nodePort;
 	private final AtomicInteger rrc = new AtomicInteger(0);
-	private final URI controllerURI;
+	private URI controllerURI;
 
 	protected int inBuffSize = BUFF_SIZE_MIN;
 	protected int outBuffSize = BUFF_SIZE_MAX;
@@ -52,7 +52,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 			final String uriSchema, final String testStepId, final DataInput dataInput,
 			final Config storageConfig, final boolean verifyFlag, final int batchSize
 	)
-			throws OmgShootMyFootException, URISyntaxException {
+			throws OmgShootMyFootException {
 		super(testStepId, dataInput, storageConfig, verifyFlag, batchSize);
 		this.uriSchema = uriSchema;
 		final String uid = credential == null ? null : credential.getUid();
@@ -60,8 +60,8 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 		nodePort = storageConfig.intVal("net-node-port");
 		final List<String> endpointAddrList = nodeConfig.listVal("addrs");
 		endpointAddrs = endpointAddrList.toArray(new String[endpointAddrList.size()]);
-		controllerURI = new URI(uriSchema, uid, endpointAddrList.get(0), String.valueOf(nodePort), "/");
-		streamManager = StreamManager.create(controllerURI);
+		streamManager = getEndpoint(endpointAddrs[0]);
+
 		requestAuthTokenFunc = null; // do not use
 		requestNewPathFunc = null; // do not use
 	}
@@ -80,6 +80,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 			}
 			final String uid = credential == null ? null : credential.getUid();
 			final URI endpointUri = new URI(uriSchema, uid, addr, port, "/", null, null);
+			controllerURI = endpointUri;
 			// set the temporary thread's context classloader
 			Thread.currentThread().setContextClassLoader(getClass().getClassLoader());
 			return StreamManager.create(endpointUri);
