@@ -35,6 +35,7 @@ import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.CompletableFuture;
 
@@ -167,25 +168,14 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
         return false;
     }
 
-    protected boolean submitItemCreate(
-        final DataOperation<? extends DataItem> eventOperation, final DataItem eventItem
-    )
+    protected boolean submitItemCreate(final DataOperation<? extends DataItem> eventOperation, final DataItem eventItem)
     {
-        final long eventSize;
-        try {
-            eventSize = eventItem.size();
-        } catch(final IOException e) {
-            throw new AssertionError(e);
-        }
-
-
         final String path = eventOperation.dstPath();
         final String scope = path.substring(0, path.indexOf("/"));
         final String streamName = path.substring(path.indexOf("/")+1);
 
         if (scopeMap.get(scope).get(streamName) == null) {
-            Loggers.ERR.debug(
-                    "Failed to create event: the stream {} not found in the scope {}", streamName, scope);
+            Loggers.ERR.debug("Failed to create event: the stream {}  not found in the scope {}", streamName, scope);
             eventOperation.status(Operation.Status.RESP_FAIL_UNKNOWN);
             return false;
         };
@@ -201,24 +191,42 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
                      null,
                      EventWriterConfig.builder().build())) {
             final String routingKey = null;
-            final DataInput dataInput = eventItem.dataInput();
-            final ByteBuffer outBuff = dataInput.getLayer(eventItem.layer());
 
-            final CompletableFuture writeFuture = writer.writeEvent(outBuff);
+
+            final long buffSize;
+            try {
+                buffSize = eventItem.size();
+            } catch (IOException e) {
+                eventOperation.status(Operation.Status.FAIL_IO);
+                Loggers.ERR.debug("Failed to create event: " + e.getMessage());
+                return false;
+            }
+
+            final DataInput dataInput = eventItem.dataInput();
+            final long offset = eventItem.offset();
+            final int dataSize = dataInput.getSize();
+
+            final ByteBuffer outBuff = dataInput
+                    .getLayer(eventItem.layer())
+                    .asReadOnlyBuffer();
+
+            outBuff.position((int)offset);
+            outBuff.limit(dataSize);
+
+            final CompletableFuture writeFuture = writer.writeEvent(outBuff).thenAccept(result -> {
+                eventItem.offset((offset + dataSize) % buffSize);
+                eventOperation.countBytesDone(dataSize);
+                eventOperation.status(Operation.Status.SUCC);
+            });
+
             try {
                 writeFuture.get();
-            } catch (Exception e){
-                Loggers.ERR.debug("Failed to create event: writeFuture.get()");
+            } catch ( Exception e) {
+                Loggers.ERR.debug("Failed to create event: " + e.getMessage());
                 eventOperation.status(Operation.Status.RESP_FAIL_CLIENT);
                 return false;
             }
-            if (!writeFuture.isDone()) {
-                Loggers.ERR.debug("Failed to create event: writeFuture.isDone()");
-                eventOperation.status(Operation.Status.RESP_FAIL_CLIENT);
-                return false;
-            }
-            eventOperation.countBytesDone(eventSize);
-            eventOperation.status(Operation.Status.SUCC);
+
             return true;
         }
     }
