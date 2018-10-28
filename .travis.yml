@@ -20,13 +20,8 @@ before_install:
 jobs:
   include:
 
-  - stage: "Integration Tests"
-    script: "./gradlew test --tests com.emc.mongoose.storage.driver.pravega.integration.*"
-
-  - stage: "System Tests"
-    script:
-    - "./gradlew clean jar"
-    - "./gradlew test --tests com.emc.mongoose.storage.driver.pravega.system.*"
+  - stage: "Tests"
+    script: "./gradlew test"
 
   - stage: "Deploy to DockerHub"
     script:
