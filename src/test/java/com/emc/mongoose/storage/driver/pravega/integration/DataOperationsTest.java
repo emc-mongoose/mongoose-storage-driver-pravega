@@ -47,10 +47,11 @@ public class DataOperationsTest
 		extends PravegaStorageDriver<DataItem, DataOperation<DataItem>> {
 
 	private static final DataInput DATA_INPUT;
+
 	static {
 		try {
 			DATA_INPUT = DataInput.instance(null, "7a42d9c483244167", new SizeInBytes("4MB"), 16);
-		} catch(final IOException e) {
+		} catch (final IOException e) {
 			throw new AssertionError(e);
 		}
 	}
@@ -69,7 +70,7 @@ public class DataOperationsTest
 							schemaProvider -> {
 								try {
 									return schemaProvider.schema();
-								} catch(final Exception e) {
+								} catch (final Exception e) {
 									fail(e.getMessage());
 								}
 								return null;
@@ -113,7 +114,7 @@ public class DataOperationsTest
 			config.val("storage-driver-limit-queue-output", 1_000_000);
 			config.val("storage-driver-limit-concurrency", 0);
 			return config;
-		} catch(final Throwable cause) {
+		} catch (final Throwable cause) {
 			throw new RuntimeException(cause);
 		}
 	}
@@ -136,7 +137,7 @@ public class DataOperationsTest
 			throws Exception {
 		try {
 			PRAVEGA_NODE_CONTAINER = new PravegaNodeContainer();
-		} catch(final Exception e) {
+		} catch (final Exception e) {
 			throw new AssertionError(e);
 		}
 	}
@@ -145,9 +146,7 @@ public class DataOperationsTest
 	public static void tearDownClass()
 			throws Exception {
 		PRAVEGA_NODE_CONTAINER.close();
-
 	}
-
 
 
 	@Test
@@ -160,11 +159,11 @@ public class DataOperationsTest
 			throws Exception {
 	}
 
-	@Test @Ignore
+	@Test
+	@Ignore
 	public final void testConcatFile()
 			throws Exception {
-
-}
+	}
 
 	@Test
 	public final void testReadFullFile()
@@ -174,7 +173,6 @@ public class DataOperationsTest
 	@Test
 	public final void testReadFixedRangesFile()
 			throws Exception {
-
 	}
 
 	@Test
@@ -185,8 +183,7 @@ public class DataOperationsTest
 	@Test
 	public final void testOverwriteFile()
 			throws Exception {
-
-}
+	}
 
 	@Test
 	public final void testAppendFile()
@@ -196,6 +193,5 @@ public class DataOperationsTest
 	@Test
 	public final void testDeleteFile()
 			throws Exception {
-
-		}
+	}
 }

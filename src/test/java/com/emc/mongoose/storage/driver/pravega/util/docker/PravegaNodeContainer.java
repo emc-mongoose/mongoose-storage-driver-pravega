@@ -14,12 +14,12 @@ import java.util.logging.Logger;
 public class PravegaNodeContainer
 		implements Closeable {
 
-		public static final int PORT = 9090;
-		private static final Logger LOG = Logger.getLogger(PravegaNodeContainer.class.getSimpleName());
-		private static final String IMAGE_NAME = "pravega/pravega:latest";
-		private static final DockerClient DOCKER_CLIENT = DockerClientBuilder.getInstance().build();
+	public static final int PORT = 9090;
+	private static final Logger LOG = Logger.getLogger(PravegaNodeContainer.class.getSimpleName());
+	private static final String IMAGE_NAME = "pravega/pravega:latest";
+	private static final DockerClient DOCKER_CLIENT = DockerClientBuilder.getInstance().build();
 
-		private static String CONTAINER_ID = null;
+	private static String CONTAINER_ID = null;
 
 	public PravegaNodeContainer()
 			throws Exception {
@@ -48,7 +48,7 @@ public class PravegaNodeContainer
 
 	}
 
-		public final void close () {
+	public final void close() {
 		if (CONTAINER_ID != null) {
 			LOG.info("docker kill " + CONTAINER_ID + "...");
 			DOCKER_CLIENT.killContainerCmd(CONTAINER_ID).exec();
@@ -57,4 +57,4 @@ public class PravegaNodeContainer
 			CONTAINER_ID = null;
 		}
 	}
-	}
+}

@@ -273,7 +273,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 
 	protected boolean invokePathDelete(final PathOperation<? extends PathItem> pathOp) {
 		final String path = pathOp.dstPath();
-		StreamManager streamManager = StreamManager.create(URI.create(uriSchema));
+		final StreamManager streamManager = StreamManager.create(URI.create(uriSchema));
 		final String scopeName = path.substring(0,path.indexOf("/"));
 		final String streamName = path.substring(path.indexOf("/")+1);
 		if(streamManager.sealStream(scopeName, streamName)){

@@ -119,12 +119,12 @@ public class CommonTest
 			}
 		}
 
-	public CommonTest ()
+		public CommonTest ()
 			throws OmgShootMyFootException {
 			this(getConfig());
 		}
 
-	private CommonTest (final Config config)
+		private CommonTest (final Config config)
 			throws OmgShootMyFootException {
 			super(
 					"tcp://127.0.0.1:9090", "test-data-pravega-driver", DATA_INPUT,
@@ -148,7 +148,6 @@ public class CommonTest
 			PRAVEGA_NODE_CONTAINER.close();
 
 		}
-
 
 
 		@Test
