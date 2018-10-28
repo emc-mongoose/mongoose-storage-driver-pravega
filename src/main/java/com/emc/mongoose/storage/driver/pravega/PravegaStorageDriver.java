@@ -49,15 +49,15 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 	private Map<String, Map<String, Stream>> scopeMap = new HashMap<>();
 
 	public PravegaStorageDriver(
-			final String uriSchema, final String testStepId, final DataInput dataInput,
+			final String testStepId, final DataInput dataInput,
 			final Config storageConfig, final boolean verifyFlag, final int batchSize
 	)
 			throws OmgShootMyFootException {
 		super(testStepId, dataInput, storageConfig, verifyFlag, batchSize);
-		this.uriSchema = uriSchema;
 		final String uid = credential == null ? null : credential.getUid();
 		final Config nodeConfig = storageConfig.configVal("net-node");
 		nodePort = storageConfig.intVal("net-node-port");
+		uriSchema = storageConfig.stringVal("net-uri-schema");
 		final List<String> endpointAddrList = nodeConfig.listVal("addrs");
 		endpointAddrs = endpointAddrList.toArray(new String[endpointAddrList.size()]);
 		streamManager = getEndpoint(endpointAddrs[0]);

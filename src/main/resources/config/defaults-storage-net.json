@@ -15,7 +15,9 @@
 			// Currently only HTTPS implementation is available.
 			// Have no effect if configured storage type is filesystem.
 			"ssl": false,
-			"storage-net-uri-schema": "tcp",
+			"uri": {
+				"schema": "tcp"
+			},
 			"node": {
 				// The list of the storage node IPs or hostnames to use for HTTP load.
 				// May include port numbers.
