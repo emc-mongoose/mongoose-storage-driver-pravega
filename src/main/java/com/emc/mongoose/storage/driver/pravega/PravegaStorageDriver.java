@@ -1,7 +1,6 @@
 package com.emc.mongoose.storage.driver.pravega;
 
 import com.emc.mongoose.data.DataInput;
-import com.emc.mongoose.exception.InterruptRunException;
 import com.emc.mongoose.exception.OmgShootMyFootException;
 import com.emc.mongoose.item.DataItem;
 import com.emc.mongoose.item.Item;
@@ -76,7 +75,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 			final String addr;
 			final int port;
 			int portSepPos = nodeAddr.lastIndexOf(':');
-			if(portSepPos > 0) {
+			if (portSepPos > 0) {
 				addr = nodeAddr.substring(0, portSepPos);
 				port = Integer.parseInt(nodeAddr.substring(portSepPos + 1));
 			} else {
@@ -88,7 +87,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 			// set the temporary thread's context classloader
 			Thread.currentThread().setContextClassLoader(getClass().getClassLoader());
 			return StreamManager.create(endpointUri);
-		} catch(final URISyntaxException e) {
+		} catch (final URISyntaxException e) {
 			throw new RuntimeException(e);
 		} finally {
 			// set the thread's context classloader back
@@ -104,7 +103,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 	protected void prepare(final O operation) {
 		super.prepare(operation);
 		String endpointAddr = operation.nodeAddr();
-		if(endpointAddr == null) {
+		if (endpointAddr == null) {
 			endpointAddr = getNextEndpointAddr();
 			operation.nodeAddr(endpointAddr);
 		}
@@ -150,9 +149,9 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 
 	@Override
 	protected final void invokeNio(final O operation) {
-		if(operation instanceof DataOperation) {
+		if (operation instanceof DataOperation) {
 			invokeFileNio((DataOperation<? extends DataItem>) operation);
-		} else if(operation instanceof PathOperation) {
+		} else if (operation instanceof PathOperation) {
 			invokeDirectoryNio((PathOperation<? extends PathItem>) operation);
 		} else {
 			throw new AssertionError("Not implemented");
@@ -175,13 +174,13 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 					break;
 				case READ:
 					if ((null != scopeMap.get(scopeName) && null != scopeMap.get(scopeName).get(streamName))) {
-						if (invokeDataRead(fileOperation, scopeName, streamName)) return true;
+						if (invokeDataRead(fileOperation, scopeName, streamName)) {
+						}
 					} else {
 						Loggers.ERR.debug(
 								"Failed to read the stream {} in the scope {}", streamName, scopeName);
 						fileOperation.status(Operation.Status.RESP_FAIL_UNKNOWN);
 					}
-					break;
 					break;
 				default:
 					throw new AssertionError("Operation " + opType + " isn't supported");
@@ -234,7 +233,6 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 			}
 		} catch (final RuntimeException e) {
 			final Throwable cause = e.getCause();
-
 			if (cause instanceof IOException) {
 				LogUtil.exception(
 						Level.DEBUG, cause, "Failed IO"
@@ -245,7 +243,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 				LogUtil.exception(Level.DEBUG, e, "Unexpected failure");
 			}
 		}
-    }
+	}
 
 	private boolean invokeDataRead(final DataOperation<? extends DataItem> dataOp, String scopeName, String streamName) {
 		final URI controllerURI = URI.create(uriSchema);
@@ -299,10 +297,10 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 		}
 
 		try (final ClientFactory clientFactory = ClientFactory.withScope(scope, controllerURI);
-			 EventStreamReader<String> reader = clientFactory.createReader("reader",
-					 readerGroup,
-					 new JavaSerializer<String>(),
-					 ReaderConfig.builder().build())) {
+		     EventStreamReader<String> reader = clientFactory.createReader("reader",
+				     readerGroup,
+				     new JavaSerializer<String>(),
+				     ReaderConfig.builder().build())) {
 			System.out.format("Reading all the events from %s/%s%n", scope, streamName);
 			EventRead<String> event = null;
 			do {
@@ -325,21 +323,19 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 
 	protected boolean invokePathDelete(final PathOperation<? extends PathItem> pathOp) {
 		final String path = pathOp.dstPath();
-		final String scopeName = path.substring(0,path.indexOf("/"));
-		final String streamName = path.substring(path.indexOf("/")+1, path.length());
-		if(streamManager.sealStream(scopeName, streamName)){
-			if(streamManager.deleteStream(scopeName, streamName)) {
+		final String scopeName = path.substring(0, path.indexOf("/"));
+		final String streamName = path.substring(path.indexOf("/") + 1, path.length());
+		if (streamManager.sealStream(scopeName, streamName)) {
+			if (streamManager.deleteStream(scopeName, streamName)) {
 				return true;
-			}
-			else {
+			} else {
 				Loggers.ERR.debug(
 						"Failed to delete the stream {} in the scope {}", streamName,
 						scopeName);
 				pathOp.status(Operation.Status.RESP_FAIL_UNKNOWN);
 				return false;
 			}
-		}
-		else {
+		} else {
 			Loggers.ERR.debug(
 					"Failed to seal the stream {} in the scope {}", streamName,
 					scopeName);
