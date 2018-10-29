@@ -47,7 +47,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 	protected int inBuffSize = BUFF_SIZE_MIN;
 	protected int outBuffSize = BUFF_SIZE_MAX;
 
-	private StreamManager streamManager;
+	//private StreamManager streamManager;
 	private Map<String, Map<String, Stream>> scopeMap = new HashMap<>();
 
 	public PravegaStorageDriver(
@@ -57,13 +57,13 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 			throws OmgShootMyFootException {
 		super(testStepId, dataInput, storageConfig, verifyFlag, batchSize);
 		this.uriSchema = uriSchema;
-		streamManager = StreamManager.create(URI.create(uriSchema));
+
 
 		final String uid = credential == null ? null : credential.getUid();
 		final Config nodeConfig = storageConfig.configVal("net-node");
 		nodePort = storageConfig.intVal("net-node-port");
 		final List<String> endpointAddrList = nodeConfig.listVal("addrs");
-		readerTimeoutMs = storageConfig.intVal("storage-item-input-readerTimeout");
+		readerTimeoutMs = storageConfig.intVal("item-input-readerTimeout");
 
 		endpointAddrs = endpointAddrList.toArray(new String[endpointAddrList.size()]);
 		requestAuthTokenFunc = null; // do not use
@@ -202,20 +202,13 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 					//TODO: StreamManager.createStream
 					break;
 				case READ:
-					final String path = pathOperation.dstPath();
-					final String scopeName = path.substring(0, path.indexOf("/"));
-					final String streamName = path.substring(path.indexOf("/") + 1);
-					if ((scopeMap.get(scopeName) == null) || (scopeMap.get(scopeName).get(streamName) == null)) {
-						//instead of this check there will be an http request, apparently.
-						Loggers.ERR.debug(
-								"Failed to delete the stream {} in the scope {}", streamName, scopeName);
-						pathOperation.status(Operation.Status.RESP_FAIL_UNKNOWN);
-					}
 					if (invokePathRead(pathOperation)) {
+						//finishOperation?
 					}
 					break;
 				case DELETE:
 					if (invokePathDelete(pathOperation)) {
+						//finishOperation?
 					}
 					break;
 				default:
@@ -280,8 +273,9 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 
 	protected boolean invokePathDelete(final PathOperation<? extends PathItem> pathOp) {
 		final String path = pathOp.dstPath();
+		final StreamManager streamManager = StreamManager.create(URI.create(uriSchema));
 		final String scopeName = path.substring(0,path.indexOf("/"));
-		final String streamName = path.substring(path.indexOf("/")+1, path.length());
+		final String streamName = path.substring(path.indexOf("/")+1);
 		if(streamManager.sealStream(scopeName, streamName)){
 			if(streamManager.deleteStream(scopeName, streamName)) {
 				return true;
