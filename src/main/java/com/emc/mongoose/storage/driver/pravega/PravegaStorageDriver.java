@@ -26,12 +26,12 @@ import org.apache.logging.log4j.Level;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 
 public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 		extends NioStorageDriverBase<I, O> {
@@ -49,9 +49,10 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 	protected int outBuffSize = BUFF_SIZE_MAX;
 
 	private StreamManager streamManager;
-	//	private Map<String, Map<String, Stream>> scopeMap = new HashMap<>();
-	private final ConcurrentHashMap<String, Boolean> scopeMap = new ConcurrentHashMap<>();
-	private final ConcurrentHashMap<String, Boolean> streamMap = new ConcurrentHashMap<>();
+	private final Map<String, Map<String, String>> scopeMap = new ConcurrentHashMap<>();
+	private final StreamConfiguration streamConfig = StreamConfiguration.builder()
+			.scalingPolicy(ScalingPolicy.fixed(1))
+			.build();
 
 	public PravegaStorageDriver(
 			final String uriSchema, final String testStepId, final DataInput dataInput,
@@ -209,8 +210,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 					final String path = pathOperation.dstPath();
 					final String scopeName = path.substring(0, path.indexOf("/"));
 					final String streamName = path.substring(path.indexOf("/") + 1);
-//					if ((scopeMap.get(scopeName) == null) || (scopeMap.get(scopeName).get(streamName) == null)) {
-					if ((scopeMap.get(scopeName) == null) || (streamMap.get(streamName) == null)) {
+					if ((scopeMap.get(scopeName) == null) || (scopeMap.get(scopeName).get(streamName) == null)) {
 						//instead of this check there will be an http request, apparently.
 						Loggers.ERR.debug(
 								"Failed to delete the stream {} in the scope {}", streamName, scopeName);
@@ -244,37 +244,34 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 		final String path = pathOp.dstPath();
 		final String scopeName = path.substring(0, path.indexOf("/"));
 		final String streamName = path.substring(path.indexOf("/") + 1, path.length());
-		final Boolean scopeIsNew;
-		final Boolean streamIsNew;
 
-		scopeIsNew = scopeMap.computeIfAbsent(scopeName, key -> streamManager.createScope(key));
+		final Function<String, Map<String, String>> createScopeComputeIfAbsent = (final String k) -> {
+			streamManager.createScope(k);
+			return new ConcurrentHashMap<String, String>();
+		};
 
-		if (scopeIsNew) {
-			StreamConfiguration streamConfig = StreamConfiguration.builder()
-					.scalingPolicy(ScalingPolicy.fixed(1))
-					.build();
+		final Function<String, String> createStreamComputeIfAbsent = (final String k) -> {
+			streamManager.createStream(scopeName, k, streamConfig);
+			return k;
+		};
 
-			streamIsNew = streamMap.computeIfAbsent(streamName, key -> streamManager.createStream(scopeName, key, streamConfig));
-			if (streamIsNew) {
+		if (null != scopeMap.computeIfAbsent(scopeName,	createScopeComputeIfAbsent)) {
+			if (null != scopeMap.get(scopeName).computeIfAbsent(streamName, createStreamComputeIfAbsent)) {
+				System.out.format("Path /%s/%s successfully created", scopeName, streamName);
 				return true;
 			} else {
-				Loggers.MSG.info("Stream with name {} already exists in {} scope", streamName, scopeName);
+				Loggers.MSG.info("Stream with name {} in {} scope not created", streamName, scopeName);
 				pathOp.status(Operation.Status.RESP_FAIL_UNKNOWN);
 				return false;
 			}
-
 		} else {
-			Loggers.MSG.info("Scope with name {} already exists", scopeName);
+			Loggers.MSG.info("Scope with name {} already exists or cannot create", scopeName);
 
-			StreamConfiguration streamConfig = StreamConfiguration.builder()
-					.scalingPolicy(ScalingPolicy.fixed(1))
-					.build();
-
-			streamIsNew = streamMap.computeIfAbsent(streamName, key -> streamManager.createStream(scopeName, streamName, streamConfig));
-			if(streamIsNew) {
+			if (null != scopeMap.get(scopeName).computeIfAbsent(streamName, createStreamComputeIfAbsent)) {
+				System.out.format("Path /%s/%s successfully created", scopeName, streamName);
 				return true;
 			} else {
-				Loggers.MSG.info("Stream with name {} already exist in {} scope", streamName, scopeName);
+				Loggers.MSG.info("Stream with name {} already exist in {} scope or cannot create", streamName, scopeName);
 				pathOp.status(Operation.Status.RESP_FAIL_UNKNOWN);
 				return false;
 			}
