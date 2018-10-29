@@ -209,7 +209,8 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 					final String path = pathOperation.dstPath();
 					final String scopeName = path.substring(0, path.indexOf("/"));
 					final String streamName = path.substring(path.indexOf("/") + 1);
-					if ((scopeMap.get(scopeName) == null) || (scopeMap.get(scopeName).get(streamName) == null)) {
+//					if ((scopeMap.get(scopeName) == null) || (scopeMap.get(scopeName).get(streamName) == null)) {
+					if ((scopeMap.get(scopeName) == null) || (streamMap.get(streamName) == null)) {
 						//instead of this check there will be an http request, apparently.
 						Loggers.ERR.debug(
 								"Failed to delete the stream {} in the scope {}", streamName, scopeName);
@@ -258,6 +259,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 				return true;
 			} else {
 				Loggers.MSG.info("Stream with name {} already exists in {} scope", streamName, scopeName);
+				pathOp.status(Operation.Status.RESP_FAIL_UNKNOWN);
 				return false;
 			}
 
@@ -273,6 +275,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 				return true;
 			} else {
 				Loggers.MSG.info("Stream with name {} already exist in {} scope", streamName, scopeName);
+				pathOp.status(Operation.Status.RESP_FAIL_UNKNOWN);
 				return false;
 			}
 		}
