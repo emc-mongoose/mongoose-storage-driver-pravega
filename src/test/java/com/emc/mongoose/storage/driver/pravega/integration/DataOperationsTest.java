@@ -43,9 +43,8 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-public class DataOperationsTest
-		extends PravegaStorageDriver<DataItem, DataOperation<DataItem>> {
-
+public class DataOperationsTest {
+	private final PravegaStorageDriver pravegaStorageDriver;
 	private static final DataInput DATA_INPUT;
 
 	static {
@@ -126,7 +125,8 @@ public class DataOperationsTest
 
 	private DataOperationsTest(final Config config)
 			throws OmgShootMyFootException {
-		super(
+
+		pravegaStorageDriver = new PravegaStorageDriver<DataItem, DataOperation<DataItem>>(
 				"tcp://127.0.0.1:9090", "test-data-pravega-driver", DATA_INPUT,
 				config.configVal("storage"), true, config.configVal("load").intVal("batch-size")
 		);
