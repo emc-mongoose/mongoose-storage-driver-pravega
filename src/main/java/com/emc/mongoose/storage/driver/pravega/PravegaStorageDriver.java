@@ -58,7 +58,6 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 		super(testStepId, dataInput, storageConfig, verifyFlag, batchSize);
 		this.uriSchema = uriSchema;
 
-
 		final String uid = credential == null ? null : credential.getUid();
 		final Config nodeConfig = storageConfig.configVal("net-node");
 		nodePort = storageConfig.intVal("net-node-port");
@@ -230,7 +229,6 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 
 	private boolean invokePathRead(final PathOperation<? extends PathItem> pathOp) {
 		//for now we consider that we use one StreamManager only
-		//StreamManager streamManager = StreamManager.create(controllerURI);
 
 		final String path = pathOp.dstPath();
 		final String scope = path.substring(0, path.indexOf("/"));
