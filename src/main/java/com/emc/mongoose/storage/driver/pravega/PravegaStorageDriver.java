@@ -173,7 +173,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 					//TODO
 					break;
 				case CREATE:
-					if (submitItemCreate(fileOperation, fileItem))
+					if (invokeItemCreate(fileOperation, fileItem))
 					{
 //						...
 					}
@@ -238,7 +238,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
     }
 
 
-	protected boolean submitItemCreate(final DataOperation<? extends DataItem> eventOperation, final DataItem eventItem)
+	protected boolean invokeItemCreate(final DataOperation<? extends DataItem> eventOperation, final DataItem eventItem)
 	{
 		final String path = eventOperation.dstPath();
 		final String scope = path.substring(0, path.indexOf("/"));
@@ -254,6 +254,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 				.scalingPolicy(ScalingPolicy.fixed(1))
 				.build();
 
+        StreamManager streamManager = StreamManager.create(URI.create(uriSchema));
 		streamManager.createStream(scope, streamName, streamConfig);
 
 		try (ClientFactory clientFactory = ClientFactory.withScope(scope, URI.create(uriSchema));
