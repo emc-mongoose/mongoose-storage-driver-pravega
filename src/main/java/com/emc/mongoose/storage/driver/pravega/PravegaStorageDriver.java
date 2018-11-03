@@ -26,11 +26,12 @@ import org.apache.logging.log4j.Level;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 
 public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 		extends NioStorageDriverBase<I, O> {
@@ -48,7 +49,10 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 	protected int outBuffSize = BUFF_SIZE_MAX;
 
 	//private StreamManager streamManager;
-	private Map<String, Map<String, Stream>> scopeMap = new HashMap<>();
+	private final Map<String, Map<String, String>> scopeMap = new ConcurrentHashMap<>();
+	private final StreamConfiguration streamConfig = StreamConfiguration.builder()
+			.scalingPolicy(ScalingPolicy.fixed(1))
+			.build();
 
 	public PravegaStorageDriver(
 			final String uriSchema, final String testStepId, final DataInput dataInput,
@@ -74,7 +78,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 			final String addr;
 			final int port;
 			int portSepPos = nodeAddr.lastIndexOf(':');
-			if(portSepPos > 0) {
+			if (portSepPos > 0) {
 				addr = nodeAddr.substring(0, portSepPos);
 				port = Integer.parseInt(nodeAddr.substring(portSepPos + 1));
 			} else {
@@ -86,7 +90,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 			// set the temporary thread's context classloader
 			Thread.currentThread().setContextClassLoader(getClass().getClassLoader());
 			return StreamManager.create(endpointUri);
-		} catch(final URISyntaxException e) {
+		} catch (final URISyntaxException e) {
 			throw new RuntimeException(e);
 		} finally {
 			// set the thread's context classloader back
@@ -102,7 +106,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 	protected void prepare(final O operation) {
 		super.prepare(operation);
 		String endpointAddr = operation.nodeAddr();
-		if(endpointAddr == null) {
+		if (endpointAddr == null) {
 			endpointAddr = getNextEndpointAddr();
 			operation.nodeAddr(endpointAddr);
 		}
@@ -148,9 +152,9 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 
 	@Override
 	protected final void invokeNio(final O operation) {
-		if(operation instanceof DataOperation) {
+		if (operation instanceof DataOperation) {
 			invokeFileNio((DataOperation<? extends DataItem>) operation);
-		} else if(operation instanceof PathOperation) {
+		} else if (operation instanceof PathOperation) {
 			invokeDirectoryNio((PathOperation<? extends PathItem>) operation);
 		} else {
 			throw new AssertionError("Not implemented");
@@ -198,7 +202,8 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 					//TODO
 					break;
 				case CREATE:
-					//TODO: StreamManager.createStream
+					if (invokePathCreate(pathOperation)) {
+					}
 					break;
 				case READ:
 					if (invokePathRead(pathOperation)) {
@@ -225,7 +230,29 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 				LogUtil.exception(Level.DEBUG, e, "Unexpected failure");
 			}
 		}
-    }
+	}
+
+	private boolean invokePathCreate(final PathOperation<? extends PathItem> pathOp) {
+		final String path = pathOp.dstPath();
+		final StreamManager streamManager = StreamManager.create(URI.create(uriSchema));
+		final String scopeName = path.substring(0, path.indexOf("/"));
+		final String streamName = path.substring(path.indexOf("/") + 1);
+
+
+		final Function<String, Map<String, String>> createScopeComputeIfAbsent = (final String k) -> {
+			streamManager.createScope(k);
+			return new ConcurrentHashMap<String, String>();
+		};
+
+		final Function<String, String> createStreamComputeIfAbsent = (final String k) -> {
+			streamManager.createStream(scopeName, k, streamConfig);
+			return k;
+		};
+
+		Map<String, String> scopeIsNew = scopeMap.computeIfAbsent(scopeName, createScopeComputeIfAbsent);
+		scopeIsNew.computeIfAbsent(streamName, createStreamComputeIfAbsent);
+		return true;
+	}
 
 	private boolean invokePathRead(final PathOperation<? extends PathItem> pathOp) {
 		//for now we consider that we use one StreamManager only
@@ -277,16 +304,14 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 		if(streamManager.sealStream(scopeName, streamName)){
 			if(streamManager.deleteStream(scopeName, streamName)) {
 				return true;
-			}
-			else {
+			} else {
 				Loggers.ERR.debug(
 						"Failed to delete the stream {} in the scope {}", streamName,
 						scopeName);
 				pathOp.status(Operation.Status.RESP_FAIL_UNKNOWN);
 				return false;
 			}
-		}
-		else {
+		} else {
 			Loggers.ERR.debug(
 					"Failed to seal the stream {} in the scope {}", streamName,
 					scopeName);
