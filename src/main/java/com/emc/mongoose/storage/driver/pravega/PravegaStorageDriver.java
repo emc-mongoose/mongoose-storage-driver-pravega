@@ -235,9 +235,10 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 
 	private boolean invokePathCreate(final PathOperation<? extends PathItem> pathOp) {
 		final String path = pathOp.dstPath();
-		StreamManager streamManager = StreamManager.create(URI.create(uriSchema));
+		final StreamManager streamManager = StreamManager.create(URI.create(uriSchema));
 		final String scopeName = path.substring(0, path.indexOf("/"));
-		final String streamName = path.substring(path.indexOf("/")+1);
+		final String streamName = path.substring(path.indexOf("/") + 1);
+
 
 		final Function<String, Map<String, String>> createScopeComputeIfAbsent = (final String k) -> {
 			streamManager.createScope(k);
@@ -249,38 +250,9 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 			return k;
 		};
 
-		if (null != scopeMap.computeIfAbsent(scopeName,	createScopeComputeIfAbsent)) {
-			if (null != scopeMap.get(scopeName).computeIfAbsent(streamName, createStreamComputeIfAbsent)) {
-				System.out.format("Path /%s/%s successfully created", scopeName, streamName);
-				return true;
-			} else {
-				Loggers.MSG.info(
-						"Stream with name {} in {} scope not created",
-						streamName,
-						scopeName
-				);
-				pathOp.status(Operation.Status.RESP_FAIL_UNKNOWN);
-				return false;
-			}
-		} else {
-			Loggers.MSG.info(
-					"Scope with name {} already exists or cannot create",
-					scopeName
-			);
-
-			if (null != scopeMap.get(scopeName).computeIfAbsent(streamName, createStreamComputeIfAbsent)) {
-				System.out.format("Path /%s/%s successfully created", scopeName, streamName);
-				return true;
-			} else {
-				Loggers.MSG.info(
-						"Stream with name {} already exist in {} scope or cannot create",
-						streamName,
-						scopeName
-				);
-				pathOp.status(Operation.Status.RESP_FAIL_UNKNOWN);
-				return false;
-			}
-		}
+		Map<String, String> scopeIsNew = scopeMap.computeIfAbsent(scopeName, createScopeComputeIfAbsent);
+		scopeIsNew.computeIfAbsent(streamName, createStreamComputeIfAbsent);
+		return true;
 	}
 
 	private boolean invokePathRead(final PathOperation<? extends PathItem> pathOp) {
