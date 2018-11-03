@@ -190,8 +190,6 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
              EventStreamWriter<ByteBuffer> writer = clientFactory.createEventWriter(streamName,
                      null,
                      EventWriterConfig.builder().build())) {
-            final String routingKey = null;
-
 
             final long buffSize;
             try {
@@ -203,18 +201,22 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
             }
 
             final DataInput dataInput = eventItem.dataInput();
-            final long offset = eventItem.offset();
             final int dataSize = dataInput.getSize();
 
             final ByteBuffer outBuff = dataInput
                     .getLayer(eventItem.layer())
                     .asReadOnlyBuffer();
 
-            outBuff.position((int)offset);
+            outBuff.position((int)eventItem.offset());
+
+            if (dataSize > outBuff.remaining()){
+                outBuff.position(0);
+                eventItem.offset(0);
+            }
             outBuff.limit(dataSize);
 
             final CompletableFuture writeFuture = writer.writeEvent(outBuff).thenAccept(result -> {
-                eventItem.offset((offset + dataSize) % buffSize);
+                eventItem.offset((eventItem.offset() + dataSize) % buffSize);
                 eventOperation.countBytesDone(dataSize);
                 eventOperation.status(Operation.Status.SUCC);
             });
