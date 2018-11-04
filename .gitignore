@@ -5,6 +5,9 @@ out
 gen### Java template
 *.class
 
+# gradle
+.gradle
+
 # Package Files #
 *.jar
 *.war
