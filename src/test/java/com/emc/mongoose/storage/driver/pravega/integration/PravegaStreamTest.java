@@ -20,7 +20,6 @@ public class PravegaStreamTest {
 			.scalingPolicy(ScalingPolicy.fixed(1))
 			.build();
 
-/*
 	@BeforeClass
 	public static void setUpClass()
 			throws Exception {
@@ -36,7 +35,6 @@ public class PravegaStreamTest {
 			throws Exception {
 		PRAVEGA_NODE_CONTAINER.close();
 	}
-*/
 
 	@Before
 	public void initTest() {
