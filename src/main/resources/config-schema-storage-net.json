@@ -1,8 +1,8 @@
 {
 	"storage": {
-		"item": {
-			"input": {
-				"readerTimeout": "int32"
+		"driver": {
+			"read": {
+				"timeoutMillis": "int32"
 			}
 		},
 		"net": {
@@ -14,7 +14,7 @@
 			"rcvBuf": "int32",
 			"sndBuf": "int32",
 			"tcpNoDelay": "boolean",
-			"timeoutMilliSec": "int32",
+			"timeoutMillis": "int32",
 			"ssl": "boolean",
 			"node": {
 				"addrs": "list",

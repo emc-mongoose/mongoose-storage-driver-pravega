@@ -60,27 +60,27 @@ public class CommonTest {
 		private static Config getConfig() {
 			try {
 				final List<Map<String, Object>> configSchemas = Extension
-						.load(Thread.currentThread().getContextClassLoader())
-						.stream()
-						.map(Extension::schemaProvider)
-						.filter(Objects::nonNull)
-						.map(
-								schemaProvider -> {
-									try {
-										return schemaProvider.schema();
-									} catch(final Exception e) {
-										fail(e.getMessage());
-									}
-									return null;
-								}
-						)
-						.filter(Objects::nonNull)
-						.collect(Collectors.toList());
+					.load(Thread.currentThread().getContextClassLoader())
+					.stream()
+					.map(Extension::schemaProvider)
+					.filter(Objects::nonNull)
+					.map(
+						schemaProvider -> {
+							try {
+								return schemaProvider.schema();
+							} catch(final Exception e) {
+								fail(e.getMessage());
+							}
+							return null;
+						}
+					)
+					.filter(Objects::nonNull)
+					.collect(Collectors.toList());
 				SchemaProvider
-						.resolve(APP_NAME, Thread.currentThread().getContextClassLoader())
-						.stream()
-						.findFirst()
-						.ifPresent(configSchemas::add);
+					.resolve(APP_NAME, Thread.currentThread().getContextClassLoader())
+					.stream()
+					.findFirst()
+					.ifPresent(configSchemas::add);
 				final Map<String, Object> configSchema = TreeUtil.reduceForest(configSchemas);
 				final Config config = new BasicConfig("-", configSchema);
 
@@ -125,10 +125,10 @@ public class CommonTest {
 
 		private CommonTest (final Config config)
 			throws OmgShootMyFootException {
-			pravegaStorageDriver = new PravegaStorageDriver(
+			pravegaStorageDriver = null;/*new PravegaStorageDriver(
 					"tcp://127.0.0.1:9090", "test-data-pravega-driver", DATA_INPUT,
 					config.configVal("storage"), true, config.configVal("load").intVal("batch-size")
-			);
+			);*/
 		}
 
 		@BeforeClass

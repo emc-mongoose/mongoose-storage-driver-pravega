@@ -1,9 +1,8 @@
 {
 	"storage": {
-
-		"item": {
-			"input": {
-				"readerTimeout": 100
+		"driver": {
+			"read": {
+				"timeoutMMillis": 100
 			}
 		},
 		"net": {
@@ -16,7 +15,7 @@
 			"rcvBuf": 0,
 			"sndBuf": 0,
 			"tcpNoDelay": true,
-			"timeoutMilliSec": 0,
+			"timeoutMillis": 0,
 			// The flag to enable the load through SSL/TLS.
 			// Currently only HTTPS implementation is available.
 			// Have no effect if configured storage type is filesystem.

@@ -126,10 +126,10 @@ public class DataOperationsTest {
 	private DataOperationsTest(final Config config)
 			throws OmgShootMyFootException {
 
-		pravegaStorageDriver = new PravegaStorageDriver<DataItem, DataOperation<DataItem>>(
+		pravegaStorageDriver = null;/*new PravegaStorageDriver<DataItem, DataOperation<DataItem>>(
 				"tcp://127.0.0.1:9090", "test-data-pravega-driver", DATA_INPUT,
 				config.configVal("storage"), true, config.configVal("load").intVal("batch-size")
-		);
+		);*/
 	}
 
 	@BeforeClass
