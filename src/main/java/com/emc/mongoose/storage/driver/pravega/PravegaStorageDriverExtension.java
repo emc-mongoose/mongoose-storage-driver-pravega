@@ -28,7 +28,7 @@ implements StorageDriverFactory<I, O, T> {
 
 		@Override
 		protected final InputStream schemaInputStream() {
-			return getClass().getResourceAsStream("/config-schema-storage-net.json");
+			return getClass().getResourceAsStream("/config-schema-storage-" + DRIVER_NAME + ".json");
 		}
 
 		@Override
@@ -37,7 +37,7 @@ implements StorageDriverFactory<I, O, T> {
 		}
 	};
 
-	private static final String DEFAULTS_FILE_NAME = "defaults-storage-net.json";
+	private static final String DEFAULTS_FILE_NAME = "defaults-storage-" + DRIVER_NAME + ".json";
 
 	private static final List<String> RES_INSTALL_FILES = Collections.unmodifiableList(
 		Arrays.asList(

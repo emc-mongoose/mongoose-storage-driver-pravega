@@ -1,6 +1,8 @@
 package com.emc.mongoose.storage.driver.pravega;
 
 import static com.emc.mongoose.item.op.OpType.NOOP;
+import static com.emc.mongoose.item.op.Operation.Status.FAIL_UNKNOWN;
+import static com.emc.mongoose.item.op.Operation.Status.SUCC;
 import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.DEFAULT_SCOPE;
 import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.DEFAULT_URI_SCHEMA;
 import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.DRIVER_NAME;
@@ -10,29 +12,34 @@ import com.emc.mongoose.exception.OmgShootMyFootException;
 import com.emc.mongoose.item.DataItem;
 import com.emc.mongoose.item.Item;
 import com.emc.mongoose.item.ItemFactory;
-import com.emc.mongoose.item.PathItem;
 import com.emc.mongoose.item.op.OpType;
 import com.emc.mongoose.item.op.Operation;
 import com.emc.mongoose.item.op.data.DataOperation;
 import com.emc.mongoose.item.op.path.PathOperation;
+import com.emc.mongoose.logging.LogUtil;
 import com.emc.mongoose.logging.Loggers;
 import com.emc.mongoose.storage.Credential;
 import com.emc.mongoose.storage.driver.coop.CoopStorageDriverBase;
 
+import com.emc.mongoose.storage.driver.pravega.io.DataItemSerializer;
 import com.github.akurilov.commons.system.SizeInBytes;
 import com.github.akurilov.confuse.Config;
 
 import io.pravega.client.ClientFactory;
 import io.pravega.client.admin.StreamManager;
+import io.pravega.client.stream.EventStreamWriter;
 import io.pravega.client.stream.EventWriterConfig;
 import io.pravega.client.stream.ScalingPolicy;
+import io.pravega.client.stream.Serializer;
 import io.pravega.client.stream.StreamConfiguration;
+import org.apache.logging.log4j.Level;
 
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -47,16 +54,19 @@ extends CoopStorageDriverBase<I, O>  {
 	protected int outBuffSize = BUFF_SIZE_MAX;
 
 	private final AtomicInteger rrc = new AtomicInteger(0);
-	private final Map<String, URI> endpointUriByNodeAddr = new ConcurrentHashMap<>();
-	private final Map<URI, StreamManager> streamMgrsByEndpointUri = new ConcurrentHashMap<>();
-	private final Map<StreamManager, String> scopesByStreamMgr = new ConcurrentHashMap<>();
-	private final Map<URI, Map<String, ClientFactory>> clientFactories = new ConcurrentHashMap<>();
-	private final Map<String, Map<String, String>> streamsByScope = new ConcurrentHashMap<>();
 	private final StreamConfiguration streamConfig = StreamConfiguration
 		.builder()
 		.scalingPolicy(ScalingPolicy.fixed(1))
 		.build();
 	private final EventWriterConfig evtWriterConfig = EventWriterConfig.builder().build();
+	private final Serializer<DataItem> evtSerializer = new DataItemSerializer(false);
+
+	// caches
+	private final Map<String, URI> endpointUriByNodeAddr = new ConcurrentHashMap<>();
+	private final Map<URI, StreamManager> streamMgrByEndpointUri = new ConcurrentHashMap<>();
+	private final Map<URI, Map<String, ClientFactory>> clientFactories = new ConcurrentHashMap<>();
+	private final Map<String, Map<String, String>> streamsByScope = new ConcurrentHashMap<>();
+	private final Map<String, EventStreamWriter<DataItem>> evtWriterByStream = new ConcurrentHashMap<>();
 
 	public PravegaStorageDriver(
 		final String stepId, final DataInput dataInput, final Config storageConfig, final boolean verifyFlag,
@@ -67,13 +77,13 @@ extends CoopStorageDriverBase<I, O>  {
 		final Config nodeConfig = storageConfig.configVal("net-node");
 		nodePort = storageConfig.intVal("net-node-port");
 		final List<String> endpointAddrList = nodeConfig.listVal("addrs");
-		readTimeoutMillis = storageConfig.intVal("storage-driver-read-timeoutMillis");
+		readTimeoutMillis = storageConfig.intVal("driver-read-timeoutMillis");
 		endpointAddrs = endpointAddrList.toArray(new String[endpointAddrList.size()]);
 		requestAuthTokenFunc = null; // do not use
 		requestNewPathFunc = null; // do not use
 	}
 
-	URI endpointUri(final String nodeAddr) {
+	URI makeEndpointUri(final String nodeAddr) {
 		try {
 			final String addr;
 			final int port;
@@ -92,8 +102,25 @@ extends CoopStorageDriverBase<I, O>  {
 		}
 	}
 
-	private final String nextEndpointAddr() {
+	String nextEndpointAddr() {
 		return endpointAddrs[rrc.getAndIncrement() % endpointAddrs.length];
+	}
+
+	Map<String, String> createScope(final StreamManager streamMgr, final String scopeName) {
+		streamMgr.createScope(scopeName);
+		return new ConcurrentHashMap<>();
+	}
+
+	String createStream(
+		final StreamManager streamMgr, final StreamConfiguration streamConfig, final String scopeName,
+		final String streamName
+	) {
+		streamMgr.createStream(scopeName, streamName, streamConfig);
+		return streamName;
+	}
+
+	EventStreamWriter<DataItem> createEventStreamWriter(final ClientFactory clientFactory, final String streamName) {
+		return clientFactory.createEventWriter(streamName, evtSerializer, evtWriterConfig);
 	}
 
 	@Override
@@ -146,23 +173,23 @@ extends CoopStorageDriverBase<I, O>  {
 	@Override
 	protected final boolean submit(final O op)
 	throws InterruptRunException, IllegalStateException {
-		final OpType opType = op.type();
-		if(NOOP.equals(opType)) {
-			submitNoop(op);
-		} else {
-			final String nodeAddr = op.nodeAddr();
-			if(op instanceof DataOperation) {
-				final String stream = op.dstPath();
-				final DataItem evtItem = ((DataOperation) op).item();
-				submitEventOperation(evtItem, opType, nodeAddr, stream);
-			} else if(op instanceof PathOperation) {
-				final PathItem streamItem = ((PathOperation) op).item();
-				submitStreamOperation(streamItem, opType, nodeAddr);
+		if(concurrencyThrottle.tryAcquire()) {
+			final OpType opType = op.type();
+			if(NOOP.equals(opType)) {
+				submitNoop(op);
 			} else {
-				throw new AssertionError(DRIVER_NAME + " storage driver doesn't support the token operations");
+				if(op instanceof DataOperation) {
+					submitEventOperation((DataOperation) op, opType);
+				} else if(op instanceof PathOperation) {
+					submitStreamOperation((PathOperation) op, opType);
+				} else {
+					throw new AssertionError(DRIVER_NAME + " storage driver doesn't support the token operations");
+				}
 			}
+			return true;
+		} else {
+			return false;
 		}
-		return true;
 	}
 
 	@Override
@@ -190,17 +217,28 @@ extends CoopStorageDriverBase<I, O>  {
 
 	void submitNoop(final O op) {
 		op.startRequest();
+		completeOperation(op, null);
+	}
+
+	boolean completeOperation(final O op, final Throwable thrown) {
+		concurrencyThrottle.release();
 		op.finishRequest();
 		op.startResponse();
 		op.finishResponse();
-		op.status(Operation.Status.SUCC);
-		handleCompleted(op);
+		if(null == thrown) {
+			op.status(SUCC);
+		} else {
+			LogUtil.exception(Level.WARN, thrown, "Load operation failure");
+			op.status(FAIL_UNKNOWN);
+		}
+		return handleCompleted(op);
 	}
 
-	void submitEventOperation(final DataItem evtItem, final OpType opType, final String nodeAddr, final String stream) {
+	void submitEventOperation(final DataOperation evtOp, final OpType opType) {
+		final String nodeAddr = evtOp.nodeAddr();
 		switch(opType) {
 			case CREATE:
-				submitCreateEventOperation(evtItem, nodeAddr, stream);
+				submitCreateEventOperation(evtOp, nodeAddr);
 				break;
 			case READ:
 				throw new AssertionError("Not implemented");
@@ -215,39 +253,40 @@ extends CoopStorageDriverBase<I, O>  {
 		}
 	}
 
-	void submitCreateEventOperation(final DataItem evtItem, final String nodeAddr, final String streamName) {
-		final URI endpointUri = endpointUriByNodeAddr.computeIfAbsent(nodeAddr, this::endpointUri);
-		final StreamManager streamMgr = streamMgrsByEndpointUri.computeIfAbsent(endpointUri, StreamManager::create);
+	void submitCreateEventOperation(final DataOperation evtOp, final String nodeAddr) {
+		// prepare
+		final URI endpointUri = endpointUriByNodeAddr.computeIfAbsent(nodeAddr, this::makeEndpointUri);
+		final StreamManager streamMgr = streamMgrByEndpointUri.computeIfAbsent(endpointUri, StreamManager::create);
 		final String scopeName = DEFAULT_SCOPE; // TODO make this configurable
-		final Map<String, String> scopeStreams = streamsByScope.computeIfAbsent(
-			scopeName,
-			name -> {
-				streamMgr.createScope(name);
-				return new ConcurrentHashMap<String, String>();
-			}
-		);
-		scopeStreams.computeIfAbsent(
-			streamName,
-			name -> {
-				streamMgr.createStream(scopeName, name, streamConfig);
-				return streamName;
-			}
-		);
-
+		final String streamName = evtOp.dstPath();
+		streamsByScope
+			.computeIfAbsent(scopeName, name -> createScope(streamMgr, scopeName))
+			.computeIfAbsent(streamName, name -> createStream(streamMgr, streamConfig, scopeName, name));
+		final ClientFactory clientFactory = clientFactories
+			.computeIfAbsent(endpointUri, u -> new ConcurrentHashMap<>())
+			.computeIfAbsent(scopeName, name -> ClientFactory.withScope(name, endpointUri));
+		final EventStreamWriter<DataItem> evtWriter = evtWriterByStream
+			.computeIfAbsent(streamName, name -> createEventStreamWriter(clientFactory, name));
+		final DataItem evtItem = evtOp.item();
+		// submit the event writing
+		final CompletionStage<Void> writeEvtFuture = evtWriter.writeEvent(evtItem);
+		evtOp.startRequest();
+		writeEvtFuture.handle((returned, thrown) -> completeOperation((O) evtOp, thrown));
 	}
 
-	void submitStreamOperation(final PathItem streamItem, final OpType opType, final String nodeAddr) {
+	void submitStreamOperation(final PathOperation streamOp, final OpType opType) {
+		final String nodeAddr = streamOp.nodeAddr();
 		switch(opType) {
 			case CREATE:
-				submitCreateStreamOperation(streamItem, nodeAddr);
+				submitCreateStreamOperation(streamOp, nodeAddr);
 				break;
 			case READ:
-				submitReadStreamOperation(streamItem, nodeAddr);
+				submitReadStreamOperation(streamOp, nodeAddr);
 				break;
 			case UPDATE:
 				throw new AssertionError("Not implemented");
 			case DELETE:
-				submitDeleteStreamOperation(streamItem, nodeAddr);
+				submitDeleteStreamOperation(streamOp, nodeAddr);
 				break;
 			case LIST:
 				throw new AssertionError("Not implemented");
@@ -256,27 +295,31 @@ extends CoopStorageDriverBase<I, O>  {
 		}
 	}
 
-	void submitReadStreamOperation(final PathItem streamItem, final String nodeAddr) {
+	void submitReadStreamOperation(final PathOperation streamOp, final String nodeAddr) {
+		// TODO
 	}
 
-	void submitDeleteStreamOperation(final PathItem streamItem, final String nodeAddr) {
+	void submitDeleteStreamOperation(final PathOperation streamOp, final String nodeAddr) {
+		// TODO
 	}
 
-	void submitCreateStreamOperation(final PathItem streamItem, final String nodeAddr) {
+	void submitCreateStreamOperation(final PathOperation streamOp, final String nodeAddr) {
+		// TODO
 	}
 
 	@Override
 	protected void doClose()
 	throws IOException {
 		super.doClose();
-		streamsByScope
-			.values()
-			.forEach(Map::clear);
+		clientFactories.values().forEach(m -> m.values().forEach(ClientFactory::close));
+		clientFactories.clear();
+		streamsByScope.values().forEach(Map::clear);
 		streamsByScope.clear();
-		streamMgrsByEndpointUri
-			.values()
-			.forEach(StreamManager::close);
-		streamMgrsByEndpointUri.clear();
+		streamMgrByEndpointUri.values().forEach(StreamManager::close);
+		streamMgrByEndpointUri.clear();
+		endpointUriByNodeAddr.clear();
+		evtWriterByStream.values().forEach(EventStreamWriter::close);
+		evtWriterByStream.clear();
 	}
 
 	@Override
