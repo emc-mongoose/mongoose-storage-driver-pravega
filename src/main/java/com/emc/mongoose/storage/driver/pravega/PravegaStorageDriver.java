@@ -20,8 +20,8 @@ import com.emc.mongoose.logging.LogUtil;
 import com.emc.mongoose.logging.Loggers;
 import com.emc.mongoose.storage.Credential;
 import com.emc.mongoose.storage.driver.coop.CoopStorageDriverBase;
-
 import com.emc.mongoose.storage.driver.pravega.io.DataItemSerializer;
+
 import com.github.akurilov.commons.system.SizeInBytes;
 import com.github.akurilov.confuse.Config;
 
@@ -32,6 +32,7 @@ import io.pravega.client.stream.EventWriterConfig;
 import io.pravega.client.stream.ScalingPolicy;
 import io.pravega.client.stream.Serializer;
 import io.pravega.client.stream.StreamConfiguration;
+
 import org.apache.logging.log4j.Level;
 
 import java.io.IOException;
@@ -54,10 +55,7 @@ extends CoopStorageDriverBase<I, O>  {
 	protected int outBuffSize = BUFF_SIZE_MAX;
 
 	private final AtomicInteger rrc = new AtomicInteger(0);
-	private final StreamConfiguration streamConfig = StreamConfiguration
-		.builder()
-		.scalingPolicy(ScalingPolicy.fixed(1))
-		.build();
+	private final StreamConfiguration streamConfig;
 	private final EventWriterConfig evtWriterConfig = EventWriterConfig.builder().build();
 	private final Serializer<DataItem> evtSerializer = new DataItemSerializer(false);
 
@@ -73,6 +71,10 @@ extends CoopStorageDriverBase<I, O>  {
 		final int batchSize
 	) throws OmgShootMyFootException {
 		super(stepId, dataInput, storageConfig, verifyFlag, batchSize);
+		this.streamConfig = StreamConfiguration
+			.builder()
+			.scalingPolicy(ScalingPolicy.fixed(concurrencyLimit))
+			.build();
 		this.uriSchema = DEFAULT_URI_SCHEMA;
 		final Config nodeConfig = storageConfig.configVal("net-node");
 		nodePort = storageConfig.intVal("net-node-port");

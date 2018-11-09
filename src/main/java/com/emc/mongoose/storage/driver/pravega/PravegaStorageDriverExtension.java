@@ -67,8 +67,8 @@ implements StorageDriverFactory<I, O, T> {
 
 	@Override
 	public T create(
-			final String stepId, final DataInput dataInput, final Config storageConfig, final boolean verifyFlag,
-			final int batchSize
+		final String stepId, final DataInput dataInput, final Config storageConfig, final boolean verifyFlag,
+		final int batchSize
 	) throws OmgShootMyFootException, InterruptedException {
 		return (T) new PravegaStorageDriver<I, O>(
 			stepId, dataInput, storageConfig, verifyFlag, batchSize
