@@ -222,6 +222,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 						pathOperation.status(Operation.Status.RESP_FAIL_UNKNOWN);
 					}
 					if (invokePathRead(pathOperation)) {
+						System.out.format("Path Op $op was made successfully", pathOperation);
 					}
 					break;
 				case DELETE:
@@ -257,22 +258,21 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 		}
 
 		try (final ClientFactory clientFactory = ClientFactory.withScope(scopeName, controllerURI);
-		     EventStreamReader<String> reader = clientFactory.createReader("reader",
+		     final EventStreamReader<String> reader = clientFactory.createReader("reader",
 				     readerGroup,
 				     new JavaSerializer<String>(),
 				     ReaderConfig.builder().build())) {
 			System.out.format("Reading all the events from %s/%s%n", scopeName, streamName);
 			EventRead<String> event = null;
-			do {
-				try {
-					event = reader.readNextEvent(Constants.READER_TIMEOUT_MS);
+			try {
+				for (event = reader.readNextEvent(readerTimeoutMs); null != event.getEvent(); ) {
 					if (event.getEvent() != null) {
 						System.out.format("Read event '%s'%n", event.getEvent());
 					}
-				} catch (ReinitializationRequiredException e) {
-					e.printStackTrace();
 				}
-			} while (event.getEvent() != null);
+			} catch (ReinitializationRequiredException e) {
+				e.printStackTrace();
+			}
 			System.out.format("No more events from %s/%s%n", scopeName, streamName);
 		}
 		return true;
@@ -297,25 +297,25 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 		}
 
 		try (final ClientFactory clientFactory = ClientFactory.withScope(scope, controllerURI);
-		     EventStreamReader<String> reader = clientFactory.createReader("reader",
+		     final EventStreamReader<String> reader = clientFactory.createReader("reader",
 				     readerGroup,
 				     new JavaSerializer<String>(),
 				     ReaderConfig.builder().build())) {
 			System.out.format("Reading all the events from %s/%s%n", scope, streamName);
 			EventRead<String> event = null;
-			do {
-				try {
-					event = reader.readNextEvent(Constants.READER_TIMEOUT_MS);
+			try {
+				for (event = reader.readNextEvent(readerTimeoutMs); null != event.getEvent(); ) {
 					if (event.getEvent() != null) {
 						System.out.format("Read event '%s'%n", event.getEvent());
 						//should we store events?
 					}
-				} catch (ReinitializationRequiredException e) {
-					//There are certain circumstances where the reader needs to be reinitialized
-					//map it to some internal error of Mongoose?
-					e.printStackTrace();
 				}
-			} while (event.getEvent() != null);
+			} catch (ReinitializationRequiredException e) {
+				//There are certain circumstances where the reader needs to be reinitialized
+				//map it to some internal error of Mongoose?
+				e.printStackTrace();
+			}
+
 			System.out.format("No more events from %s/%s%n", scope, streamName);
 		}
 		return true;
