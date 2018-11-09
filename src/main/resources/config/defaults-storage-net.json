@@ -1,5 +1,11 @@
 {
 	"storage": {
+
+		"item": {
+			"input": {
+				"readerTimeout": 100
+			}
+		},
 		"net": {
 			// Socket options
 			"bindBacklogSize": 0,

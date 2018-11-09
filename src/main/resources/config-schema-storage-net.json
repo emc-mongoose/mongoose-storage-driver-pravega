@@ -1,5 +1,10 @@
 {
 	"storage": {
+		"item": {
+			"input": {
+				"readerTimeout": "int32"
+			}
+		},
 		"net": {
 			"bindBacklogSize": "int32",
 			"interestOpQueued": "boolean",
