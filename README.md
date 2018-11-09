@@ -35,12 +35,13 @@ The storage driver extends the Mongoose's Abstract Coop Storage Driver and uses 
 
 * Authentication: TBD
 * SSL/TLS: TBD
-* Item Types: `data`, `path`
+* Item Types:
+    * `data` -> "event"
+    * `path` -> "stream"
 * Supported load operations:
-    * `create`
-    * `read`
-    * `update` (append only)
-    * `delete`
+    * `create` (events, streams)
+    * `read` (events)
+    * `delete` (streams)
 * Storage-specific:
     * Stream sealing
     * Routing keys
@@ -108,12 +109,9 @@ Mongoose and Pravega are using different concepts. So it's necessary to determin
 | Pravega | Mongoose |
 |---------|----------|
 | [Stream](http://pravega.io/docs/latest/pravega-concepts/#streams) | *Path Item* |
-| Scope | *Storage Path* part (*stream name* is the 2nd part) |
+| Scope | Storage Namespace
 | [Event](http://pravega.io/docs/latest/pravega-concepts/#events) | *Data Item* |
 | Stream Segment | N/A |
-
-**Note**:
-> The Pravega storage driver should extend the NIO storage driver base.
 
 ## 4.1. Data Item Operations
 
@@ -137,6 +135,11 @@ that it returns the `CompletableFuture` which should be handled properly.
 1. Get an `EventStreamReader<ByteBuffer>` instance
 2. Read the next event using the method `readNextEvent` using some very small timeout (check if 0 is possible)
 
+There is also another option, called `storage-driver-read-timeoutMillis`. Pravega documentation says it only works when
+there is no available event in the stream. `readNextEvent()` will block for the specified time in ms. So, in theory 0
+and 1 should work just fine. They do not. In practice, this value should be somewhere between 100 and 2000 ms (2000 is
+Pravega default value).
+
 ### 4.1.3. Update
 
 Not supported. Stream append may be performed using `create` load operation type.
@@ -152,24 +155,20 @@ Mongoose should perform the load operations on the *streams* when the configurat
 ### 4.2.1. Create
 
 1. Check the corresponding scope if it exists and create it if not.
-2. Invoke `StreamManager.createStream` using *item path* as a *scope name* and *item id* as a *stream name*. Fail the
-load operation using the status code *14* if the method returns `false`.
+2. Invoke `StreamManager.createStream` using *item path* as a *scope name* and *item id* as a *stream name*.
 
 ### 4.2.2. Read
 
-For each item read the whole corresponding stream. Unlike events, it's possible to read the streams in the random order
-so both `item-input-path` (scope's streams listing) and `item-input-file` (stream ids list) options should be supported.
+TBD
 
-There is also another option, called `reader-timeout`. Pravega documentation says it only works when there is no available Event 
-in the stream. `readNextEvent()` will block for the specified time in ms. So, in theory 0 and 1 should work just fine. 
-They do not. In practice, this value should be somewhere between 100 and 2000 ms (2000 is Pravega default value).
 ### 4.2.3. Update
 
 Not supported
 
 ### 4.2.4. Delete
 
-A deletion of a path composed of a scope and a stream is implemented through `invokePathDelete()` method. Before the deletion, the stream must be sealed because of Pravega concepts. So the sealing of the stream is done in `invokePathDelete()` method too.
+Before the deletion, the stream must be sealed because of Pravega concepts. So the sealing of the stream is done during
+the deletion too.
 
 ## 4.2. Open Issues
 
