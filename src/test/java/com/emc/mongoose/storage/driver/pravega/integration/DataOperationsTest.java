@@ -127,7 +127,7 @@ public class DataOperationsTest {
 			throws OmgShootMyFootException {
 
 		pravegaStorageDriver = new PravegaStorageDriver<DataItem, DataOperation<DataItem>>(
-				"tcp://127.0.0.1:9090", "test-data-pravega-driver", DATA_INPUT,
+				"test-data-pravega-driver", DATA_INPUT,
 				config.configVal("storage"), true, config.configVal("load").intVal("batch-size")
 		);
 	}
