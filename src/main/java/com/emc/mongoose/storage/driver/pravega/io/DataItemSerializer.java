@@ -2,6 +2,8 @@ package com.emc.mongoose.storage.driver.pravega.io;
 
 import com.emc.mongoose.item.DataItem;
 
+import com.emc.mongoose.logging.Loggers;
+import com.github.akurilov.commons.system.SizeInBytes;
 import io.pravega.client.stream.Serializer;
 
 import java.io.IOException;
@@ -29,12 +31,18 @@ implements Serializer<DataItem>, Serializable {
 	 */
 	@Override
 	public final ByteBuffer serialize(final DataItem dataItem)
-	throws OutOfMemoryError {
+	throws OutOfMemoryError, IllegalArgumentException {
 		final ByteBuffer dstBuff;
 		try {
 			final long dataItemSize = dataItem.size();
 			if(Integer.MAX_VALUE < dataItemSize) {
 				throw new IllegalArgumentException("Can't serialize the data item with size > 2^31 - 1");
+			}
+			if(MAX_EVENT_SIZE < dataItemSize) {
+				Loggers.ERR.warn(
+					"Event size is {}, Pravega storage doesn't support the event size more than {}",
+					SizeInBytes.formatFixedSize(dataItemSize), SizeInBytes.formatFixedSize(MAX_EVENT_SIZE)
+				);
 			}
 			if(useDirectMem) {
 				dstBuff = ByteBuffer.allocateDirect((int) dataItemSize); // will crash if not enough memory

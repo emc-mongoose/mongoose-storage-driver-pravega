@@ -96,18 +96,17 @@ public class CommonTest {
 				config.val("storage-net-tcpNoDelay", false);
 				config.val("storage-net-interestOpQueued", false);
 				config.val("storage-net-linger", 0);
-				config.val("storage-net-timeoutMilliSec", 0);
+				config.val("storage-net-timeoutMillis", 0);
 				config.val("storage-net-node-addrs", Collections.singletonList("127.0.0.1"));
 				config.val("storage-net-node-port", PravegaNodeContainer.PORT);
 				config.val("storage-net-node-connAttemptsLimit", 0);
-
-				config.val("storage-item-input-readerTimeout", 100);
 
 				config.val("storage-auth-uid", CREDENTIAL.getUid());
 				config.val("storage-auth-token", null);
 				config.val("storage-auth-secret", CREDENTIAL.getSecret());
 
 
+				config.val("storage-driver-read-timeoutMillis", 100);
 				config.val("storage-driver-threads", 0);
 				config.val("storage-driver-limit-queue-input", 1_000_000);
 				config.val("storage-driver-limit-queue-output", 1_000_000);
@@ -125,10 +124,10 @@ public class CommonTest {
 
 		private CommonTest (final Config config)
 			throws OmgShootMyFootException {
-			pravegaStorageDriver = null;/*new PravegaStorageDriver(
-					"tcp://127.0.0.1:9090", "test-data-pravega-driver", DATA_INPUT,
-					config.configVal("storage"), true, config.configVal("load").intVal("batch-size")
-			);*/
+			pravegaStorageDriver = new PravegaStorageDriver(
+				"test-data-pravega-driver", DATA_INPUT, config.configVal("storage"), true,
+				config.configVal("load").intVal("batch-size")
+			);
 		}
 
 		@BeforeClass

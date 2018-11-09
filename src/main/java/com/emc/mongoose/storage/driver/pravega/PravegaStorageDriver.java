@@ -295,15 +295,15 @@ extends CoopStorageDriverBase<I, O>  {
 		}
 	}
 
+	void submitCreateStreamOperation(final PathOperation streamOp, final String nodeAddr) {
+		// TODO
+	}
+
 	void submitReadStreamOperation(final PathOperation streamOp, final String nodeAddr) {
 		// TODO
 	}
 
 	void submitDeleteStreamOperation(final PathOperation streamOp, final String nodeAddr) {
-		// TODO
-	}
-
-	void submitCreateStreamOperation(final PathOperation streamOp, final String nodeAddr) {
 		// TODO
 	}
 
