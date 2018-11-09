@@ -52,7 +52,7 @@ public class MongooseContainer
 
 	private static final String MONGOOSE_DIR = Paths.get(USER_HOME, "." + APP_NAME, APP_VERSION).toString();
 	public static final String CONTAINER_SHARE_PATH = "/root/.mongoose/" + APP_VERSION + "/share";
-	public static final Path HOST_SHARE_PATH = Paths.get(MONGOOSE_DIR, "log");
+	public static final Path HOST_SHARE_PATH = Paths.get(MONGOOSE_DIR, "share");
 
 	static {
 		HOST_SHARE_PATH.toFile().mkdir();
