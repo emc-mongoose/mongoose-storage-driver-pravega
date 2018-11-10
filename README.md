@@ -184,6 +184,29 @@ TODO
 
 ## 5.2. Test
 
+### 5.2.1. Automated
+
 ```bash
 ./gradlew clean test
+```
+
+### 5.2.1. Manual
+
+1. Build the storage driver
+2. Copy the storage driver's jar file into the mongoose's `ext` directory:
+```bash
+cp -f build/libs/mongoose-storage-driver-pravega.jar ~/.mongoose/<VERSION>/ext/
+```
+3. Run the Pravega standalone node:
+```bash
+docker run --network host --expose 9090 pravega/pravega standalone
+```
+4. Run some Mongoose scenario:
+```bash
+java -jar mongoose-<VERSION>.jar \
+    --storage-driver-type=pravega \
+    --storage-net-node-port=9090 \
+    --item-data-size=1000 \
+    --storage-driver-limit-concurrency=100 \
+    --item-output-path=goose-events-stream-0
 ```

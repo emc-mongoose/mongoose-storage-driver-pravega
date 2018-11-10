@@ -14,6 +14,7 @@ import com.emc.mongoose.item.Item;
 import com.emc.mongoose.item.ItemFactory;
 import com.emc.mongoose.item.op.OpType;
 import com.emc.mongoose.item.op.Operation;
+import com.emc.mongoose.item.op.Operation.Status;
 import com.emc.mongoose.item.op.data.DataOperation;
 import com.emc.mongoose.item.op.path.PathOperation;
 import com.emc.mongoose.logging.LogUtil;
@@ -108,17 +109,33 @@ extends CoopStorageDriverBase<I, O>  {
 		return endpointAddrs[rrc.getAndIncrement() % endpointAddrs.length];
 	}
 
-	Map<String, String> createScope(final StreamManager streamMgr, final String scopeName) {
-		streamMgr.createScope(scopeName);
-		return new ConcurrentHashMap<>();
+	Map<String, String> createScope(final StreamManager streamMgr, final String scopeName)
+	throws ScopeCreateException {
+		try {
+			if(!streamMgr.createScope(scopeName)) {
+				Loggers.ERR.warn("{}: scope \"{}\" was not created, may be already existing before", stepId, scopeName);
+			}
+			return new ConcurrentHashMap<>();
+		} catch(final Throwable cause) {
+			throw new ScopeCreateException(scopeName, cause);
+		}
 	}
 
 	String createStream(
 		final StreamManager streamMgr, final StreamConfiguration streamConfig, final String scopeName,
 		final String streamName
-	) {
-		streamMgr.createStream(scopeName, streamName, streamConfig);
-		return streamName;
+	) throws StreamCreateException {
+		try {
+			if(!streamMgr.createStream(scopeName, streamName, streamConfig)) {
+				Loggers.ERR.warn(
+					"{}: stream \"{}\" was not created @ the scope \"{}\", may be already existing before", stepId,
+					streamName, scopeName
+				);
+			}
+			return streamName;
+		} catch(final Throwable cause) {
+			throw new StreamCreateException(streamName, cause);
+		}
 	}
 
 	EventStreamWriter<DataItem> createEventStreamWriter(final ClientFactory clientFactory, final String streamName) {
@@ -140,6 +157,7 @@ extends CoopStorageDriverBase<I, O>  {
 		final ItemFactory<I> itemFactory, final String path, final String prefix, final int idRadix,
 		final I lastPrevItem, final int count
 	) throws IOException {
+		// TODO: Evgeny, issue SDP-50
 		return null;
 	}
 
@@ -219,21 +237,33 @@ extends CoopStorageDriverBase<I, O>  {
 
 	void submitNoop(final O op) {
 		op.startRequest();
-		completeOperation(op, null);
+		completeOperation(op, SUCC);
 	}
 
-	boolean completeOperation(final O op, final Throwable thrown) {
+	boolean completeOperation(final O op, final Status status) {
 		concurrencyThrottle.release();
+		op.status(status);
 		op.finishRequest();
 		op.startResponse();
 		op.finishResponse();
-		if(null == thrown) {
-			op.status(SUCC);
-		} else {
-			LogUtil.exception(Level.WARN, thrown, "Load operation failure");
-			op.status(FAIL_UNKNOWN);
-		}
 		return handleCompleted(op);
+	}
+
+	boolean completeFailedOperation(final O op, final Throwable thrown) {
+		LogUtil.exception(Level.WARN, thrown, "{}: unexpected load operation failure", stepId);
+		return completeOperation(op, FAIL_UNKNOWN);
+	}
+
+	boolean completeCreateEventOperation(final DataOperation evtOp, final DataItem evtItem, final Throwable thrown) {
+		if(null == thrown) {
+			try {
+				evtOp.countBytesDone(evtItem.size());
+			} catch(final IOException ignored) {
+			}
+			return completeOperation((O) evtOp, SUCC);
+		} else {
+			return completeFailedOperation((O) evtOp, thrown);
+		}
 	}
 
 	void submitEventOperation(final DataOperation evtOp, final OpType opType) {
@@ -243,7 +273,7 @@ extends CoopStorageDriverBase<I, O>  {
 				submitCreateEventOperation(evtOp, nodeAddr);
 				break;
 			case READ:
-				throw new AssertionError("Not implemented");
+				submitReadEventOperation(evtOp, nodeAddr);
 			case UPDATE:
 				throw new AssertionError("Not implemented");
 			case DELETE:
@@ -257,23 +287,39 @@ extends CoopStorageDriverBase<I, O>  {
 
 	void submitCreateEventOperation(final DataOperation evtOp, final String nodeAddr) {
 		// prepare
-		final URI endpointUri = endpointUriByNodeAddr.computeIfAbsent(nodeAddr, this::makeEndpointUri);
-		final StreamManager streamMgr = streamMgrByEndpointUri.computeIfAbsent(endpointUri, StreamManager::create);
-		final String scopeName = DEFAULT_SCOPE; // TODO make this configurable
-		final String streamName = evtOp.dstPath();
-		streamsByScope
-			.computeIfAbsent(scopeName, name -> createScope(streamMgr, scopeName))
-			.computeIfAbsent(streamName, name -> createStream(streamMgr, streamConfig, scopeName, name));
-		final ClientFactory clientFactory = clientFactories
-			.computeIfAbsent(endpointUri, u -> new ConcurrentHashMap<>())
-			.computeIfAbsent(scopeName, name -> ClientFactory.withScope(name, endpointUri));
-		final EventStreamWriter<DataItem> evtWriter = evtWriterByStream
-			.computeIfAbsent(streamName, name -> createEventStreamWriter(clientFactory, name));
-		final DataItem evtItem = evtOp.item();
-		// submit the event writing
-		final CompletionStage<Void> writeEvtFuture = evtWriter.writeEvent(evtItem);
-		evtOp.startRequest();
-		writeEvtFuture.handle((returned, thrown) -> completeOperation((O) evtOp, thrown));
+		try {
+			final URI endpointUri = endpointUriByNodeAddr.computeIfAbsent(nodeAddr, this::makeEndpointUri);
+			final StreamManager streamMgr = streamMgrByEndpointUri.computeIfAbsent(endpointUri, StreamManager::create);
+			final String scopeName = DEFAULT_SCOPE; // TODO make this configurable
+			final String streamName = evtOp.dstPath();
+			streamsByScope
+				.computeIfAbsent(scopeName, name -> createScope(streamMgr, name))
+				.computeIfAbsent(streamName, name -> createStream(streamMgr, streamConfig, scopeName, name));
+			final ClientFactory clientFactory = clientFactories
+				.computeIfAbsent(endpointUri, uri -> new ConcurrentHashMap<>())
+				.computeIfAbsent(scopeName, name -> ClientFactory.withScope(name, endpointUri));
+			final EventStreamWriter<DataItem> evtWriter = evtWriterByStream
+				.computeIfAbsent(streamName, name -> createEventStreamWriter(clientFactory, name));
+			final DataItem evtItem = evtOp.item();
+			// submit the event writing
+			final CompletionStage<Void> writeEvtFuture = evtWriter.writeEvent(evtItem);
+			evtOp.startRequest();
+			writeEvtFuture.handle((returned, thrown) -> completeCreateEventOperation(evtOp, evtItem, thrown));
+		} catch(final ScopeCreateException e) {
+			LogUtil.exception(Level.WARN, e.getCause(), "{}: failed to create the scope \"{}\"", stepId, e.scopeName());
+			completeOperation((O) evtOp, Status.RESP_FAIL_CLIENT);
+		} catch(final StreamCreateException e) {
+			LogUtil.exception(
+				Level.WARN, e.getCause(), "{}: failed to create the stream \"{}\"", stepId, e.streamName()
+			);
+			completeOperation((O) evtOp, Status.RESP_FAIL_CLIENT);
+		} catch(final Throwable cause) {
+			completeFailedOperation((O) evtOp, cause);
+		}
+	}
+
+	void submitReadEventOperation(final DataOperation evtOp, final String nodeAddr) {
+		// TODO: Evgeny, issue SDP-50
 	}
 
 	void submitStreamOperation(final PathOperation streamOp, final OpType opType) {
@@ -283,8 +329,7 @@ extends CoopStorageDriverBase<I, O>  {
 				submitCreateStreamOperation(streamOp, nodeAddr);
 				break;
 			case READ:
-				submitReadStreamOperation(streamOp, nodeAddr);
-				break;
+				throw new AssertionError("Not implemented");
 			case UPDATE:
 				throw new AssertionError("Not implemented");
 			case DELETE:
@@ -298,15 +343,11 @@ extends CoopStorageDriverBase<I, O>  {
 	}
 
 	void submitCreateStreamOperation(final PathOperation streamOp, final String nodeAddr) {
-		// TODO
-	}
-
-	void submitReadStreamOperation(final PathOperation streamOp, final String nodeAddr) {
-		// TODO
+		// TODO: Vlad, issue SDP-47
 	}
 
 	void submitDeleteStreamOperation(final PathOperation streamOp, final String nodeAddr) {
-		// TODO
+		// TODO: Igor, issue SDP-49
 	}
 
 	@Override
