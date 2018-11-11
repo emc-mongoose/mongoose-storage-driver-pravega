@@ -105,7 +105,8 @@ private static final DataInput DATA_INPUT;
 			config.val("storage-auth-token", null);
 			config.val("storage-auth-secret", CREDENTIAL.getSecret());
 
-
+			config.val("storage-driver-create-key-enabled", false);
+			config.val("storage-driver-create-key-count", 0);
 			config.val("storage-driver-read-timeoutMillis", 100);
 			config.val("storage-driver-threads", 0);
 			config.val("storage-driver-limit-queue-input", 1_000_000);
