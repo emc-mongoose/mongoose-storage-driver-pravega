@@ -338,7 +338,7 @@ extends CoopStorageDriverBase<I, O>  {
 		return completeOperation(op, FAIL_UNKNOWN);
 	}
 
-	boolean completeCreateEventOperation(final DataOperation evtOp, final DataItem evtItem, final Throwable thrown) {
+	boolean completeEventCreateOperation(final DataOperation evtOp, final DataItem evtItem, final Throwable thrown) {
 		if(null == thrown) {
 			try {
 				evtOp.countBytesDone(evtItem.size());
@@ -354,10 +354,10 @@ extends CoopStorageDriverBase<I, O>  {
 		final String nodeAddr = evtOp.nodeAddr();
 		switch(opType) {
 			case CREATE:
-				submitCreateEventOperation(evtOp, nodeAddr);
+				submitEventCreateOperation(evtOp, nodeAddr);
 				break;
 			case READ:
-				submitReadEventOperation(evtOp, nodeAddr);
+				submitEventReadOperation(evtOp, nodeAddr);
 				break;
 			case UPDATE:
 				throw new AssertionError("Not implemented");
@@ -370,7 +370,7 @@ extends CoopStorageDriverBase<I, O>  {
 		}
 	}
 
-	void submitCreateEventOperation(final DataOperation evtOp, final String nodeAddr) {
+	void submitEventCreateOperation(final DataOperation evtOp, final String nodeAddr) {
 		try {
 			// prepare
 			final URI endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::makeEndpointUri);
@@ -414,7 +414,7 @@ extends CoopStorageDriverBase<I, O>  {
 				writeEvtFuture = evtWriter.writeEvent(evtItem);
 			}
 			evtOp.startRequest();
-			writeEvtFuture.handle((returned, thrown) -> completeCreateEventOperation(evtOp, evtItem, thrown));
+			writeEvtFuture.handle((returned, thrown) -> completeEventCreateOperation(evtOp, evtItem, thrown));
 		} catch(final ScopeCreateException e) {
 			LogUtil.exception(Level.WARN, e.getCause(), "{}: failed to create the scope \"{}\"", stepId, e.scopeName());
 			completeOperation((O) evtOp, RESP_FAIL_CLIENT);
@@ -434,7 +434,7 @@ extends CoopStorageDriverBase<I, O>  {
 		}
 	}
 
-	void submitReadEventOperation(final DataOperation evtOp, final String nodeAddr) {
+	void submitEventReadOperation(final DataOperation evtOp, final String nodeAddr) {
 		// TODO: Evgeny, issue SDP-50
 	}
 
@@ -442,14 +442,14 @@ extends CoopStorageDriverBase<I, O>  {
 		final String nodeAddr = streamOp.nodeAddr();
 		switch(opType) {
 			case CREATE:
-				submitCreateStreamOperation(streamOp, nodeAddr);
+				submitStreamCreateOperation(streamOp, nodeAddr);
 				break;
 			case READ:
 				throw new AssertionError("Not implemented");
 			case UPDATE:
 				throw new AssertionError("Not implemented");
 			case DELETE:
-				submitDeleteStreamOperation(streamOp, nodeAddr);
+				submitStreamDeleteOperation(streamOp, nodeAddr);
 				break;
 			case LIST:
 				throw new AssertionError("Not implemented");
@@ -458,11 +458,11 @@ extends CoopStorageDriverBase<I, O>  {
 		}
 	}
 
-	void submitCreateStreamOperation(final PathOperation streamOp, final String nodeAddr) {
+	void submitStreamCreateOperation(final PathOperation streamOp, final String nodeAddr) {
 		// TODO: Vlad, issue SDP-47
 	}
 
-	void submitDeleteStreamOperation(final PathOperation streamOp, final String nodeAddr) {
+	void submitStreamDeleteOperation(final PathOperation streamOp, final String nodeAddr) {
 		// TODO: Igor, issue SDP-49
 	}
 
