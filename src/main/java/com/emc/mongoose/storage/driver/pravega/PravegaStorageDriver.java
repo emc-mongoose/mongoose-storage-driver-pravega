@@ -445,7 +445,8 @@ extends CoopStorageDriverBase<I, O>  {
 				submitStreamCreateOperation(streamOp, nodeAddr);
 				break;
 			case READ:
-				throw new AssertionError("Not implemented");
+				submitStreamReadOperation(streamOp, nodeAddr);
+				break;
 			case UPDATE:
 				throw new AssertionError("Not implemented");
 			case DELETE:
@@ -460,6 +461,10 @@ extends CoopStorageDriverBase<I, O>  {
 
 	void submitStreamCreateOperation(final PathOperation streamOp, final String nodeAddr) {
 		// TODO: Vlad, issue SDP-47
+	}
+
+	void submitStreamReadOperation(final PathOperation streamOp, final String nodeAddr) {
+		// TODO: Alex, issue SDP-51
 	}
 
 	void submitStreamDeleteOperation(final PathOperation streamOp, final String nodeAddr) {
