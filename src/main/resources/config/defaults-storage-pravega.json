@@ -1,6 +1,12 @@
 {
 	"storage": {
 		"driver": {
+			"create": {
+				"key": {
+					"enabled": false,
+					"count": 0
+				}
+			},
 			"read": {
 				"timeoutMillis": 100
 			}

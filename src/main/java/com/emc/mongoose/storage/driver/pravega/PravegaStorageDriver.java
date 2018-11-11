@@ -2,6 +2,8 @@ package com.emc.mongoose.storage.driver.pravega;
 
 import static com.emc.mongoose.item.op.OpType.NOOP;
 import static com.emc.mongoose.item.op.Operation.Status.FAIL_UNKNOWN;
+import static com.emc.mongoose.item.op.Operation.Status.INTERRUPTED;
+import static com.emc.mongoose.item.op.Operation.Status.RESP_FAIL_CLIENT;
 import static com.emc.mongoose.item.op.Operation.Status.SUCC;
 import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.DEFAULT_SCOPE;
 import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.DEFAULT_URI_SCHEMA;
@@ -21,9 +23,15 @@ import com.emc.mongoose.logging.LogUtil;
 import com.emc.mongoose.logging.Loggers;
 import com.emc.mongoose.storage.Credential;
 import com.emc.mongoose.storage.driver.coop.CoopStorageDriverBase;
+import com.emc.mongoose.storage.driver.pravega.cache.ClientFactoryCreateFunction;
+import com.emc.mongoose.storage.driver.pravega.cache.ClientFactoryCreateFunctionImpl;
+import com.emc.mongoose.storage.driver.pravega.cache.ScopeCreateFunction;
+import com.emc.mongoose.storage.driver.pravega.cache.StreamCreateFunction;
+import com.emc.mongoose.storage.driver.pravega.cache.EventWriterCreateFunction;
+import com.emc.mongoose.storage.driver.pravega.exception.ScopeCreateException;
+import com.emc.mongoose.storage.driver.pravega.exception.StreamCreateException;
 import com.emc.mongoose.storage.driver.pravega.io.DataItemSerializer;
 
-import com.github.akurilov.commons.system.SizeInBytes;
 import com.github.akurilov.confuse.Config;
 
 import io.pravega.client.ClientFactory;
@@ -51,21 +59,131 @@ extends CoopStorageDriverBase<I, O>  {
 	protected final String uriSchema;
 	protected final String[] endpointAddrs;
 	protected final int nodePort;
+	protected final boolean createRoutingKeys;
+	protected final long createRoutingKeysPeriod;
 	protected final int readTimeoutMillis;
-	protected int inBuffSize = BUFF_SIZE_MIN;
-	protected int outBuffSize = BUFF_SIZE_MAX;
-
+	protected final Serializer<DataItem> evtSerializer = new DataItemSerializer(false);
+	protected final EventWriterConfig evtWriterConfig = EventWriterConfig.builder().build();
+	// round-robin counter to select the endpoint node for each load operation in order to distribute them uniformly
 	private final AtomicInteger rrc = new AtomicInteger(0);
 	private final StreamConfiguration streamConfig;
-	private final EventWriterConfig evtWriterConfig = EventWriterConfig.builder().build();
-	private final Serializer<DataItem> evtSerializer = new DataItemSerializer(false);
 
-	// caches
-	private final Map<String, URI> endpointUriByNodeAddr = new ConcurrentHashMap<>();
-	private final Map<URI, StreamManager> streamMgrByEndpointUri = new ConcurrentHashMap<>();
-	private final Map<URI, Map<String, ClientFactory>> clientFactories = new ConcurrentHashMap<>();
-	private final Map<String, Map<String, String>> streamsByScope = new ConcurrentHashMap<>();
-	private final Map<String, EventStreamWriter<DataItem>> evtWriterByStream = new ConcurrentHashMap<>();
+	// should be an inner class in order to access the stream create function implementation constructor
+	final class ScopeCreateFunctionImpl
+	implements ScopeCreateFunction {
+
+		private final StreamManager streamMgr;
+
+		public ScopeCreateFunctionImpl(final StreamManager streamMgr) {
+			this.streamMgr = streamMgr;
+		}
+
+		@Override
+		public final StreamCreateFunction apply(final String scopeName)
+		throws ScopeCreateException {
+			try {
+				if(!streamMgr.createScope(scopeName)) {
+					Loggers.ERR.warn("Scope \"{}\" was not created, may be already existing before", scopeName);
+				}
+				return new StreamCreateFunctionImpl(streamMgr, scopeName);
+			} catch(final Throwable cause) {
+				throw new ScopeCreateException(scopeName, cause);
+			}
+		}
+	}
+
+	// should be an inner class in order to access the storage driver instance stream config field
+	final class StreamCreateFunctionImpl
+	implements StreamCreateFunction {
+
+		private final StreamManager streamMgr;
+		private final String scopeName;
+
+		public StreamCreateFunctionImpl(
+			final StreamManager streamMgr, final String scopeName
+		) {
+			this.streamMgr = streamMgr;
+			this.scopeName = scopeName;
+		}
+
+		@Override
+		public final String apply(final String streamName) {
+			try {
+				if(!streamMgr.createStream(scopeName, streamName, streamConfig)) {
+					Loggers.ERR.warn(
+						"Stream \"{}\" was not created @ the scope \"{}\", may be already existing before", streamName,
+						scopeName
+					);
+				}
+				return streamName;
+			} catch(final Throwable cause) {
+				throw new StreamCreateException(streamName, cause);
+			}
+		}
+
+		@Override
+		public final int hashCode() {
+			return streamMgr.hashCode() ^ streamConfig.hashCode() ^ scopeName.hashCode();
+		}
+
+		@Override
+		public final boolean equals(final Object other) {
+			if(other instanceof StreamCreateFunction) {
+				final StreamCreateFunctionImpl that = (StreamCreateFunctionImpl) other;
+				return this.streamMgr.equals(that.streamMgr) && this.scopeName.equals(that.scopeName);
+			} else {
+				return false;
+			}
+		}
+	}
+
+	// should be an inner class in order to access the storage driver instance's fields (serializer, writer config)
+	final class EventWriterCreateFunctionImpl
+	implements EventWriterCreateFunction {
+
+		private final ClientFactory clientFactory;
+
+		public EventWriterCreateFunctionImpl(final ClientFactory clientFactory) {
+			this.clientFactory = clientFactory;
+		}
+
+		@Override
+		public final EventStreamWriter<DataItem> apply(final String streamName) {
+			return clientFactory.createEventWriter(streamName, evtSerializer, evtWriterConfig);
+		}
+
+		@Override
+		public final int hashCode() {
+			return clientFactory.hashCode();
+		}
+
+		@Override
+		public final boolean equals(final Object other) {
+			if(other instanceof EventWriterCreateFunction) {
+				final EventWriterCreateFunctionImpl that = (EventWriterCreateFunctionImpl) other;
+				return this.clientFactory.equals(that.clientFactory);
+			} else {
+				return false;
+			}
+		}
+	}
+
+	// caches allowing the lazy creation of the necessary things:
+	// * endpoints
+	private final Map<String, URI> endpointCache = new ConcurrentHashMap<>();
+	// * stream managers
+	private final Map<URI, StreamManager> streamMgrCache = new ConcurrentHashMap<>();
+	// * scopes
+	private final Map<StreamManager, ScopeCreateFunction> scopeCreateFuncCache = new ConcurrentHashMap<>();
+	private final Map<String, StreamCreateFunction> streamCreateFuncCache = new ConcurrentHashMap<>();
+	// * streams
+	private final Map<String, Map<String, String>> scopeStreamsCache = new ConcurrentHashMap<>();
+	// * client factories
+	private final Map<URI, ClientFactoryCreateFunction> clientFactoryCreateFuncCache = new ConcurrentHashMap<>();
+	private final Map<String, ClientFactory> clientFactoryCache = new ConcurrentHashMap<>();
+	// * event writers
+	private final Map<ClientFactory, EventWriterCreateFunction> evtWriterCreateFuncCache = new ConcurrentHashMap<>();
+	private final Map<String, EventStreamWriter<DataItem>> evtWriterCache = new ConcurrentHashMap<>();
 
 	public PravegaStorageDriver(
 		final String stepId, final DataInput dataInput, final Config storageConfig, final boolean verifyFlag,
@@ -80,10 +198,18 @@ extends CoopStorageDriverBase<I, O>  {
 		final Config nodeConfig = storageConfig.configVal("net-node");
 		nodePort = storageConfig.intVal("net-node-port");
 		final List<String> endpointAddrList = nodeConfig.listVal("addrs");
-		readTimeoutMillis = storageConfig.intVal("driver-read-timeoutMillis");
+		final Config driverConfig = storageConfig.configVal("driver");
+		final Config createRoutingKeysConfig = driverConfig.configVal("create-key");
+		createRoutingKeys = createRoutingKeysConfig.boolVal("enabled");
+		createRoutingKeysPeriod = createRoutingKeysConfig.longVal("count");
+		readTimeoutMillis = driverConfig.intVal("read-timeoutMillis");
 		endpointAddrs = endpointAddrList.toArray(new String[endpointAddrList.size()]);
 		requestAuthTokenFunc = null; // do not use
 		requestNewPathFunc = null; // do not use
+	}
+
+	String nextEndpointAddr() {
+		return endpointAddrs[rrc.getAndIncrement() % endpointAddrs.length];
 	}
 
 	URI makeEndpointUri(final String nodeAddr) {
@@ -105,48 +231,17 @@ extends CoopStorageDriverBase<I, O>  {
 		}
 	}
 
-	String nextEndpointAddr() {
-		return endpointAddrs[rrc.getAndIncrement() % endpointAddrs.length];
-	}
-
-	Map<String, String> createScope(final StreamManager streamMgr, final String scopeName)
-	throws ScopeCreateException {
-		try {
-			if(!streamMgr.createScope(scopeName)) {
-				Loggers.ERR.warn("{}: scope \"{}\" was not created, may be already existing before", stepId, scopeName);
-			}
-			return new ConcurrentHashMap<>();
-		} catch(final Throwable cause) {
-			throw new ScopeCreateException(scopeName, cause);
-		}
-	}
-
-	String createStream(
-		final StreamManager streamMgr, final StreamConfiguration streamConfig, final String scopeName,
-		final String streamName
-	) throws StreamCreateException {
-		try {
-			if(!streamMgr.createStream(scopeName, streamName, streamConfig)) {
-				Loggers.ERR.warn(
-					"{}: stream \"{}\" was not created @ the scope \"{}\", may be already existing before", stepId,
-					streamName, scopeName
-				);
-			}
-			return streamName;
-		} catch(final Throwable cause) {
-			throw new StreamCreateException(streamName, cause);
-		}
-	}
-
-	EventStreamWriter<DataItem> createEventStreamWriter(final ClientFactory clientFactory, final String streamName) {
-		return clientFactory.createEventWriter(streamName, evtSerializer, evtWriterConfig);
-	}
-
+	/**
+	 Not used in this driver implementation
+	 */
 	@Override
 	protected String requestNewPath(final String path) {
 		throw new AssertionError("Should not be invoked");
 	}
 
+	/**
+	 Not used in this driver implementation
+	 */
 	@Override
 	protected String requestNewAuthToken(final Credential credential) {
 		throw new AssertionError("Should not be invoked");
@@ -161,23 +256,11 @@ extends CoopStorageDriverBase<I, O>  {
 		return null;
 	}
 
+	/**
+	 Not used in this driver implementation
+	 */
 	@Override
 	public void adjustIoBuffers(final long avgTransferSize, final OpType opType) {
-		int size;
-		if (avgTransferSize < BUFF_SIZE_MIN) {
-			size = BUFF_SIZE_MIN;
-		} else if (BUFF_SIZE_MAX < avgTransferSize) {
-			size = BUFF_SIZE_MAX;
-		} else {
-			size = (int) avgTransferSize;
-		}
-		if(OpType.CREATE.equals(opType)) {
-			Loggers.MSG.info("Adjust output buffer size: {}", SizeInBytes.formatFixedSize(size));
-			outBuffSize = size;
-		} else if (OpType.READ.equals(opType)) {
-			Loggers.MSG.info("Adjust input buffer size: {}", SizeInBytes.formatFixedSize(size));
-			inBuffSize = size;
-		}
 	}
 
 	@Override
@@ -250,7 +333,8 @@ extends CoopStorageDriverBase<I, O>  {
 	}
 
 	boolean completeFailedOperation(final O op, final Throwable thrown) {
-		LogUtil.exception(Level.WARN, thrown, "{}: unexpected load operation failure", stepId);
+		//LogUtil.exception(Level.WARN, thrown, "{}: unexpected load operation failure", stepId);
+		thrown.printStackTrace();
 		return completeOperation(op, FAIL_UNKNOWN);
 	}
 
@@ -274,6 +358,7 @@ extends CoopStorageDriverBase<I, O>  {
 				break;
 			case READ:
 				submitReadEventOperation(evtOp, nodeAddr);
+				break;
 			case UPDATE:
 				throw new AssertionError("Not implemented");
 			case DELETE:
@@ -286,33 +371,64 @@ extends CoopStorageDriverBase<I, O>  {
 	}
 
 	void submitCreateEventOperation(final DataOperation evtOp, final String nodeAddr) {
-		// prepare
 		try {
-			final URI endpointUri = endpointUriByNodeAddr.computeIfAbsent(nodeAddr, this::makeEndpointUri);
-			final StreamManager streamMgr = streamMgrByEndpointUri.computeIfAbsent(endpointUri, StreamManager::create);
+			// prepare
+			final URI endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::makeEndpointUri);
+			final StreamManager streamMgr = streamMgrCache.computeIfAbsent(endpointUri, StreamManager::create);
 			final String scopeName = DEFAULT_SCOPE; // TODO make this configurable
+			final ScopeCreateFunction scopeCreateFunc = scopeCreateFuncCache.computeIfAbsent(
+				streamMgr, ScopeCreateFunctionImpl::new
+			);
+			// create the scope if necessary
+			final StreamCreateFunction streamCreateFunc = streamCreateFuncCache.computeIfAbsent(
+				scopeName, scopeCreateFunc
+			);
 			final String streamName = evtOp.dstPath();
-			streamsByScope
-				.computeIfAbsent(scopeName, name -> createScope(streamMgr, name))
-				.computeIfAbsent(streamName, name -> createStream(streamMgr, streamConfig, scopeName, name));
-			final ClientFactory clientFactory = clientFactories
-				.computeIfAbsent(endpointUri, uri -> new ConcurrentHashMap<>())
-				.computeIfAbsent(scopeName, name -> ClientFactory.withScope(name, endpointUri));
-			final EventStreamWriter<DataItem> evtWriter = evtWriterByStream
-				.computeIfAbsent(streamName, name -> createEventStreamWriter(clientFactory, name));
+			scopeStreamsCache
+				.computeIfAbsent(scopeName, ScopeCreateFunction::createStreamCache)
+				.computeIfAbsent(streamName, streamCreateFunc);
+			// create the client factory create function if necessary
+			final ClientFactoryCreateFunction clientFactoryCreateFunc = clientFactoryCreateFuncCache.computeIfAbsent(
+				endpointUri, ClientFactoryCreateFunctionImpl::new
+			);
+			// create the client factory if necessary
+			final ClientFactory clientFactory = clientFactoryCache.computeIfAbsent(scopeName, clientFactoryCreateFunc);
+			// create the event stream writer create function if necessary
+			final EventWriterCreateFunction evtWriterCreateFunc = evtWriterCreateFuncCache.computeIfAbsent(
+				clientFactory, EventWriterCreateFunctionImpl::new
+			);
+			// create the event stream writer if necessary
+			final EventStreamWriter<DataItem> evtWriter = evtWriterCache.computeIfAbsent(
+				streamName, evtWriterCreateFunc
+			);
 			final DataItem evtItem = evtOp.item();
 			// submit the event writing
-			final CompletionStage<Void> writeEvtFuture = evtWriter.writeEvent(evtItem);
+			final CompletionStage<Void> writeEvtFuture;
+			if(createRoutingKeys) {
+				final String routingKey = Long.toString(
+					createRoutingKeysPeriod > 0 ? evtItem.offset() % createRoutingKeysPeriod : evtItem.offset(),
+					Character.MAX_RADIX
+				);
+				writeEvtFuture = evtWriter.writeEvent(routingKey, evtItem);
+			} else {
+				writeEvtFuture = evtWriter.writeEvent(evtItem);
+			}
 			evtOp.startRequest();
 			writeEvtFuture.handle((returned, thrown) -> completeCreateEventOperation(evtOp, evtItem, thrown));
 		} catch(final ScopeCreateException e) {
 			LogUtil.exception(Level.WARN, e.getCause(), "{}: failed to create the scope \"{}\"", stepId, e.scopeName());
-			completeOperation((O) evtOp, Status.RESP_FAIL_CLIENT);
+			completeOperation((O) evtOp, RESP_FAIL_CLIENT);
 		} catch(final StreamCreateException e) {
 			LogUtil.exception(
 				Level.WARN, e.getCause(), "{}: failed to create the stream \"{}\"", stepId, e.streamName()
 			);
-			completeOperation((O) evtOp, Status.RESP_FAIL_CLIENT);
+			completeOperation((O) evtOp, RESP_FAIL_CLIENT);
+		} catch(final NullPointerException e) {
+			if(!isStarted()) { // occurs on manual interruption which is normal so should be handled
+				completeOperation((O) evtOp, INTERRUPTED);
+			} else {
+				completeFailedOperation((O) evtOp, e);
+			}
 		} catch(final Throwable cause) {
 			completeFailedOperation((O) evtOp, cause);
 		}
@@ -354,15 +470,20 @@ extends CoopStorageDriverBase<I, O>  {
 	protected void doClose()
 	throws IOException {
 		super.doClose();
-		clientFactories.values().forEach(m -> m.values().forEach(ClientFactory::close));
-		clientFactories.clear();
-		streamsByScope.values().forEach(Map::clear);
-		streamsByScope.clear();
-		streamMgrByEndpointUri.values().forEach(StreamManager::close);
-		streamMgrByEndpointUri.clear();
-		endpointUriByNodeAddr.clear();
-		evtWriterByStream.values().forEach(EventStreamWriter::close);
-		evtWriterByStream.clear();
+		// clear all caches
+		endpointCache.clear();
+		streamMgrCache.values().forEach(StreamManager::close);
+		streamMgrCache.clear();
+		scopeCreateFuncCache.clear();
+		streamCreateFuncCache.clear();
+		scopeStreamsCache.values().forEach(Map::clear);
+		scopeStreamsCache.clear();
+		clientFactoryCreateFuncCache.clear();
+		clientFactoryCache.values().forEach(ClientFactory::close);
+		clientFactoryCache.clear();
+		evtWriterCreateFuncCache.clear();
+		evtWriterCache.values().forEach(EventStreamWriter::close);
+		evtWriterCache.clear();
 	}
 
 	@Override

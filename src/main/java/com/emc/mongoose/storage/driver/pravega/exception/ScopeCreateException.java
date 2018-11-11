@@ -1,4 +1,4 @@
-package com.emc.mongoose.storage.driver.pravega;
+package com.emc.mongoose.storage.driver.pravega.exception;
 
 public class ScopeCreateException
 extends RuntimeException {

@@ -39,8 +39,8 @@ The storage driver extends the Mongoose's Abstract Coop Storage Driver and uses 
     * `data` -> "event"
     * `path` -> "stream"
 * Supported load operations:
-    * `create` (events, streams)
-    * `read` (events)
+    * `create` (events)
+    * `read` (streams)
     * `delete` (streams)
 * Storage-specific:
     * Stream sealing
@@ -127,18 +127,7 @@ that it returns the `CompletableFuture` which should be handled properly.
 
 ### 4.1.2. Read
 
-**Note**:
-> Pravega storage doesn't support reading the events in the random order. So the `item-input-file` configuration option
-> couldn't be used also. The only way to specify the items (events) to read is a scope + stream (`item-input-path` in
-> Mongoose terms)
-
-1. Get an `EventStreamReader<ByteBuffer>` instance
-2. Read the next event using the method `readNextEvent` using some very small timeout (check if 0 is possible)
-
-There is also another option, called `storage-driver-read-timeoutMillis`. Pravega documentation says it only works when
-there is no available event in the stream. `readNextEvent()` will block for the specified time in ms. So, in theory 0
-and 1 should work just fine. They do not. In practice, this value should be somewhere between 100 and 2000 ms (2000 is
-Pravega default value).
+Not supported. The Pravega storage doesn't support reading the events in the random order.
 
 ### 4.1.3. Update
 
@@ -159,7 +148,13 @@ Mongoose should perform the load operations on the *streams* when the configurat
 
 ### 4.2.2. Read
 
-TBD
+1. Get an `EventStreamReader<ByteBuffer>` instance
+2. Read the next event using the method `readNextEvent` using some very small timeout (check if 0 is possible)
+
+There is also another option, called `storage-driver-read-timeoutMillis`. Pravega documentation says it only works when
+there is no available event in the stream. `readNextEvent()` will block for the specified time in ms. So, in theory 0
+and 1 should work just fine. They do not. In practice, this value should be somewhere between 100 and 2000 ms (2000 is
+Pravega default value).
 
 ### 4.2.3. Update
 
