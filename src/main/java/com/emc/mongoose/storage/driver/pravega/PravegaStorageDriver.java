@@ -41,6 +41,11 @@ import io.pravega.client.stream.EventWriterConfig;
 import io.pravega.client.stream.ScalingPolicy;
 import io.pravega.client.stream.Serializer;
 import io.pravega.client.stream.StreamConfiguration;
+import lombok.AllArgsConstructor;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
+import lombok.experimental.var;
+import lombok.val;
 
 import org.apache.logging.log4j.Level;
 
@@ -69,14 +74,11 @@ extends CoopStorageDriverBase<I, O>  {
 	private final StreamConfiguration streamConfig;
 
 	// should be an inner class in order to access the stream create function implementation constructor
+	@AllArgsConstructor @Value
 	final class ScopeCreateFunctionImpl
 	implements ScopeCreateFunction {
 
-		private final StreamManager streamMgr;
-
-		public ScopeCreateFunctionImpl(final StreamManager streamMgr) {
-			this.streamMgr = streamMgr;
-		}
+		StreamManager streamMgr;
 
 		@Override
 		public final StreamCreateFunction apply(final String scopeName)
@@ -93,18 +95,12 @@ extends CoopStorageDriverBase<I, O>  {
 	}
 
 	// should be an inner class in order to access the storage driver instance stream config field
+	@AllArgsConstructor @Value
 	final class StreamCreateFunctionImpl
 	implements StreamCreateFunction {
 
-		private final StreamManager streamMgr;
-		private final String scopeName;
-
-		public StreamCreateFunctionImpl(
-			final StreamManager streamMgr, final String scopeName
-		) {
-			this.streamMgr = streamMgr;
-			this.scopeName = scopeName;
-		}
+		StreamManager streamMgr;
+		String scopeName;
 
 		@Override
 		public final String apply(final String streamName) {
@@ -120,51 +116,18 @@ extends CoopStorageDriverBase<I, O>  {
 				throw new StreamCreateException(streamName, cause);
 			}
 		}
-
-		@Override
-		public final int hashCode() {
-			return streamMgr.hashCode() ^ streamConfig.hashCode() ^ scopeName.hashCode();
-		}
-
-		@Override
-		public final boolean equals(final Object other) {
-			if(other instanceof StreamCreateFunction) {
-				final StreamCreateFunctionImpl that = (StreamCreateFunctionImpl) other;
-				return this.streamMgr.equals(that.streamMgr) && this.scopeName.equals(that.scopeName);
-			} else {
-				return false;
-			}
-		}
 	}
 
 	// should be an inner class in order to access the storage driver instance's fields (serializer, writer config)
+	@AllArgsConstructor @Value
 	final class EventWriterCreateFunctionImpl
 	implements EventWriterCreateFunction {
 
-		private final ClientFactory clientFactory;
-
-		public EventWriterCreateFunctionImpl(final ClientFactory clientFactory) {
-			this.clientFactory = clientFactory;
-		}
+		ClientFactory clientFactory;
 
 		@Override
 		public final EventStreamWriter<DataItem> apply(final String streamName) {
 			return clientFactory.createEventWriter(streamName, evtSerializer, evtWriterConfig);
-		}
-
-		@Override
-		public final int hashCode() {
-			return clientFactory.hashCode();
-		}
-
-		@Override
-		public final boolean equals(final Object other) {
-			if(other instanceof EventWriterCreateFunction) {
-				final EventWriterCreateFunctionImpl that = (EventWriterCreateFunctionImpl) other;
-				return this.clientFactory.equals(that.clientFactory);
-			} else {
-				return false;
-			}
 		}
 	}
 
@@ -195,11 +158,11 @@ extends CoopStorageDriverBase<I, O>  {
 			.scalingPolicy(ScalingPolicy.fixed(concurrencyLimit))
 			.build();
 		this.uriSchema = DEFAULT_URI_SCHEMA;
-		final Config nodeConfig = storageConfig.configVal("net-node");
+		val nodeConfig = storageConfig.configVal("net-node");
 		nodePort = storageConfig.intVal("net-node-port");
-		final List<String> endpointAddrList = nodeConfig.listVal("addrs");
-		final Config driverConfig = storageConfig.configVal("driver");
-		final Config createRoutingKeysConfig = driverConfig.configVal("create-key");
+		val endpointAddrList = nodeConfig.listVal("addrs");
+		val driverConfig = storageConfig.configVal("driver");
+		val createRoutingKeysConfig = driverConfig.configVal("create-key");
 		createRoutingKeys = createRoutingKeysConfig.boolVal("enabled");
 		createRoutingKeysPeriod = createRoutingKeysConfig.longVal("count");
 		readTimeoutMillis = driverConfig.intVal("read-timeoutMillis");
@@ -216,7 +179,7 @@ extends CoopStorageDriverBase<I, O>  {
 		try {
 			final String addr;
 			final int port;
-			int portSepPos = nodeAddr.lastIndexOf(':');
+			val portSepPos = nodeAddr.lastIndexOf(':');
 			if(portSepPos > 0) {
 				addr = nodeAddr.substring(0, portSepPos);
 				port = Integer.parseInt(nodeAddr.substring(portSepPos + 1));
@@ -224,7 +187,7 @@ extends CoopStorageDriverBase<I, O>  {
 				addr = nodeAddr;
 				port = nodePort;
 			}
-			final String uid = credential == null ? null : credential.getUid();
+			val uid = credential == null ? null : credential.getUid();
 			return new URI(uriSchema, uid, addr, port, "/", null, null);
 		} catch (final URISyntaxException e) {
 			throw new RuntimeException(e);
@@ -266,7 +229,7 @@ extends CoopStorageDriverBase<I, O>  {
 	@Override
 	protected void prepare(final O operation) {
 		super.prepare(operation);
-		String endpointAddr = operation.nodeAddr();
+		var endpointAddr = operation.nodeAddr();
 		if(endpointAddr == null) {
 			endpointAddr = nextEndpointAddr();
 			operation.nodeAddr(endpointAddr);
@@ -277,7 +240,7 @@ extends CoopStorageDriverBase<I, O>  {
 	protected final boolean submit(final O op)
 	throws InterruptRunException, IllegalStateException {
 		if(concurrencyThrottle.tryAcquire()) {
-			final OpType opType = op.type();
+			val opType = op.type();
 			if(NOOP.equals(opType)) {
 				submitNoop(op);
 			} else {
@@ -298,7 +261,7 @@ extends CoopStorageDriverBase<I, O>  {
 	@Override
 	protected final int submit(final List<O> ops, final int from, final int to)
 	throws InterruptRunException, IllegalStateException {
-		for(int i = from; i < to; i ++) {
+		for(var i = from; i < to; i ++) {
 			if(!submit(ops.get(i))) {
 				return i - from;
 			}
@@ -309,8 +272,8 @@ extends CoopStorageDriverBase<I, O>  {
 	@Override
 	protected final int submit(final List<O> ops)
 	throws InterruptRunException, IllegalStateException {
-		final int opsCount = ops.size();
-		for(int i = 0; i < opsCount; i ++) {
+		val opsCount = ops.size();
+		for(var i = 0; i < opsCount; i ++) {
 			if(!submit(ops.get(i))) {
 				return i;
 			}
@@ -373,39 +336,33 @@ extends CoopStorageDriverBase<I, O>  {
 	void submitEventCreateOperation(final DataOperation evtOp, final String nodeAddr) {
 		try {
 			// prepare
-			final URI endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::makeEndpointUri);
-			final StreamManager streamMgr = streamMgrCache.computeIfAbsent(endpointUri, StreamManager::create);
-			final String scopeName = DEFAULT_SCOPE; // TODO make this configurable
-			final ScopeCreateFunction scopeCreateFunc = scopeCreateFuncCache.computeIfAbsent(
-				streamMgr, ScopeCreateFunctionImpl::new
-			);
+			val endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::makeEndpointUri);
+			val streamMgr = streamMgrCache.computeIfAbsent(endpointUri, StreamManager::create);
+			val scopeName = DEFAULT_SCOPE; // TODO make this configurable
+			val scopeCreateFunc = scopeCreateFuncCache.computeIfAbsent(streamMgr, ScopeCreateFunctionImpl::new);
 			// create the scope if necessary
-			final StreamCreateFunction streamCreateFunc = streamCreateFuncCache.computeIfAbsent(
-				scopeName, scopeCreateFunc
-			);
-			final String streamName = evtOp.dstPath();
+			val streamCreateFunc = streamCreateFuncCache.computeIfAbsent(scopeName, scopeCreateFunc);
+			val streamName = evtOp.dstPath();
 			scopeStreamsCache
 				.computeIfAbsent(scopeName, ScopeCreateFunction::createStreamCache)
 				.computeIfAbsent(streamName, streamCreateFunc);
 			// create the client factory create function if necessary
-			final ClientFactoryCreateFunction clientFactoryCreateFunc = clientFactoryCreateFuncCache.computeIfAbsent(
+			val clientFactoryCreateFunc = clientFactoryCreateFuncCache.computeIfAbsent(
 				endpointUri, ClientFactoryCreateFunctionImpl::new
 			);
 			// create the client factory if necessary
-			final ClientFactory clientFactory = clientFactoryCache.computeIfAbsent(scopeName, clientFactoryCreateFunc);
+			val clientFactory = clientFactoryCache.computeIfAbsent(scopeName, clientFactoryCreateFunc);
 			// create the event stream writer create function if necessary
-			final EventWriterCreateFunction evtWriterCreateFunc = evtWriterCreateFuncCache.computeIfAbsent(
+			val evtWriterCreateFunc = evtWriterCreateFuncCache.computeIfAbsent(
 				clientFactory, EventWriterCreateFunctionImpl::new
 			);
 			// create the event stream writer if necessary
-			final EventStreamWriter<DataItem> evtWriter = evtWriterCache.computeIfAbsent(
-				streamName, evtWriterCreateFunc
-			);
-			final DataItem evtItem = evtOp.item();
+			val evtWriter = evtWriterCache.computeIfAbsent(streamName, evtWriterCreateFunc);
+			val evtItem = evtOp.item();
 			// submit the event writing
 			final CompletionStage<Void> writeEvtFuture;
 			if(createRoutingKeys) {
-				final String routingKey = Long.toString(
+				val routingKey = Long.toString(
 					createRoutingKeysPeriod > 0 ? evtItem.offset() % createRoutingKeysPeriod : evtItem.offset(),
 					Character.MAX_RADIX
 				);
