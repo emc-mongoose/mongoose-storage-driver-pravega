@@ -13,10 +13,10 @@ tasks.withType(JavaCompile) {
 }
 
 task("create-dirs").doLast(
-        {
-            sourceSets*.java.srcDirs*.each { it.mkdirs() }
-            sourceSets*.resources.srcDirs*.each { it.mkdirs() }
-        }
+    {
+        sourceSets*.java.srcDirs*.each { it.mkdirs() }
+        sourceSets*.resources.srcDirs*.each { it.mkdirs() }
+    }
 )
 
 repositories {
@@ -25,12 +25,17 @@ repositories {
 
 ext {
     depVersion = [
-            commonsJava: "2.1.3",
-            disruptor: "3.4.2",
-            dockerJava: "3.0.14",
-            log4j: "2.8.2",
-            mongoose: "4.0.0",
-			pravega: "0.3.2",
+        commonsJava: "2.1.3",
+        disruptor: "3.4.2",
+        dockerJava: "3.0.14",
+		grpc: "1.8.0",
+		guava: "20.0",
+        log4j: "2.8.2",
+        mongoose: "4.0.1",
+	    netty: "4.1.16.Final",
+	    opencensus: "0.8.0",
+		pravega: "0.3.2",
+	    protobuf: "3.4.0",
     ]
 }
 
@@ -49,31 +54,31 @@ sourceSets {
 }
 
 configurations.all {
-    exclude module: 'slf4j-log4j12'
+    exclude module: "slf4j-log4j12"
 }
 
 dependencies {
 
     compileOnly(
-            "com.github.emc-mongoose:mongoose:${depVersion.mongoose}",
-            "com.github.emc-mongoose:mongoose-storage-driver-coop:${depVersion.mongoose}",
-            "com.github.emc-mongoose:mongoose-storage-driver-coop-nio:${depVersion.mongoose}",
-            "com.github.akurilov:java-commons:${depVersion.commonsJava}",
-            "org.apache.logging.log4j:log4j-api:${depVersion.log4j}",
+        "com.github.emc-mongoose:mongoose:${depVersion.mongoose}",
+        "com.github.emc-mongoose:mongoose-storage-driver-coop:${depVersion.mongoose}",
+        "com.github.emc-mongoose:mongoose-storage-driver-coop-nio:${depVersion.mongoose}",
+        "com.github.akurilov:java-commons:${depVersion.commonsJava}",
+        "org.apache.logging.log4j:log4j-api:${depVersion.log4j}",
     )
 
     provided(
-		"io.pravega:pravega-client:0.3.2",
+		"io.pravega:pravega-client:${depVersion.pravega}",
 	)
 
     testCompile(
-            "junit:junit:[4,)",
-            "com.github.docker-java:docker-java:${depVersion.dockerJava}",
-            "org.apache.commons:commons-csv:1.1",
+        "junit:junit:[4,)",
+        "com.github.docker-java:docker-java:${depVersion.dockerJava}",
+        "org.apache.commons:commons-csv:1.1",
     )
 
     testRuntime(
-            "com.lmax:disruptor:${depVersion.disruptor}",
+        "com.lmax:disruptor:${depVersion.disruptor}",
     )
 }
 
@@ -104,11 +109,16 @@ jar {
 
     manifest {
         attributes (
-                "Implementation-Version": version,
-                "Implementation-Title": project.description,
+            "Implementation-Version": version,
+            "Implementation-Title": project.description,
         )
     }
-    
+
+	from configurations
+		.provided
+		.collect {
+			zipTree(it)
+		}
 
     exclude "META-INF/*.RSA", "META-INF/*.SF", "META-INF/*.DSA"
 }
@@ -131,10 +141,8 @@ artifacts {
     archives javadocJar
 }
 
-def ossrhUsername = project.hasProperty("ossrhUsername") ?
-        project.property("ossrhUsername") : null
-def ossrhPassword = project.hasProperty("ossrhPassword") ?
-        project.property("ossrhPassword") : null
+def ossrhUsername = project.hasProperty("ossrhUsername") ? project.property("ossrhUsername") : null
+def ossrhPassword = project.hasProperty("ossrhPassword") ? project.property("ossrhPassword") : null
 
 signing {
     required {
