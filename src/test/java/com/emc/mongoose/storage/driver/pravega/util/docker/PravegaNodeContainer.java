@@ -12,7 +12,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
 public class PravegaNodeContainer
-		implements Closeable {
+implements Closeable {
 
 	public static final int PORT = 9090;
 	private static final Logger LOG = Logger.getLogger(PravegaNodeContainer.class.getSimpleName());
@@ -22,25 +22,24 @@ public class PravegaNodeContainer
 	private static String CONTAINER_ID = null;
 
 	public PravegaNodeContainer()
-			throws Exception {
+	throws Exception {
 		try {
 			DOCKER_CLIENT.inspectImageCmd(IMAGE_NAME).exec();
 		} catch (final NotFoundException e) {
 			DOCKER_CLIENT
-					.pullImageCmd(IMAGE_NAME)
-					.exec(new PullImageResultCallback())
-					.awaitCompletion();
+				.pullImageCmd(IMAGE_NAME)
+				.exec(new PullImageResultCallback())
+				.awaitCompletion();
 		}
 
 		final CreateContainerResponse container = DOCKER_CLIENT
-				.createContainerCmd(IMAGE_NAME)
-				.withCmd("standalone")
-				.withName("pravega_node")
-				.withNetworkMode("host")
-
-				.withAttachStderr(true)
-				.withAttachStdout(true)
-				.exec();
+			.createContainerCmd(IMAGE_NAME)
+			.withCmd("standalone")
+			.withName("pravega_node")
+			.withNetworkMode("host")
+			.withAttachStderr(true)
+			.withAttachStdout(true)
+			.exec();
 		CONTAINER_ID = container.getId();
 		LOG.info("docker start " + CONTAINER_ID + "...");
 		DOCKER_CLIENT.startContainerCmd(CONTAINER_ID).exec();
@@ -49,7 +48,7 @@ public class PravegaNodeContainer
 	}
 
 	public final void close() {
-		if (CONTAINER_ID != null) {
+		if(CONTAINER_ID != null) {
 			LOG.info("docker kill " + CONTAINER_ID + "...");
 			DOCKER_CLIENT.killContainerCmd(CONTAINER_ID).exec();
 			LOG.info("docker rm " + CONTAINER_ID + "...");

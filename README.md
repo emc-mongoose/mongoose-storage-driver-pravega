@@ -11,13 +11,14 @@
 &nbsp;&nbsp;&nbsp;&nbsp;3.2.2. [Distributed](#322-distributed)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3.2.2.1. [Additional Node](#3221-additional-node)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3.2.2.2. [Entry Node](#3222-entry-node)<br/>
+&nbsp;&nbsp;3.3. [Specific Configuration Options](#33-specific-configuration-options)<br/>
 4. [Design](#4-design)<br/>
-&nbsp;&nbsp;4.1. [Data Item Operations](#41-data-item-operations)<br/>
+&nbsp;&nbsp;4.1. [Event Operations](#41-event-operations)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;4.1.1. [Create](#411-create)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;4.1.2. [Read](#412-read)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;4.1.3. [Update](#413-update)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;4.1.4. [Delete](#414-delete)<br/>
-&nbsp;&nbsp;4.2. [Path Item Operations](#42-path-item-operations)<br/>
+&nbsp;&nbsp;4.2. [Stream Operations](#42-stream-operations)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;4.2.1. [Create](#421-create)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;4.2.2. [Read](#422-read)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;4.2.3. [Update](#423-update)<br/>
@@ -25,22 +26,25 @@
 5. [Development](#5-development)<br/>
 &nbsp;&nbsp;5.1. [Build](#51-build)<br/>
 &nbsp;&nbsp;5.2. [Test](#52-test)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;5.2.1 [Automated](#521-automated)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;5.2.2 [Manual](#522-manual)<br/>
 
 # 1. Introduction
 
-The storage driver extends the Mongoose's Abstract COOP Storage Driver and uses the following libraries:
+The storage driver extends the Mongoose's Abstract Coop Storage Driver and uses the following libraries:
 * `pravega-client` version 0.3.2
 
 # 2. Features
 
 * Authentication: TBD
 * SSL/TLS: TBD
-* Item Types: `data`, `path`
+* Item Types:
+    * `data` -> "event"
+    * `path` -> "stream"
 * Supported load operations:
-    * `create`
-    * `read`
-    * `update` (append only)
-    * `delete`
+    * `create` (events)
+    * `read` (streams)
+    * `delete` (streams)
 * Storage-specific:
     * Stream sealing
     * Routing keys
@@ -99,77 +103,110 @@ docker run \
     ...
 ```
 
+## 3.3. Specific Configuration Options
+
+| Name                              | Type            | Default Value | Description                                      |
+|:----------------------------------|:----------------|:--------------|:-------------------------------------------------|
+| storage-driver-create-key-enabled | boolean         | false         | Specifies if Mongoose should generate its own routing key during the events creation
+| storage-driver-create-key-count   | integer         | 0             | Specifies a max count of unique routing keys to use during the events creation (may be considered as a routing key period). 0 value means to use unique routing key for each new event
+| storage-driver-read-timeoutMillis | integer         | 100           | The event read timeout in milliseconds
+| storage-net-node-addrs            | list of strings | 127.0.0.1     | The list of the Pravega storage nodes to use for the load
+| storage-net-node-port             | integer         | 9020          | The default port of the Pravega storage nodes, should be explicitly set to 9090 (the value used by Pravega by default)
+
 # 4. Design
 
-Mongoose and Pravega are using different concepts. So it's necessary to determine how
+Mongoose and Pravega are using quite different concepts. So it's necessary to determine how
 [Pravega-specific terms](http://pravega.io/docs/latest/terminology/) are mapped to the
 [Mongoose abstractions]((https://github.com/emc-mongoose/mongoose/tree/master/doc/design/architecture#1-basic-terms)).
 
 | Pravega | Mongoose |
 |---------|----------|
 | [Stream](http://pravega.io/docs/latest/pravega-concepts/#streams) | *Path Item* |
-| Scope | *Storage Path* part (*stream name* is the 2nd part) |
+| Scope | Storage Namespace
 | [Event](http://pravega.io/docs/latest/pravega-concepts/#events) | *Data Item* |
 | Stream Segment | N/A |
 
-**Note**:
-> The Pravega storage driver should extend the NIO storage driver base.
-
-## 4.1. Data Item Operations
+## 4.1. Event Operations
 
 Mongoose should perform the load operations on the *events* when the configuration option `item-type` is set to `data`.
 
 ### 4.1.1. Create
 
-1. Check the corresponding scope if it exists and create it if not.
-2. Check the corresponding stream if it exists and create it if not.
-1. Get an `EventStreamWriter<ByteBuffer>` instance using the *item id* as a *stream name*.
-2. Submit the next `ByteBuffer` event writing using a `writeEvent` method with a routing key either without it. Note
-that it returns the `CompletableFuture` which should be handled properly.
+Steps:
+1. Get the endpoint URI from the cache.
+2. Check if the corresponding `StreamManager` exists using the cache, create a new one if it doesn't.
+3. Check if the destination scope exists using the cache, create a new one if it doesn't.
+4. Check if the destination stream exists using the cache, create a new one if it doesn't.
+5. Check if the corresponding `ClientFactory` exists using the cache, create a new one if it doesn't.
+6. Check if the `EventStreamWriter` exists using the cache, create new one if it doesn't.
+7. Submit the event writing, use a routing key if configured.
+8. Submit the load operation completion handler.
 
 ### 4.1.2. Read
 
-**Note**:
-> Pravega storage doesn't support reading the events in the random order. So the `item-input-file` configuration option
-> couldn't be used also. The only way to specify the items (events) to read is a scope + stream (`item-input-path` in
-> Mongoose terms)
+**Notes**:
+> * The Pravega storage doesn't support reading the stream events in the random order.
+> * Works synchronously
 
-1. Get an `EventStreamReader<ByteBuffer>` instance
-2. Read the next event using the method `readNextEvent` using some very small timeout (check if 0 is possible)
+There is also another option, called `storage-driver-read-timeoutMillis`. Pravega documentation says it only works when
+there is no available event in the stream. `readNextEvent()` will block for the specified time in ms. So, in theory 0
+and 1 should work just fine. They do not. In practice, this value should be somewhere between 100 and 2000 ms (2000 is
+Pravega default value).
+
+Steps:
+1. Get the endpoint URI from the cache.
+2. Check if the corresponding `StreamManager` exists using the cache, create a new one if it doesn't.
+3. Check if the corresponding `ClientFactory` exists using the cache, create a new one if it doesn't.
+4. Check if the corresponding `EventStreamReader<ByteBuffer>` exists using the cache, create a new one if it doesn't.
+5. Read the next event, verify the returned byte buffer content if configured so, discard it otherwise.
+6. Invoke the load operation completion handler.
 
 ### 4.1.3. Update
 
-Not supported. Stream append may be performed using `create` load operation type.
+Not supported. A stream append may be performed using the `create` load operation type and a same stream previously used
+to write the events.
 
 ### 4.1.4. Delete
 
 Not supported.
 
-## 4.2. Path Item Operations
+## 4.2. Stream Operations
 
 Mongoose should perform the load operations on the *streams* when the configuration option `item-type` is set to `path`.
 
 ### 4.2.1. Create
 
-1. Check the corresponding scope if it exists and create it if not.
-2. Invoke `StreamManager.createStream` using *item path* as a *scope name* and *item id* as a *stream name*. Fail the
-load operation using the status code *14* if the method returns `false`.
+**Notes**:
+> * Just creates empty streams
+> * Works synchronously
+
+Steps:
+1. Get the endpoint URI from the cache.
+2. Check if the corresponding `StreamManager` exists using the cache, create a new one if it doesn't.
+3. Check if the destination scope exists using the cache, create a new one if it doesn't.
+4. Create the corresponding stream using the `StreamManager` instance, scope name, etc.
+5. Invoke the load operation completion handler.
 
 ### 4.2.2. Read
 
-For each item read the whole corresponding stream. Unlike events, it's possible to read the streams in the random order
-so both `item-input-path` (scope's streams listing) and `item-input-file` (stream ids list) options should be supported.
+Read the whole streams (all the corresponding events)
 
-There is also another option, called `reader-timeout`. Pravega documentation says it only works when there is no available Event 
-in the stream. `readNextEvent()` will block for the specified time in ms. So, in theory 0 and 1 should work just fine. 
-They do not. In practice, this value should be somewhere between 100 and 2000 ms (2000 is Pravega default value).
+Steps:
+1. Get the endpoint URI from the cache.
+2. Check if the corresponding `StreamManager` exists using the cache, create a new one if it doesn't.
+3. Check if the corresponding `ClientFactory` exists using the cache, create a new one if it doesn't.
+4. Check if the corresponding `EventStreamReader<ByteBuffer>` exists using the cache, create a new one if it doesn't.
+5. Read all events in the stream in the loop, discard the returned byte buffers content.
+6. Invoke the load operation completion handler.
+
 ### 4.2.3. Update
 
 Not supported
 
 ### 4.2.4. Delete
 
-A deletion of a path composed of a scope and a stream is implemented through `invokePathDelete()` method. Before the deletion, the stream must be sealed because of Pravega concepts. So the sealing of the stream is done in `invokePathDelete()` method too.
+Before the deletion, the stream must be sealed because of Pravega concepts. So the sealing of the stream is done during
+the deletion too.
 
 ## 4.2. Open Issues
 
@@ -185,6 +222,29 @@ TODO
 
 ## 5.2. Test
 
+### 5.2.1. Automated
+
 ```bash
 ./gradlew clean test
+```
+
+### 5.2.1. Manual
+
+1. Build the storage driver
+2. Copy the storage driver's jar file into the mongoose's `ext` directory:
+```bash
+cp -f build/libs/mongoose-storage-driver-pravega.jar ~/.mongoose/<VERSION>/ext/
+```
+3. Run the Pravega standalone node:
+```bash
+docker run --network host --expose 9090 pravega/pravega standalone
+```
+4. Run some Mongoose scenario:
+```bash
+java -jar mongoose-<VERSION>.jar \
+    --storage-driver-type=pravega \
+    --storage-net-node-port=9090 \
+    --item-data-size=1000 \
+    --storage-driver-limit-concurrency=100 \
+    --item-output-path=goose-events-stream-0
 ```

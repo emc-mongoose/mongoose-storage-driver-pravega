@@ -44,8 +44,8 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 public class DataOperationsTest {
-	private final PravegaStorageDriver pravegaStorageDriver;
-	private static final DataInput DATA_INPUT;
+private final PravegaStorageDriver pravegaStorageDriver;
+private static final DataInput DATA_INPUT;
 
 	static {
 		try {
@@ -66,14 +66,14 @@ public class DataOperationsTest {
 					.map(Extension::schemaProvider)
 					.filter(Objects::nonNull)
 					.map(
-							schemaProvider -> {
-								try {
-									return schemaProvider.schema();
-								} catch (final Exception e) {
-									fail(e.getMessage());
-								}
-								return null;
+						schemaProvider -> {
+							try {
+								return schemaProvider.schema();
+							} catch (final Exception e) {
+								fail(e.getMessage());
 							}
+							return null;
+						}
 					)
 					.filter(Objects::nonNull)
 					.collect(Collectors.toList());
@@ -96,22 +96,22 @@ public class DataOperationsTest {
 			config.val("storage-net-tcpNoDelay", false);
 			config.val("storage-net-interestOpQueued", false);
 			config.val("storage-net-linger", 0);
-			config.val("storage-net-timeoutMilliSec", 0);
+			config.val("storage-net-timeoutMillis", 0);
 			config.val("storage-net-node-addrs", Collections.singletonList("127.0.0.1"));
 			config.val("storage-net-node-port", PravegaNodeContainer.PORT);
 			config.val("storage-net-node-connAttemptsLimit", 0);
-
-			config.val("storage-item-input-readerTimeout", 100);
 
 			config.val("storage-auth-uid", CREDENTIAL.getUid());
 			config.val("storage-auth-token", null);
 			config.val("storage-auth-secret", CREDENTIAL.getSecret());
 
-
+			config.val("storage-driver-create-key-enabled", false);
+			config.val("storage-driver-create-key-count", 0);
+			config.val("storage-driver-read-timeoutMillis", 100);
 			config.val("storage-driver-threads", 0);
 			config.val("storage-driver-limit-queue-input", 1_000_000);
 			config.val("storage-driver-limit-queue-output", 1_000_000);
-			config.val("storage-driver-limit-concurrency", 0);
+			config.val("storage-driver-limit-concurrency", 1);
 			return config;
 		} catch (final Throwable cause) {
 			throw new RuntimeException(cause);
@@ -119,22 +119,21 @@ public class DataOperationsTest {
 	}
 
 	public DataOperationsTest()
-			throws OmgShootMyFootException {
+	throws OmgShootMyFootException {
 		this(getConfig());
 	}
 
 	private DataOperationsTest(final Config config)
-			throws OmgShootMyFootException {
-
-		pravegaStorageDriver = new PravegaStorageDriver<DataItem, DataOperation<DataItem>>(
-				"tcp://127.0.0.1:9090", "test-data-pravega-driver", DATA_INPUT,
-				config.configVal("storage"), true, config.configVal("load").intVal("batch-size")
+	throws OmgShootMyFootException {
+		pravegaStorageDriver = new PravegaStorageDriver(
+			"test-data-pravega-driver", DATA_INPUT, config.configVal("storage"), true,
+			config.configVal("load").intVal("batch-size")
 		);
 	}
 
 	@BeforeClass
 	public static void setUpClass()
-			throws Exception {
+	throws Exception {
 		try {
 			PRAVEGA_NODE_CONTAINER = new PravegaNodeContainer();
 		} catch (final Exception e) {
@@ -144,54 +143,54 @@ public class DataOperationsTest {
 
 	@AfterClass
 	public static void tearDownClass()
-			throws Exception {
+	throws Exception {
 		PRAVEGA_NODE_CONTAINER.close();
 	}
 
 
 	@Test
 	public final void testCreateFile()
-			throws Exception {
+	throws Exception {
 	}
 
 	@Test
 	public final void testCopyFile()
-			throws Exception {
+	throws Exception {
 	}
 
 	@Test
 	@Ignore
 	public final void testConcatFile()
-			throws Exception {
+	throws Exception {
 	}
 
 	@Test
 	public final void testReadFullFile()
-			throws Exception {
+	throws Exception {
 	}
 
 	@Test
 	public final void testReadFixedRangesFile()
-			throws Exception {
+	throws Exception {
 	}
 
 	@Test
 	public final void testReadRandomRangesFile()
-			throws Exception {
+	throws Exception {
 	}
 
 	@Test
 	public final void testOverwriteFile()
-			throws Exception {
+	throws Exception {
 	}
 
 	@Test
 	public final void testAppendFile()
-			throws Exception {
+	throws Exception {
 	}
 
 	@Test
 	public final void testDeleteFile()
-			throws Exception {
+	throws Exception {
 	}
 }

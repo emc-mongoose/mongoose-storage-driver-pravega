@@ -60,27 +60,27 @@ public class CommonTest {
 		private static Config getConfig() {
 			try {
 				final List<Map<String, Object>> configSchemas = Extension
-						.load(Thread.currentThread().getContextClassLoader())
-						.stream()
-						.map(Extension::schemaProvider)
-						.filter(Objects::nonNull)
-						.map(
-								schemaProvider -> {
-									try {
-										return schemaProvider.schema();
-									} catch(final Exception e) {
-										fail(e.getMessage());
-									}
-									return null;
-								}
-						)
-						.filter(Objects::nonNull)
-						.collect(Collectors.toList());
+					.load(Thread.currentThread().getContextClassLoader())
+					.stream()
+					.map(Extension::schemaProvider)
+					.filter(Objects::nonNull)
+					.map(
+						schemaProvider -> {
+							try {
+								return schemaProvider.schema();
+							} catch(final Exception e) {
+								fail(e.getMessage());
+							}
+							return null;
+						}
+					)
+					.filter(Objects::nonNull)
+					.collect(Collectors.toList());
 				SchemaProvider
-						.resolve(APP_NAME, Thread.currentThread().getContextClassLoader())
-						.stream()
-						.findFirst()
-						.ifPresent(configSchemas::add);
+					.resolve(APP_NAME, Thread.currentThread().getContextClassLoader())
+					.stream()
+					.findFirst()
+					.ifPresent(configSchemas::add);
 				final Map<String, Object> configSchema = TreeUtil.reduceForest(configSchemas);
 				final Config config = new BasicConfig("-", configSchema);
 
@@ -96,22 +96,22 @@ public class CommonTest {
 				config.val("storage-net-tcpNoDelay", false);
 				config.val("storage-net-interestOpQueued", false);
 				config.val("storage-net-linger", 0);
-				config.val("storage-net-timeoutMilliSec", 0);
+				config.val("storage-net-timeoutMillis", 0);
 				config.val("storage-net-node-addrs", Collections.singletonList("127.0.0.1"));
 				config.val("storage-net-node-port", PravegaNodeContainer.PORT);
 				config.val("storage-net-node-connAttemptsLimit", 0);
-
-				config.val("storage-item-input-readerTimeout", 100);
 
 				config.val("storage-auth-uid", CREDENTIAL.getUid());
 				config.val("storage-auth-token", null);
 				config.val("storage-auth-secret", CREDENTIAL.getSecret());
 
-
+				config.val("storage-driver-create-key-enabled", false);
+				config.val("storage-driver-create-key-count", 0);
+				config.val("storage-driver-read-timeoutMillis", 100);
 				config.val("storage-driver-threads", 0);
 				config.val("storage-driver-limit-queue-input", 1_000_000);
 				config.val("storage-driver-limit-queue-output", 1_000_000);
-				config.val("storage-driver-limit-concurrency", 0);
+				config.val("storage-driver-limit-concurrency", 1);
 				return config;
 			} catch(final Throwable cause) {
 				throw new RuntimeException(cause);
@@ -126,8 +126,8 @@ public class CommonTest {
 		private CommonTest (final Config config)
 			throws OmgShootMyFootException {
 			pravegaStorageDriver = new PravegaStorageDriver(
-					"tcp://127.0.0.1:9090", "test-data-pravega-driver", DATA_INPUT,
-					config.configVal("storage"), true, config.configVal("load").intVal("batch-size")
+				"test-data-pravega-driver", DATA_INPUT, config.configVal("storage"), true,
+				config.configVal("load").intVal("batch-size")
 			);
 		}
 

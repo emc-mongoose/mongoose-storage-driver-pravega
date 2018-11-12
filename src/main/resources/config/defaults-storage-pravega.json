@@ -1,9 +1,14 @@
 {
 	"storage": {
-
-		"item": {
-			"input": {
-				"readerTimeout": 100
+		"driver": {
+			"create": {
+				"key": {
+					"enabled": false,
+					"count": 0
+				}
+			},
+			"read": {
+				"timeoutMillis": 100
 			}
 		},
 		"net": {
@@ -16,7 +21,7 @@
 			"rcvBuf": 0,
 			"sndBuf": 0,
 			"tcpNoDelay": true,
-			"timeoutMilliSec": 0,
+			"timeoutMillis": 0,
 			// The flag to enable the load through SSL/TLS.
 			// Currently only HTTPS implementation is available.
 			// Have no effect if configured storage type is filesystem.
@@ -30,7 +35,7 @@
 				// The common port number to access the storage nodes,
 				// may be overridden adding the port number to the storage-driver-net-node-addrs,
 				// for example: "127.0.0.1:9020,127.0.0.1:9022,..."
-				"port": 9030,
+				"port": 9090,
 				// The limit for the subsequent connection attempts for each storage endpoint node.
 				// The node is excluded from the connection pool forever if the node has more
 				// subsequent connection failures. The default value (0) means no limit.
