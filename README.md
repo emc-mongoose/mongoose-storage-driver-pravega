@@ -237,7 +237,7 @@ cp -f build/libs/mongoose-storage-driver-pravega.jar ~/.mongoose/<VERSION>/ext/
 ```
 3. Run the Pravega standalone node:
 ```bash
-docker run --network host --expose 9090 pravega/pravega standalone
+docker run --network host pravega/pravega standalone
 ```
 4. Run some Mongoose scenario:
 ```bash

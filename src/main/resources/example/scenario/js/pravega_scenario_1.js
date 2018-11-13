@@ -39,9 +39,9 @@ function writeEventsLoadStepConfig(c) {
 	}
 }
 
-for(int i = 0; i < concurrencyLimits.lenght; i ++) {
+for(var i = 0; i < concurrencyLimits.length; i ++) {
 	concurrencyLimit = concurrencyLimits[i]
-	print("Run the load step using the concurrency limit = " + limitConcurrency)
+	print("Run the load step using the concurrency limit = " + concurrencyLimit)
 	var stepId = "pravega_scenario_1_concurrency_" + concurrencyLimit
 	Load
 		.config(writeEventsLoadStepConfig(concurrencyLimit))
