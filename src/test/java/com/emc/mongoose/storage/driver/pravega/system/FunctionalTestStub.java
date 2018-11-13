@@ -20,7 +20,7 @@ import static com.emc.mongoose.storage.driver.pravega.util.docker.MongooseContai
 import static com.emc.mongoose.storage.driver.pravega.util.docker.MongooseContainer.HOST_SHARE_PATH;
 
 public class FunctionalTestStub {
-	private static final String SCENARIO_FILE = null; //"scenario" + File.separator + "*.js";
+	private static final String SCENARIO_FILE = "scenario" + File.separator + "test_stub.js";
 	/*TODO: add all settings fields*/
 //	private static final String ITEM_LIST_FILE = CONTAINER_SHARE_PATH + File.separator + "*.cvs";
 //	private static final String ITEM_OUTPUT_PATH = "/" + FunctionalTestStub.class.getSimpleName();
@@ -73,6 +73,7 @@ public class FunctionalTestStub {
 	}
 
 	@Test
+	@Ignore
 	public final void test()
 	throws Exception {
 		//TODO test the results
