@@ -1,12 +1,11 @@
 package com.emc.mongoose.storage.driver.pravega.system;
 
 
+import com.emc.mongoose.storage.driver.pravega.util.EnvUtil;
 import com.emc.mongoose.storage.driver.pravega.util.docker.MongooseContainer;
 import com.emc.mongoose.storage.driver.pravega.util.docker.PravegaNodeContainer;
 import com.github.akurilov.commons.system.SizeInBytes;
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
+import org.junit.*;
 
 import java.io.File;
 import java.io.IOException;
@@ -23,11 +22,11 @@ import static com.emc.mongoose.storage.driver.pravega.util.docker.MongooseContai
 public class FunctionalTestStub {
 	private static final String SCENARIO_FILE = null; //"scenario" + File.separator + "*.js";
 	/*TODO: add all settings fields*/
-	private static final String ITEM_LIST_FILE = CONTAINER_SHARE_PATH + File.separator + "*.cvs";
-	private static final String ITEM_OUTPUT_PATH = "/" + FunctionalTestStub.class.getSimpleName();
+//	private static final String ITEM_LIST_FILE = CONTAINER_SHARE_PATH + File.separator + "*.cvs";
+//	private static final String ITEM_OUTPUT_PATH = "/" + FunctionalTestStub.class.getSimpleName();
 	private static final String STEP_ID = FunctionalTestStub.class.getSimpleName();
 	private static final int STEP_LIMIT_COUNT = 1000;
-	private static final SizeInBytes ITEM_DATA_SIZE = new SizeInBytes(MIB);
+	private static final int RUN_MODE = 1;
 	private static final int CONCURRENCY = 10;
 
 	private static PravegaNodeContainer PRAVEGA_NODE_CONTAINER;
@@ -48,7 +47,10 @@ public class FunctionalTestStub {
 		}
 		Files.copy(Paths.get(resourceScenarioPath), hostScenarioPath);
 		final List<String> args = new ArrayList<>();
+		args.add("--load-step-id=" + STEP_ID);
+		args.add("--run-scenario=" + hostScenarioPath);
 		//TODO: add args
+		EnvUtil.set("STEP_LIMIT_COUNT", Integer.toString(STEP_LIMIT_COUNT));
 		//TODO: EnvUtil
 
 		try {
@@ -70,7 +72,11 @@ public class FunctionalTestStub {
 		MONGOOSE_CONTAINER.close();
 	}
 
-
+	@Test
+	public final void test()
+	throws Exception {
+		//TODO test the results
+	}
 
 
 }
