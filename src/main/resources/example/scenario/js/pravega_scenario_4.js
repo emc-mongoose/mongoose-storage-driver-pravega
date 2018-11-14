@@ -1,33 +1,41 @@
-var additionalSegmentCount = 100
+var concurrencyLimits = [
+	1, 10, 20, 30, 40, 50
+]
+var eventPayloadSize = 1000
+var timeLimitPerStep = "1m"
 
-var sharedConfig = {
-	"item" : {
-		"data" : {
-			"size" : 1000
-		},
-		"output" : {
-			"path" : "stream-4"
-		}
-	},
-	"load" : {
-		"op" : {
-			"limit" : {
-				"rate" : 300000
+function writeEventsLoadStepConfig(c) {
+	return {
+		"item" : {
+			"data" : {
+				"size" : eventPayloadSize
+			},
+			"output" : {
+				"path" : "test-stream"
 			}
 		},
-		"step" : {
-			"limit" : {
-				"time" : 100
+		"load" : {
+			"step" : {
+				"id" : stepId,
+				"limit" : {
+					"time" : timeLimitPerStep
+				}
 			}
-		}
-	},
-	"storage" : {
-		"driver" : {
-			"type" : "pravega"
 		},
-		"net" : {
-			"node" : {
-				"port" : 9090
+		"storage" : {
+			"driver" : {
+				"limit" : {
+					"concurrency" : c
+				},
+				"scaling" : {
+					"segments" : c
+				},
+				"type" : "pravega"
+			},
+			"net" : {
+				"node" : {
+					"port" : 9090
+				}
 			}
 		}
 	}
@@ -40,42 +48,15 @@ print("Run the Pravega standalone...")
 cmdRunPravega.waitFor();
 print("OK")
 
-print("Create the stream and fill it with some events...")
-Load
-	.config(sharedConfig)
-	.config(
-		{
-			"load" : {
-				"step" : {
-					"id" : "pravega_scenario_4_create_stream"
-				}
-			}
-		}
-	)
-	.run()
-
-print("Update the stream from the previous load step to more segments...")
-Load
-	.config(sharedConfig)
-	.config(
-		{
-			"load" : {
-				"step" : {
-					"id" : "pravega_scenario_4_update_stream_to_more_segments"
-				}
-			},
-			"storage" : {
-				"driver" : {
-					"create" : {
-						"key" : {
-							"count" : additionalSegmentCount
-						}
-					}
-				}
-			}
-		}
-	)
-	.run()
+print("Run the test...")
+for(var i = 0; i < concurrencyLimits.length; i ++) {
+	concurrencyLimit = concurrencyLimits[i]
+	print("Run the load step using the concurrency limit = " + concurrencyLimit)
+	var stepId = "pravega_scenario_1_concurrency_" + concurrencyLimit
+	Load
+		.config(writeEventsLoadStepConfig(concurrencyLimit))
+		.run();
+}
 
 var cmdStopPravega = new java.lang.ProcessBuilder()
 	.command("sh", "-c", "docker stop pravega_standalone")

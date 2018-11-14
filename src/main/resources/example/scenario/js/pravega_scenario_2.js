@@ -2,8 +2,7 @@ var concurrencyLimits = [
 	1, 10, 20, 30, 40, 50
 ]
 var eventPayloadSize = 1000
-var rateLimit = 300000
-var timeLimitPerStep = "100s"
+var timeLimitPerStep = "1m"
 
 function writeEventsLoadStepConfig(c) {
 	return {
@@ -16,11 +15,6 @@ function writeEventsLoadStepConfig(c) {
 			}
 		},
 		"load" : {
-			"op" : {
-				"limit" : {
-					"rate" : rateLimit
-				}
-			},
 			"step" : {
 				"id" : stepId,
 				"limit" : {
