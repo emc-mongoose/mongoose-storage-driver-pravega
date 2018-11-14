@@ -2,6 +2,8 @@ package com.emc.mongoose.storage.driver.pravega.cache;
 
 import com.emc.mongoose.storage.driver.pravega.exception.ScopeCreateException;
 
+import io.pravega.client.stream.StreamConfiguration;
+
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
@@ -24,7 +26,7 @@ extends Function<String, StreamCreateFunction> {
 	/**
 	 The supplementary function to create the cache of the streams for the given scope
 	 */
-	static Map<String, String> createStreamCache(final String scopeName) {
+	static Map<String, StreamConfiguration> createStreamCache(final String scopeName) {
 		return new ConcurrentHashMap<>();
 	}
 }

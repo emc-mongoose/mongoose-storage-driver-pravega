@@ -65,14 +65,13 @@ for(var i = 0; i < concurrencyLimits.length; i ++) {
 
 var cmdStopPravega = new java.lang.ProcessBuilder()
 	.command("sh", "-c", "docker stop pravega_standalone")
-	.inheritIO()
 	.start();
 print("Stop the Pravega container...")
 cmdStopPravega.waitFor();
 print("OK")
+
 var cmdRemovePravegaContainer = new java.lang.ProcessBuilder()
 	.command("sh", "-c", "docker rm pravega_standalone")
-	.inheritIO()
 	.start();
 print("Remove the Pravega container...")
 cmdRemovePravegaContainer.waitFor();
