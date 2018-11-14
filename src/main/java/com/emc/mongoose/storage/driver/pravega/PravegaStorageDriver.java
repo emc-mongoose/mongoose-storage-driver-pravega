@@ -472,7 +472,7 @@ extends CoopStorageDriverBase<I, O>  {
 				if(!closeExecutor.awaitTermination(CLOSE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
 					Loggers.ERR.warn(
 						"{}: storage driver timeout while closing one of \"{}\"",
-						closeables.stream().findFirst().get().getClass(), stepId
+						stepId, closeables.stream().findFirst().get().getClass().getSimpleName()
 					);
 				}
 			} catch(final InterruptedException e) {
