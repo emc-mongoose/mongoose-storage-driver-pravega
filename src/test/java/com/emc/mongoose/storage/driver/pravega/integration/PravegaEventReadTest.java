@@ -7,7 +7,8 @@ import io.pravega.client.admin.ReaderGroupManager;
 import io.pravega.client.admin.StreamManager;
 import io.pravega.client.stream.*;
 import io.pravega.client.stream.impl.JavaSerializer;
-
+import lombok.experimental.var;
+import lombok.val;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -41,51 +42,56 @@ public class PravegaEventReadTest {
 	public void testEventRead()
 			throws Exception {
 		/* writing */
-		final String scopeName = "Scope";
-		final String streamName = "Stream";
-		final URI controllerURI = URI.create("tcp://127.0.0.1:9090");
-		final String routingKey = "RoutingKey";
-		final String testEvent = "TestEvent";
-		final int readerTimeoutMs = 100;
-		final StreamManager streamManager = StreamManager.create(controllerURI);
-		final boolean scopeIsNew = streamManager.createScope(scopeName);
-		StreamConfiguration streamConfig = StreamConfiguration.builder()
-				.scalingPolicy(ScalingPolicy.fixed(1))
-				.build();
-		final boolean streamIsNew = streamManager.createStream(scopeName, streamName, streamConfig);
+		val scopeName = "Scope";
+		val streamName = "Stream";
+		val controllerURI = URI.create("tcp://127.0.0.1:9090");
+		val routingKey = "RoutingKey";
+		val testEvent = "TestEvent";
+		val readerTimeoutMs = 100;
+		val streamManager = StreamManager.create(controllerURI);
+		val scopeIsNew = streamManager.createScope(scopeName);
+		val streamConfig = StreamConfiguration.builder()
+			.scalingPolicy(ScalingPolicy.fixed(1))
+			.build();
+		streamManager.createStream(scopeName, streamName, streamConfig);
 
-		try (final ClientFactory clientFactory = ClientFactory.withScope(scopeName, controllerURI);
-			 EventStreamWriter<String> writer = clientFactory.createEventWriter(streamName,
-					 new JavaSerializer<String>(),
-					 EventWriterConfig.builder().build())) {
+		try(
+			val clientFactory = ClientFactory.withScope(scopeName, controllerURI);
+			val writer = clientFactory.createEventWriter(
+				streamName, new JavaSerializer<>(), EventWriterConfig.builder().build()
+			)
+		) {
 			writer.writeEvent(routingKey, testEvent);
-			System.out.format("Writing message: '%s' with routing-key: '%s' to stream '%s / %s'%n",
-					testEvent, routingKey, scopeName, streamName);
+			System.out.format(
+				"Writing message: '%s' with routing-key: '%s' to stream '%s / %s'%n", testEvent, routingKey, scopeName,
+				streamName
+			);
 		}
 		/*end of writing*/
 
 		/*reading*/
-		final String readerGroup = UUID.randomUUID().toString().replace("-", "");
-		final ReaderGroupConfig readerGroupConfig = ReaderGroupConfig.builder()
-				.stream(Stream.of(scopeName, streamName))
-				.build();
-		try (final ReaderGroupManager readerGroupManager = ReaderGroupManager.withScope(scopeName, controllerURI)) {
+		val readerGroup = UUID.randomUUID().toString().replace("-", "");
+		val readerGroupConfig = ReaderGroupConfig.builder()
+			.stream(Stream.of(scopeName, streamName))
+			.build();
+		try(val readerGroupManager = ReaderGroupManager.withScope(scopeName, controllerURI)) {
 			readerGroupManager.createReaderGroup(readerGroup, readerGroupConfig);
 		}
-		try (final ClientFactory clientFactory = ClientFactory.withScope(scopeName, controllerURI);
-			 EventStreamReader<String> reader = clientFactory.createReader("reader",
-					 readerGroup,
-					 new JavaSerializer<String>(),
-					 ReaderConfig.builder().build())) {
-			EventRead<String> event = null;
-			event = reader.readNextEvent(readerTimeoutMs);
-			if (event.getEvent() != null) {
-				System.out.format("Read event '%s'%n", event.getEvent());
-				assertEquals("we didn't read the event string we had put into stream",
-						"TestEvent", event.getEvent());
+		try(
+			val clientFactory = ClientFactory.withScope(scopeName, controllerURI);
+			val reader = clientFactory.createReader(
+				"reader", readerGroup, new JavaSerializer<>(), ReaderConfig.builder().build()
+			)
+		) {
+			val event1 = reader.readNextEvent(readerTimeoutMs);
+			if(event1.getEvent() != null) {
+				System.out.format("Read event '%s'%n", event1.getEvent());
+				assertEquals(
+					"we didn't read the event string we had put into stream", "TestEvent", event1.getEvent()
+				);
 			}
-			event = reader.readNextEvent(readerTimeoutMs);
-			assertNull("there should't be anything else in the stream", event.getEvent());
+			val event2 = reader.readNextEvent(readerTimeoutMs);
+			assertNull("there should't be anything else in the stream", event2.getEvent());
 			System.out.format("No more events from %s/%s%n", scopeName, streamName);
 		}
 	}
