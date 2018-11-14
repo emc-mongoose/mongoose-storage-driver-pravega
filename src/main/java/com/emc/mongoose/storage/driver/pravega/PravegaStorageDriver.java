@@ -471,7 +471,7 @@ extends CoopStorageDriverBase<I, O>  {
 	void submitStreamDeleteOperation(final PathOperation streamOp, final String nodeAddr) {
 		try {
 			final String scopeName = DEFAULT_SCOPE; // TODO make this configurable
-			final String streamName = streamOp.dstPath();
+			final String streamName = streamOp.item().name();
 			final URI endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::makeEndpointUri);
 			final StreamManager streamMgr = streamMgrCache.computeIfAbsent(endpointUri, StreamManager::create);
 			if (streamMgr.sealStream(scopeName, streamName)) {
