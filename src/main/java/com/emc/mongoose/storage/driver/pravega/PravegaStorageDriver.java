@@ -5,6 +5,7 @@ import static com.emc.mongoose.item.op.Operation.Status.FAIL_UNKNOWN;
 import static com.emc.mongoose.item.op.Operation.Status.INTERRUPTED;
 import static com.emc.mongoose.item.op.Operation.Status.RESP_FAIL_CLIENT;
 import static com.emc.mongoose.item.op.Operation.Status.SUCC;
+import static com.emc.mongoose.item.op.Operation.Status.RESP_FAIL_UNKNOWN;
 import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.DEFAULT_SCOPE;
 import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.DEFAULT_URI_SCHEMA;
 import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.DRIVER_NAME;
@@ -425,7 +426,35 @@ extends CoopStorageDriverBase<I, O>  {
 	}
 
 	void submitStreamDeleteOperation(final PathOperation streamOp, final String nodeAddr) {
-		// TODO: Igor, issue SDP-49
+		try {
+			final String scopeName = DEFAULT_SCOPE; // TODO make this configurable
+			final String streamName = streamOp.item().name();
+			final URI endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::makeEndpointUri);
+			final StreamManager streamMgr = streamMgrCache.computeIfAbsent(endpointUri, StreamManager::create);
+			if (streamMgr.sealStream(scopeName, streamName)) {
+				if(streamMgr.deleteStream(scopeName, streamName)) {
+					completeOperation((O) streamOp, SUCC);
+				} else {
+					Loggers.ERR.debug(
+							"Failed to delete the stream {} in the scope {}", streamName,
+							scopeName);
+					completeOperation((O) streamOp, RESP_FAIL_UNKNOWN);
+				}
+			} else {
+				Loggers.ERR.debug(
+						"Failed to seal the stream {} in the scope {}", streamName,
+						scopeName);
+				completeOperation((O) streamOp, RESP_FAIL_UNKNOWN);
+			}
+		} catch(final NullPointerException e) {
+			if(!isStarted()) {
+				completeOperation((O) streamOp, INTERRUPTED);
+			} else {
+				completeFailedOperation((O) streamOp, e);
+			}
+		} catch(final Throwable cause) {
+			completeFailedOperation((O) streamOp, cause);
+		}
 	}
 
 	@Override
