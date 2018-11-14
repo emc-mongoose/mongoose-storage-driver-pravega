@@ -4,28 +4,28 @@
 			"create": {
 				"key": {
 					"enabled": "boolean",
-					"count": "int64"
+					"count": "long"
 				}
 			},
 			"read": {
-				"timeoutMillis": "int32"
+				"timeoutMillis": "int"
 			}
 		},
 		"net": {
-			"bindBacklogSize": "int32",
+			"bindBacklogSize": "int",
 			"interestOpQueued": "boolean",
 			"keepAlive": "boolean",
-			"linger": "int32",
+			"linger": "int",
 			"reuseAddr": "boolean",
-			"rcvBuf": "int32",
-			"sndBuf": "int32",
+			"rcvBuf": "int",
+			"sndBuf": "int",
 			"tcpNoDelay": "boolean",
-			"timeoutMillis": "int32",
+			"timeoutMillis": "int",
 			"ssl": "boolean",
 			"node": {
 				"addrs": "list",
-				"port": "int32",
-				"connAttemptsLimit": "int32"
+				"port": "int",
+				"connAttemptsLimit": "int"
 			}
 		}
 	}
