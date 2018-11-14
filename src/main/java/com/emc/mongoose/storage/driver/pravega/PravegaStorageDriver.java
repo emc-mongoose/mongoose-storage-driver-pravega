@@ -5,6 +5,7 @@ import static com.emc.mongoose.item.op.Operation.Status.FAIL_UNKNOWN;
 import static com.emc.mongoose.item.op.Operation.Status.INTERRUPTED;
 import static com.emc.mongoose.item.op.Operation.Status.RESP_FAIL_CLIENT;
 import static com.emc.mongoose.item.op.Operation.Status.SUCC;
+import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.CLOSE_TIMEOUT_MILLIS;
 import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.DEFAULT_SCOPE;
 import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.DEFAULT_URI_SCHEMA;
 import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.DRIVER_NAME;
@@ -42,7 +43,6 @@ import io.pravega.client.stream.ScalingPolicy;
 import io.pravega.client.stream.Serializer;
 import io.pravega.client.stream.StreamConfiguration;
 
-import lombok.AllArgsConstructor;
 import lombok.Value;
 import lombok.experimental.var;
 import lombok.val;
@@ -52,10 +52,14 @@ import org.apache.logging.log4j.Level;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
@@ -74,7 +78,7 @@ extends CoopStorageDriverBase<I, O>  {
 	private final StreamConfiguration streamConfig;
 
 	// should be an inner class in order to access the stream create function implementation constructor
-	@AllArgsConstructor @Value
+	@Value
 	final class ScopeCreateFunctionImpl
 	implements ScopeCreateFunction {
 
@@ -95,7 +99,7 @@ extends CoopStorageDriverBase<I, O>  {
 	}
 
 	// should be an inner class in order to access the storage driver instance stream config field
-	@AllArgsConstructor @Value
+	@Value
 	final class StreamCreateFunctionImpl
 	implements StreamCreateFunction {
 
@@ -119,7 +123,7 @@ extends CoopStorageDriverBase<I, O>  {
 	}
 
 	// should be an inner class in order to access the storage driver instance's fields (serializer, writer config)
-	@AllArgsConstructor @Value
+	@Value
 	final class EventWriterCreateFunctionImpl
 	implements EventWriterCreateFunction {
 
@@ -434,18 +438,46 @@ extends CoopStorageDriverBase<I, O>  {
 		super.doClose();
 		// clear all caches
 		endpointCache.clear();
-		streamMgrCache.values().forEach(StreamManager::close);
+		closeAllWithTimeout(streamMgrCache.values());
 		streamMgrCache.clear();
 		scopeCreateFuncCache.clear();
 		streamCreateFuncCache.clear();
 		scopeStreamsCache.values().forEach(Map::clear);
 		scopeStreamsCache.clear();
 		clientFactoryCreateFuncCache.clear();
-		clientFactoryCache.values().forEach(ClientFactory::close);
+		closeAllWithTimeout(clientFactoryCache.values());
 		clientFactoryCache.clear();
 		evtWriterCreateFuncCache.clear();
-		evtWriterCache.values().forEach(EventStreamWriter::close);
+		closeAllWithTimeout(evtWriterCache.values());
 		evtWriterCache.clear();
+	}
+
+	void closeAllWithTimeout(final Collection<? extends AutoCloseable> closeables) {
+		if(null != closeables && 0 < closeables.size()) {
+			final ExecutorService closeExecutor = Executors.newFixedThreadPool(closeables.size());
+			closeables.forEach(
+				closeable -> closeExecutor.submit(
+					() -> {
+						try {
+							closeable.close();
+						} catch(final Exception e) {
+							LogUtil.exception(
+								Level.WARN, e, "{}: storage driver failed to close \"{}\"", stepId, closeable
+							);
+						}
+					}
+				)
+			);
+			try {
+				if(!closeExecutor.awaitTermination(CLOSE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
+					Loggers.ERR.warn("{}: storage driver timeout while closing the used resources");
+				}
+			} catch(final InterruptedException e) {
+				throw new InterruptRunException(e);
+			} finally {
+				closeExecutor.shutdownNow();
+			}
+		}
 	}
 
 	@Override
