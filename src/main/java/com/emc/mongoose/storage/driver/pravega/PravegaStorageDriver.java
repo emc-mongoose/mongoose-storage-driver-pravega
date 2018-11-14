@@ -110,8 +110,8 @@ extends CoopStorageDriverBase<I, O>  {
 			try {
 				if(!streamMgr.createStream(scopeName, streamName, streamConfig)) {
 					Loggers.ERR.warn(
-						"Stream \"{}\" was not created @ the scope \"{}\", may be already existing before", streamName,
-						scopeName
+						"Stream \"{}/{}\" was not created @ the scope \"{}\", may be already existing before",
+						scopeName, streamName
 					);
 				}
 				return streamName;
