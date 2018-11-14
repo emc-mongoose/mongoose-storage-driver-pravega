@@ -9,6 +9,12 @@
 			},
 			"read": {
 				"timeoutMillis": 100
+			},
+			"scaling": {
+				"type": "fixed",
+				"rate": 0,
+				"factor": 0,
+				"segments": 1
 			}
 		},
 		"net": {

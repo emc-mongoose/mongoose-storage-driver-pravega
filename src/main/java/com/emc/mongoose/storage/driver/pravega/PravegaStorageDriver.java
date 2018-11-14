@@ -39,7 +39,6 @@ import io.pravega.client.ClientFactory;
 import io.pravega.client.admin.StreamManager;
 import io.pravega.client.stream.EventStreamWriter;
 import io.pravega.client.stream.EventWriterConfig;
-import io.pravega.client.stream.ScalingPolicy;
 import io.pravega.client.stream.Serializer;
 import io.pravega.client.stream.StreamConfiguration;
 
@@ -155,17 +154,16 @@ extends CoopStorageDriverBase<I, O>  {
 	public PravegaStorageDriver(
 		final String stepId, final DataInput dataInput, final Config storageConfig, final boolean verifyFlag,
 		final int batchSize
-	) throws OmgShootMyFootException {
+	) throws OmgShootMyFootException, IllegalArgumentException {
 		super(stepId, dataInput, storageConfig, verifyFlag, batchSize);
-		this.streamConfig = StreamConfiguration
-			.builder()
-			.scalingPolicy(ScalingPolicy.fixed(concurrencyLimit))
-			.build();
+		val driverConfig = storageConfig.configVal("driver");
+		val scalingConfig = driverConfig.configVal("scaling");
+		val scalingPolicy = PravegaScalingConfig.scalingPolicy(scalingConfig);
+		this.streamConfig = StreamConfiguration.builder().scalingPolicy(scalingPolicy).build();
 		this.uriSchema = DEFAULT_URI_SCHEMA;
 		val nodeConfig = storageConfig.configVal("net-node");
 		nodePort = storageConfig.intVal("net-node-port");
 		val endpointAddrList = nodeConfig.listVal("addrs");
-		val driverConfig = storageConfig.configVal("driver");
 		val createRoutingKeysConfig = driverConfig.configVal("create-key");
 		createRoutingKeys = createRoutingKeysConfig.boolVal("enabled");
 		createRoutingKeysPeriod = createRoutingKeysConfig.longVal("count");

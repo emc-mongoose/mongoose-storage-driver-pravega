@@ -9,6 +9,12 @@
 			},
 			"read": {
 				"timeoutMillis": "int"
+			},
+			"scaling": {
+				"type": "string",
+				"rate": "int",
+				"factor": "int",
+				"segments": "int"
 			}
 		},
 		"net": {

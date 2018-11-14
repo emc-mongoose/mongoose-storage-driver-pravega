@@ -1,4 +1,4 @@
-var concurrencyLimit = 100
+var additionalSegmentCount = 100
 
 var sharedConfig = {
 	"item" : {
@@ -23,10 +23,12 @@ var sharedConfig = {
 	},
 	"storage" : {
 		"driver" : {
-			"limit" : {
-				"concurrency" : concurrencyLimit
-			},
 			"type" : "pravega"
+		},
+		"net" : {
+			"node" : {
+				"port" : 9090
+			}
 		}
 	}
 }
@@ -66,7 +68,7 @@ Load
 				"driver" : {
 					"create" : {
 						"key" : {
-							"count" : concurrencyLimit
+							"count" : additionalSegmentCount
 						}
 					}
 				}

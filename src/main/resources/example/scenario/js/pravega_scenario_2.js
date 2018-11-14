@@ -30,6 +30,11 @@ function writeEventsLoadStepConfig(c) {
 		},
 		"storage" : {
 			"driver" : {
+				"create" : {
+					"key" : {
+						"count" : 0 // -> use new routing key for each new event
+					}
+				},
 				"limit" : {
 					"concurrency" : c
 				},
@@ -58,7 +63,7 @@ print("Run the test...")
 for(var i = 0; i < concurrencyLimits.length; i ++) {
 	concurrencyLimit = concurrencyLimits[i]
 	print("Run the load step using the concurrency limit = " + concurrencyLimit)
-	var stepId = "pravega_scenario_1_concurrency_" + concurrencyLimit
+	var stepId = "pravega_scenario_2_concurrency_" + concurrencyLimit
 	Load
 		.config(writeEventsLoadStepConfig(concurrencyLimit))
 		.run();
