@@ -55,11 +55,11 @@ The storage driver extends the Mongoose's Abstract Coop Storage Driver and uses 
 
 Get the latest pre-built jar file which is available at:
 http://repo.maven.apache.org/maven2/com/github/emc-mongoose/mongoose-storage-driver-pravega/
-The jar file may be downloaded manually and placed into the <USER_HOME_DIR>/.mongoose/<VERSION>/ext directory of
+The jar file may be downloaded manually and placed into the <USER_HOME_DIR>/.mongoose/4.0.2/ext directory of
 Mongoose to be automatically loaded into the runtime.
 
 ```bash
-java -jar mongoose-<VERSION>.jar \
+java -jar mongoose-4.0.2.jar \
     --storage-driver-type=pravega \
     --storage-net-node-addrs=<NODE_IP_ADDRS> \
     --storage-net-node-port=<NODE_PORT> \
@@ -233,7 +233,7 @@ TODO
 1. Build the storage driver
 2. Copy the storage driver's jar file into the mongoose's `ext` directory:
 ```bash
-cp -f build/libs/mongoose-storage-driver-pravega.jar ~/.mongoose/<VERSION>/ext/
+cp -f build/libs/mongoose-storage-driver-pravega.jar ~/.mongoose/4.0.2/ext/
 ```
 3. Run the Pravega standalone node:
 ```bash
@@ -241,7 +241,7 @@ docker run --network host --expose 9090 pravega/pravega standalone
 ```
 4. Run some Mongoose scenario:
 ```bash
-java -jar mongoose-<VERSION>.jar \
+java -jar mongoose-4.0.2.jar \
     --storage-driver-type=pravega \
     --storage-net-node-port=9090 \
     --item-data-size=1000 \
