@@ -31,7 +31,7 @@ ext {
 		grpc: "1.8.0",
 		guava: "20.0",
         log4j: "2.8.2",
-        mongoose: "4.0.1",
+        mongoose: "4.0.2",
 	    netty: "4.1.16.Final",
 	    opencensus: "0.8.0",
 		pravega: "0.3.2",

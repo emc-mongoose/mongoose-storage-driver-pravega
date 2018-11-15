@@ -1,9 +1,9 @@
 package com.emc.mongoose.storage.driver.pravega.exception;
 
-public class StreamCreateException
+public class StreamUpdateException
 extends StreamException {
 
-	public StreamCreateException(final String streamName, final Throwable cause) {
+	public StreamUpdateException(final String streamName, final Throwable cause) {
 		super(streamName, cause);
 	}
 }

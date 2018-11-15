@@ -41,7 +41,11 @@ implements StorageDriverFactory<I, O, T> {
 
 	private static final List<String> RES_INSTALL_FILES = Collections.unmodifiableList(
 		Arrays.asList(
-			"config/" + DEFAULTS_FILE_NAME
+			"config/" + DEFAULTS_FILE_NAME,
+			"example/scenario/js/pravega_scenario_1.js",
+			"example/scenario/js/pravega_scenario_2.js",
+			"example/scenario/js/pravega_scenario_3.js",
+			"example/scenario/js/pravega_scenario_4.js"
 		)
 	);
 
