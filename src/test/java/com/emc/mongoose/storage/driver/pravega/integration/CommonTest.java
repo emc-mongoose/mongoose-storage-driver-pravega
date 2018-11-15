@@ -19,8 +19,7 @@ import com.github.akurilov.commons.system.SizeInBytes;
 import com.github.akurilov.confuse.Config;
 import com.github.akurilov.confuse.SchemaProvider;
 import com.github.akurilov.confuse.impl.BasicConfig;
-
-
+import lombok.val;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
@@ -59,7 +58,7 @@ public class CommonTest {
 
 		private static Config getConfig() {
 			try {
-				final List<Map<String, Object>> configSchemas = Extension
+				val configSchemas = Extension
 					.load(Thread.currentThread().getContextClassLoader())
 					.stream()
 					.map(Extension::schemaProvider)
@@ -81,9 +80,8 @@ public class CommonTest {
 					.stream()
 					.findFirst()
 					.ifPresent(configSchemas::add);
-				final Map<String, Object> configSchema = TreeUtil.reduceForest(configSchemas);
-				final Config config = new BasicConfig("-", configSchema);
-
+				val configSchema = TreeUtil.reduceForest(configSchemas);
+				val config = new BasicConfig("-", configSchema);
 
 				config.val("load-batch-size", 4096);
 
@@ -108,6 +106,10 @@ public class CommonTest {
 				config.val("storage-driver-create-key-enabled", false);
 				config.val("storage-driver-create-key-count", 0);
 				config.val("storage-driver-read-timeoutMillis", 100);
+				config.val("storage-driver-scaling-type", "fixed");
+				config.val("storage-driver-scaling-rate", 0);
+				config.val("storage-driver-scaling-factor", 0);
+				config.val("storage-driver-scaling-segments", 1);
 				config.val("storage-driver-threads", 0);
 				config.val("storage-driver-limit-queue-input", 1_000_000);
 				config.val("storage-driver-limit-queue-output", 1_000_000);
@@ -119,12 +121,12 @@ public class CommonTest {
 		}
 
 		public CommonTest ()
-			throws OmgShootMyFootException {
+		throws OmgShootMyFootException {
 			this(getConfig());
 		}
 
 		private CommonTest (final Config config)
-			throws OmgShootMyFootException {
+		throws OmgShootMyFootException {
 			pravegaStorageDriver = new PravegaStorageDriver(
 				"test-data-pravega-driver", DATA_INPUT, config.configVal("storage"), true,
 				config.configVal("load").intVal("batch-size")
@@ -133,7 +135,7 @@ public class CommonTest {
 
 		@BeforeClass
 		public static void setUpClass()
-			throws Exception {
+		throws Exception {
 			try {
 				PRAVEGA_NODE_CONTAINER = new PravegaNodeContainer();
 			} catch(final Exception e) {
@@ -143,7 +145,7 @@ public class CommonTest {
 
 		@AfterClass
 		public static void tearDownClass()
-			throws Exception {
+		throws Exception {
 			PRAVEGA_NODE_CONTAINER.close();
 
 		}
@@ -151,6 +153,6 @@ public class CommonTest {
 
 		@Test
 		public final void testExample()
-			throws Exception {
+		throws Exception {
 		}
 }

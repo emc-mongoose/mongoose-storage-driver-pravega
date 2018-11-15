@@ -1,10 +1,13 @@
 package com.emc.mongoose.storage.driver.pravega.io;
 
 import com.emc.mongoose.item.DataItem;
-
 import com.emc.mongoose.logging.Loggers;
+
 import com.github.akurilov.commons.system.SizeInBytes;
+
 import io.pravega.client.stream.Serializer;
+
+import lombok.val;
 
 import java.io.IOException;
 import java.io.Serializable;
@@ -32,9 +35,8 @@ implements Serializer<DataItem>, Serializable {
 	@Override
 	public final ByteBuffer serialize(final DataItem dataItem)
 	throws OutOfMemoryError, IllegalArgumentException {
-		final ByteBuffer dstBuff;
 		try {
-			final long dataItemSize = dataItem.size();
+			val dataItemSize = dataItem.size();
 			if(Integer.MAX_VALUE < dataItemSize) {
 				throw new IllegalArgumentException("Can't serialize the data item with size > 2^31 - 1");
 			}
@@ -44,11 +46,9 @@ implements Serializer<DataItem>, Serializable {
 					SizeInBytes.formatFixedSize(dataItemSize), SizeInBytes.formatFixedSize(MAX_EVENT_SIZE)
 				);
 			}
-			if(useDirectMem) {
-				dstBuff = ByteBuffer.allocateDirect((int) dataItemSize); // will crash if not enough memory
-			} else {
-				dstBuff = ByteBuffer.allocate((int) dataItemSize); // will throw OOM error if not enough memory
-			}
+			val dstBuff = useDirectMem ?
+				ByteBuffer.allocateDirect((int) dataItemSize) : // will crash if not enough memory
+				ByteBuffer.allocate((int) dataItemSize); // will throw OOM error if not enough memory
 			while(dstBuff.remaining() > 0) {
 				dataItem.read(dstBuff);
 			}

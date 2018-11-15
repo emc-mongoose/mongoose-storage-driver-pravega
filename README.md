@@ -55,11 +55,11 @@ The storage driver extends the Mongoose's Abstract Coop Storage Driver and uses 
 
 Get the latest pre-built jar file which is available at:
 http://repo.maven.apache.org/maven2/com/github/emc-mongoose/mongoose-storage-driver-pravega/
-The jar file may be downloaded manually and placed into the <USER_HOME_DIR>/.mongoose/<VERSION>/ext directory of
+The jar file may be downloaded manually and placed into the <USER_HOME_DIR>/.mongoose/4.0.2/ext directory of
 Mongoose to be automatically loaded into the runtime.
 
 ```bash
-java -jar mongoose-<VERSION>.jar \
+java -jar mongoose-4.0.2.jar \
     --storage-driver-type=pravega \
     --storage-net-node-addrs=<NODE_IP_ADDRS> \
     --storage-net-node-port=<NODE_PORT> \
@@ -107,9 +107,13 @@ docker run \
 
 | Name                              | Type            | Default Value | Description                                      |
 |:----------------------------------|:----------------|:--------------|:-------------------------------------------------|
-| storage-driver-create-key-enabled | boolean         | false         | Specifies if Mongoose should generate its own routing key during the events creation
-| storage-driver-create-key-count   | integer         | 0             | Specifies a max count of unique routing keys to use during the events creation (may be considered as a routing key period). 0 value means to use unique routing key for each new event
+| storage-driver-create-key-enabled | boolean         | true          | Specifies if Mongoose should generate its own routing key during the events creation
+| storage-driver-create-key-count   | integer         | 1             | Specifies a max count of unique routing keys to use during the events creation (may be considered as a routing key period). 0 value means to use unique routing key for each new event
 | storage-driver-read-timeoutMillis | integer         | 100           | The event read timeout in milliseconds
+| storage-driver-scaling-type       | one of: "fixed", "event_rate", "byte_rate" | fixed | The scaling policy type to use. [See the Pravega documentation](http://pravega.io/docs/latest/terminology/) for details
+| storage-driver-scaling-rate       | integer         | 0             | The scaling policy target rate. May be meausred in events per second either kilobytes per second depending on the scaling policy type
+| storage-driver-scaling-factor     | integer         | 0             | The scaling policy factor. From the Pravega javadoc: *the maximum number of splits of a segment for a scale-up event.*
+| storage-driver-scaling-segments   | integer         | 1             | From the Pravega javadoc: *the minimum number of segments that a stream can have independent of the number of scale down events.*
 | storage-net-node-addrs            | list of strings | 127.0.0.1     | The list of the Pravega storage nodes to use for the load
 | storage-net-node-port             | integer         | 9020          | The default port of the Pravega storage nodes, should be explicitly set to 9090 (the value used by Pravega by default)
 
@@ -233,18 +237,17 @@ TODO
 1. Build the storage driver
 2. Copy the storage driver's jar file into the mongoose's `ext` directory:
 ```bash
-cp -f build/libs/mongoose-storage-driver-pravega.jar ~/.mongoose/<VERSION>/ext/
+cp -f build/libs/mongoose-storage-driver-pravega.jar ~/.mongoose/4.0.2/ext/
 ```
 3. Run the Pravega standalone node:
 ```bash
-docker run --network host --expose 9090 pravega/pravega standalone
+docker run --network host pravega/pravega standalone
 ```
-4. Run some Mongoose scenario:
+4. Run Mongoose's default scenario with some specific command-line arguments:
 ```bash
-java -jar mongoose-<VERSION>.jar \
+java -jar mongoose-4.0.2.jar \
     --storage-driver-type=pravega \
     --storage-net-node-port=9090 \
-    --item-data-size=1000 \
-    --storage-driver-limit-concurrency=100 \
+    --storage-driver-limit-concurrency=10 \
     --item-output-path=goose-events-stream-0
 ```

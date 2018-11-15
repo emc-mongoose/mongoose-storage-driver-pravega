@@ -19,8 +19,7 @@ import com.github.akurilov.commons.system.SizeInBytes;
 import com.github.akurilov.confuse.Config;
 import com.github.akurilov.confuse.SchemaProvider;
 import com.github.akurilov.confuse.impl.BasicConfig;
-
-
+import lombok.val;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
@@ -60,30 +59,30 @@ private static final DataInput DATA_INPUT;
 
 	private static Config getConfig() {
 		try {
-			final List<Map<String, Object>> configSchemas = Extension
-					.load(Thread.currentThread().getContextClassLoader())
-					.stream()
-					.map(Extension::schemaProvider)
-					.filter(Objects::nonNull)
-					.map(
-						schemaProvider -> {
-							try {
-								return schemaProvider.schema();
-							} catch (final Exception e) {
-								fail(e.getMessage());
-							}
-							return null;
+			val configSchemas = Extension
+				.load(Thread.currentThread().getContextClassLoader())
+				.stream()
+				.map(Extension::schemaProvider)
+				.filter(Objects::nonNull)
+				.map(
+					schemaProvider -> {
+						try {
+							return schemaProvider.schema();
+						} catch (final Exception e) {
+							fail(e.getMessage());
 						}
-					)
-					.filter(Objects::nonNull)
-					.collect(Collectors.toList());
+						return null;
+					}
+				)
+				.filter(Objects::nonNull)
+				.collect(Collectors.toList());
 			SchemaProvider
-					.resolve(APP_NAME, Thread.currentThread().getContextClassLoader())
-					.stream()
-					.findFirst()
-					.ifPresent(configSchemas::add);
-			final Map<String, Object> configSchema = TreeUtil.reduceForest(configSchemas);
-			final Config config = new BasicConfig("-", configSchema);
+				.resolve(APP_NAME, Thread.currentThread().getContextClassLoader())
+				.stream()
+				.findFirst()
+				.ifPresent(configSchemas::add);
+			val configSchema = TreeUtil.reduceForest(configSchemas);
+			val config = new BasicConfig("-", configSchema);
 
 			config.val("load-batch-size", 4096);
 
@@ -108,6 +107,10 @@ private static final DataInput DATA_INPUT;
 			config.val("storage-driver-create-key-enabled", false);
 			config.val("storage-driver-create-key-count", 0);
 			config.val("storage-driver-read-timeoutMillis", 100);
+			config.val("storage-driver-scaling-type", "fixed");
+			config.val("storage-driver-scaling-rate", 0);
+			config.val("storage-driver-scaling-factor", 0);
+			config.val("storage-driver-scaling-segments", 1);
 			config.val("storage-driver-threads", 0);
 			config.val("storage-driver-limit-queue-input", 1_000_000);
 			config.val("storage-driver-limit-queue-output", 1_000_000);
