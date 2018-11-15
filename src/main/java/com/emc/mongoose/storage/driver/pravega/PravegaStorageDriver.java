@@ -4,6 +4,7 @@ import static com.emc.mongoose.item.op.OpType.NOOP;
 import static com.emc.mongoose.item.op.Operation.Status.FAIL_UNKNOWN;
 import static com.emc.mongoose.item.op.Operation.Status.INTERRUPTED;
 import static com.emc.mongoose.item.op.Operation.Status.RESP_FAIL_CLIENT;
+import static com.emc.mongoose.item.op.Operation.Status.RESP_FAIL_UNKNOWN;
 import static com.emc.mongoose.item.op.Operation.Status.SUCC;
 import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.BACKGROUND_THREAD_COUNT;
 import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.CLOSE_TIMEOUT_MILLIS;
@@ -137,7 +138,7 @@ extends CoopStorageDriverBase<I, O>  {
 					scaleToFixedSegmentCount(controller, scopeName, streamName, scalingPolicy);
 				}
 				return streamConfig;
-			} catch(final StreamException e) {
+			} catch(final StreamException | InterruptRunException e) {
 				throw  e;
 			} catch(final InterruptedException e) {
 				throw new InterruptRunException(e);
@@ -427,6 +428,9 @@ extends CoopStorageDriverBase<I, O>  {
 			} else {
 				completeFailedOperation((O) evtOp, e);
 			}
+		} catch(final InterruptRunException e) {
+			completeOperation((O) evtOp, INTERRUPTED);
+			throw e;
 		} catch(final Throwable cause) {
 			completeFailedOperation((O) evtOp, cause);
 		}
@@ -469,10 +473,14 @@ extends CoopStorageDriverBase<I, O>  {
 		try {
 			final String scopeName = DEFAULT_SCOPE; // TODO make this configurable
 			final String streamName = streamOp.item().name();
-			final URI endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::makeEndpointUri);
-			final StreamManager streamMgr = streamMgrCache.computeIfAbsent(endpointUri, StreamManager::create);
-			if (streamMgr.sealStream(scopeName, streamName)) {
-				if(streamMgr.deleteStream(scopeName, streamName)) {
+			final URI endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
+			final Controller controller = controllerCache.computeIfAbsent(endpointUri, this::createController);
+			if(controller.sealStream(scopeName, streamName).get(CONTROL_API_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
+				if(
+					controller
+						.deleteStream(scopeName, streamName)
+						.get(CONTROL_API_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)
+				) {
 					completeOperation((O) streamOp, SUCC);
 				} else {
 					Loggers.ERR.debug(
@@ -492,6 +500,12 @@ extends CoopStorageDriverBase<I, O>  {
 			} else {
 				completeFailedOperation((O) streamOp, e);
 			}
+		} catch(final InterruptedException e) {
+			completeOperation((O) streamOp, INTERRUPTED);
+			throw new InterruptRunException(e);
+		} catch(final InterruptRunException e) {
+			completeOperation((O) streamOp, INTERRUPTED);
+			throw e;
 		} catch(final Throwable cause) {
 			completeFailedOperation((O) streamOp, cause);
 		}

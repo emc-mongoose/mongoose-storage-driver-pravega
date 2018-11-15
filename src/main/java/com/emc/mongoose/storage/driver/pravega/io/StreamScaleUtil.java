@@ -23,7 +23,7 @@ public interface StreamScaleUtil {
 
 	static void scaleToFixedSegmentCount(
 		final Controller controller, final String scopeName, final String streamName, final ScalingPolicy scalingPolicy
-	) throws StreamUpdateException {
+	) throws StreamUpdateException, InterruptRunException {
 		val segments = controller.getCurrentSegments(scopeName, streamName).join();
 		val segmentCount = segments.getSegments().size();
 		val targetSegmentCount = scalingPolicy.getMinNumSegments();
