@@ -1,6 +1,9 @@
 {
 	"storage": {
 		"driver": {
+			"control": {
+				"timeoutMillis": 30000
+			},
 			"create": {
 				"key": {
 					"enabled": true,

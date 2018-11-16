@@ -1,7 +1,5 @@
 package com.emc.mongoose.storage.driver.pravega.cache;
 
-import com.emc.mongoose.storage.driver.pravega.exception.ScopeCreateException;
-
 import io.pravega.client.stream.StreamConfiguration;
 
 import java.util.Map;
@@ -17,11 +15,9 @@ extends Function<String, StreamCreateFunction> {
 	/**
 	 @param scopeName the name of the scope to create
 	 @return the function to create a stream in the given scope
-	 @throws ScopeCreateException
 	 */
 	@Override
-	StreamCreateFunction apply(final String scopeName)
-	throws ScopeCreateException;
+	StreamCreateFunction apply(final String scopeName);
 
 	/**
 	 The supplementary function to create the cache of the streams for the given scope

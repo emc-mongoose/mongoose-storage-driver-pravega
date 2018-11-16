@@ -3,12 +3,9 @@ package com.emc.mongoose.storage.driver.pravega;
 import static com.emc.mongoose.item.op.OpType.NOOP;
 import static com.emc.mongoose.item.op.Operation.Status.FAIL_UNKNOWN;
 import static com.emc.mongoose.item.op.Operation.Status.INTERRUPTED;
-import static com.emc.mongoose.item.op.Operation.Status.RESP_FAIL_CLIENT;
 import static com.emc.mongoose.item.op.Operation.Status.RESP_FAIL_UNKNOWN;
 import static com.emc.mongoose.item.op.Operation.Status.SUCC;
 import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.BACKGROUND_THREAD_COUNT;
-import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.CLOSE_TIMEOUT_MILLIS;
-import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.CONTROL_API_TIMEOUT_MILLIS;
 import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.DEFAULT_SCOPE;
 import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.DEFAULT_URI_SCHEMA;
 import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.DRIVER_NAME;
@@ -34,9 +31,6 @@ import com.emc.mongoose.storage.driver.pravega.cache.ClientFactoryCreateFunction
 import com.emc.mongoose.storage.driver.pravega.cache.ScopeCreateFunction;
 import com.emc.mongoose.storage.driver.pravega.cache.StreamCreateFunction;
 import com.emc.mongoose.storage.driver.pravega.cache.EventWriterCreateFunction;
-import com.emc.mongoose.storage.driver.pravega.exception.ScopeCreateException;
-import com.emc.mongoose.storage.driver.pravega.exception.StreamCreateException;
-import com.emc.mongoose.storage.driver.pravega.exception.StreamException;
 import com.emc.mongoose.storage.driver.pravega.io.DataItemSerializer;
 
 import com.github.akurilov.confuse.Config;
@@ -78,6 +72,7 @@ extends CoopStorageDriverBase<I, O>  {
 	protected final String uriSchema;
 	protected final String[] endpointAddrs;
 	protected final int nodePort;
+	protected final int controlApiTimeoutMillis;
 	protected final boolean createRoutingKeys;
 	protected final long createRoutingKeysPeriod;
 	protected final int readTimeoutMillis;
@@ -96,20 +91,19 @@ extends CoopStorageDriverBase<I, O>  {
 		Controller controller;
 
 		@Override
-		public final StreamCreateFunction apply(final String scopeName)
-		throws ScopeCreateException {
+		public final StreamCreateFunction apply(final String scopeName) {
 			try {
-				if(controller.createScope(scopeName).get(CONTROL_API_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
+				if(controller.createScope(scopeName).get(controlApiTimeoutMillis, TimeUnit.MILLISECONDS)) {
 					Loggers.MSG.trace("Scope \"{}\" was created", scopeName);
 				} else {
 					Loggers.MSG.info("Scope \"{}\" was not created, may be already existing before", scopeName);
 				}
-				return new StreamCreateFunctionImpl(controller, scopeName);
 			} catch(final InterruptedException e) {
 				throw new InterruptRunException(e);
 			} catch(final Throwable cause) {
-				throw new ScopeCreateException(scopeName, cause);
+				LogUtil.exception(Level.WARN, cause, "{}: failed to create the scope \"{}\"", stepId, scopeName);
 			}
+			return new StreamCreateFunctionImpl(controller, scopeName);
 		}
 	}
 
@@ -123,28 +117,28 @@ extends CoopStorageDriverBase<I, O>  {
 
 		@Override
 		public final StreamConfiguration apply(final String streamName) {
+			final StreamConfiguration streamConfig = StreamConfiguration
+				.builder()
+				.scalingPolicy(scalingPolicy)
+				.streamName(streamName)
+				.scope(scopeName)
+				.build();
 			try {
-				final StreamConfiguration streamConfig = StreamConfiguration
-					.builder()
-					.scalingPolicy(scalingPolicy)
-					.streamName(streamName)
-					.scope(scopeName)
-					.build();
-				if(controller.createStream(streamConfig).get(CONTROL_API_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
+				if(controller.createStream(streamConfig).get(controlApiTimeoutMillis, TimeUnit.MILLISECONDS)) {
 					Loggers.MSG.trace(
 						"Stream \"{}/{}\" was created using the config: {}", scopeName, streamName, streamConfig
 					);
 				} else {
-					scaleToFixedSegmentCount(controller, scopeName, streamName, scalingPolicy);
+					scaleToFixedSegmentCount(controller, controlApiTimeoutMillis, scopeName, streamName, scalingPolicy);
 				}
-				return streamConfig;
-			} catch(final StreamException | InterruptRunException e) {
+			} catch(final InterruptRunException e) {
 				throw  e;
 			} catch(final InterruptedException e) {
 				throw new InterruptRunException(e);
 			} catch(final Throwable cause) {
-				throw new StreamCreateException(streamName, cause);
+				LogUtil.exception(Level.WARN, cause, "{}: failed to create the stream \"{}\"", stepId, streamName);
 			}
+			return streamConfig;
 		}
 	}
 
@@ -184,6 +178,7 @@ extends CoopStorageDriverBase<I, O>  {
 	) throws OmgShootMyFootException, IllegalArgumentException {
 		super(stepId, dataInput, storageConfig, verifyFlag, batchSize);
 		val driverConfig = storageConfig.configVal("driver");
+		this.controlApiTimeoutMillis = driverConfig.intVal("control-timeoutMillis");
 		val scalingConfig = driverConfig.configVal("scaling");
 		this.scalingPolicy = PravegaScalingConfig.scalingPolicy(scalingConfig);
 		this.uriSchema = DEFAULT_URI_SCHEMA;
@@ -414,14 +409,6 @@ extends CoopStorageDriverBase<I, O>  {
 			}
 			evtOp.startRequest();
 			writeEvtFuture.handle((returned, thrown) -> completeEventCreateOperation(evtOp, evtItem, thrown));
-		} catch(final ScopeCreateException e) {
-			LogUtil.exception(Level.WARN, e.getCause(), "{}: failed to create the scope \"{}\"", stepId, e.scopeName());
-			completeOperation((O) evtOp, RESP_FAIL_CLIENT);
-		} catch(final StreamCreateException e) {
-			LogUtil.exception(
-				Level.WARN, e.getCause(), "{}: failed to create the stream \"{}\"", stepId, e.streamName()
-			);
-			completeOperation((O) evtOp, RESP_FAIL_CLIENT);
 		} catch(final NullPointerException e) {
 			if(!isStarted()) { // occurs on manual interruption which is normal so should be handled
 				completeOperation((O) evtOp, INTERRUPTED);
@@ -475,11 +462,11 @@ extends CoopStorageDriverBase<I, O>  {
 			final String streamName = streamOp.item().name();
 			final URI endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
 			final Controller controller = controllerCache.computeIfAbsent(endpointUri, this::createController);
-			if(controller.sealStream(scopeName, streamName).get(CONTROL_API_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
+			if(controller.sealStream(scopeName, streamName).get(controlApiTimeoutMillis, TimeUnit.MILLISECONDS)) {
 				if(
 					controller
 						.deleteStream(scopeName, streamName)
-						.get(CONTROL_API_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)
+						.get(controlApiTimeoutMillis, TimeUnit.MILLISECONDS)
 				) {
 					completeOperation((O) streamOp, SUCC);
 				} else {
@@ -549,7 +536,7 @@ extends CoopStorageDriverBase<I, O>  {
 				)
 			);
 			try {
-				if(!closeExecutor.awaitTermination(CLOSE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
+				if(!closeExecutor.awaitTermination(controlApiTimeoutMillis, TimeUnit.MILLISECONDS)) {
 					Loggers.ERR.warn(
 						"{}: storage driver timeout while closing one of \"{}\"", stepId,
 						closeables.stream().findFirst().get().getClass().getSimpleName()
