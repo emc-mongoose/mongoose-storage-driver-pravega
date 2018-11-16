@@ -1,19 +1,5 @@
 package com.emc.mongoose.storage.driver.pravega;
 
-import static com.emc.mongoose.item.op.OpType.NOOP;
-import static com.emc.mongoose.item.op.Operation.Status.FAIL_UNKNOWN;
-import static com.emc.mongoose.item.op.Operation.Status.INTERRUPTED;
-import static com.emc.mongoose.item.op.Operation.Status.RESP_FAIL_CLIENT;
-import static com.emc.mongoose.item.op.Operation.Status.RESP_FAIL_UNKNOWN;
-import static com.emc.mongoose.item.op.Operation.Status.SUCC;
-import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.BACKGROUND_THREAD_COUNT;
-import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.CLOSE_TIMEOUT_MILLIS;
-import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.CONTROL_API_TIMEOUT_MILLIS;
-import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.DEFAULT_SCOPE;
-import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.DEFAULT_URI_SCHEMA;
-import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.DRIVER_NAME;
-import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.MAX_BACKOFF_MILLIS;
-import static com.emc.mongoose.storage.driver.pravega.io.StreamScaleUtil.scaleToFixedSegmentCount;
 import com.emc.mongoose.data.DataInput;
 import com.emc.mongoose.exception.InterruptRunException;
 import com.emc.mongoose.exception.OmgShootMyFootException;
@@ -29,33 +15,24 @@ import com.emc.mongoose.logging.LogUtil;
 import com.emc.mongoose.logging.Loggers;
 import com.emc.mongoose.storage.Credential;
 import com.emc.mongoose.storage.driver.coop.CoopStorageDriverBase;
-import com.emc.mongoose.storage.driver.pravega.cache.ClientFactoryCreateFunction;
-import com.emc.mongoose.storage.driver.pravega.cache.ClientFactoryCreateFunctionImpl;
-import com.emc.mongoose.storage.driver.pravega.cache.ScopeCreateFunction;
-import com.emc.mongoose.storage.driver.pravega.cache.StreamCreateFunction;
-import com.emc.mongoose.storage.driver.pravega.cache.EventWriterCreateFunction;
+import com.emc.mongoose.storage.driver.pravega.cache.*;
 import com.emc.mongoose.storage.driver.pravega.exception.ScopeCreateException;
 import com.emc.mongoose.storage.driver.pravega.exception.StreamCreateException;
 import com.emc.mongoose.storage.driver.pravega.exception.StreamException;
 import com.emc.mongoose.storage.driver.pravega.io.DataItemSerializer;
-
 import com.github.akurilov.confuse.Config;
-
 import io.pravega.client.ClientConfig;
 import io.pravega.client.ClientFactory;
-import io.pravega.client.stream.EventStreamWriter;
-import io.pravega.client.stream.EventWriterConfig;
-import io.pravega.client.stream.ScalingPolicy;
-import io.pravega.client.stream.Serializer;
-import io.pravega.client.stream.StreamConfiguration;
+import io.pravega.client.admin.ReaderGroupManager;
+import io.pravega.client.stream.*;
 import io.pravega.client.stream.impl.Controller;
 import io.pravega.client.stream.impl.ControllerImpl;
 import io.pravega.client.stream.impl.ControllerImplConfig;
-
+import io.pravega.client.stream.impl.JavaSerializer;
+import lombok.Cleanup;
 import lombok.Value;
 import lombok.experimental.var;
 import lombok.val;
-
 import org.apache.logging.log4j.Level;
 
 import java.io.IOException;
@@ -64,16 +41,17 @@ import java.net.URISyntaxException;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletionStage;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.UUID;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static com.emc.mongoose.item.op.OpType.NOOP;
+import static com.emc.mongoose.item.op.Operation.Status.*;
+import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.*;
+import static com.emc.mongoose.storage.driver.pravega.io.StreamScaleUtil.scaleToFixedSegmentCount;
+
 public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
-extends CoopStorageDriverBase<I, O>  {
+		extends CoopStorageDriverBase<I, O> {
 
 	protected final String uriSchema;
 	protected final String[] endpointAddrs;
@@ -91,23 +69,23 @@ extends CoopStorageDriverBase<I, O>  {
 	// should be an inner class in order to access the stream create function implementation constructor
 	@Value
 	final class ScopeCreateFunctionImpl
-	implements ScopeCreateFunction {
+			implements ScopeCreateFunction {
 
 		Controller controller;
 
 		@Override
 		public final StreamCreateFunction apply(final String scopeName)
-		throws ScopeCreateException {
+				throws ScopeCreateException {
 			try {
-				if(controller.createScope(scopeName).get(CONTROL_API_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
+				if (controller.createScope(scopeName).get(CONTROL_API_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
 					Loggers.MSG.trace("Scope \"{}\" was created", scopeName);
 				} else {
 					Loggers.MSG.info("Scope \"{}\" was not created, may be already existing before", scopeName);
 				}
 				return new StreamCreateFunctionImpl(controller, scopeName);
-			} catch(final InterruptedException e) {
+			} catch (final InterruptedException e) {
 				throw new InterruptRunException(e);
-			} catch(final Throwable cause) {
+			} catch (final Throwable cause) {
 				throw new ScopeCreateException(scopeName, cause);
 			}
 		}
@@ -116,7 +94,7 @@ extends CoopStorageDriverBase<I, O>  {
 	// should be an inner class in order to access the storage driver instance stream config field
 	@Value
 	final class StreamCreateFunctionImpl
-	implements StreamCreateFunction {
+			implements StreamCreateFunction {
 
 		Controller controller;
 		String scopeName;
@@ -125,24 +103,24 @@ extends CoopStorageDriverBase<I, O>  {
 		public final StreamConfiguration apply(final String streamName) {
 			try {
 				final StreamConfiguration streamConfig = StreamConfiguration
-					.builder()
-					.scalingPolicy(scalingPolicy)
-					.streamName(streamName)
-					.scope(scopeName)
-					.build();
-				if(controller.createStream(streamConfig).get(CONTROL_API_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
+						.builder()
+						.scalingPolicy(scalingPolicy)
+						.streamName(streamName)
+						.scope(scopeName)
+						.build();
+				if (controller.createStream(streamConfig).get(CONTROL_API_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
 					Loggers.MSG.trace(
-						"Stream \"{}/{}\" was created using the config: {}", scopeName, streamName, streamConfig
+							"Stream \"{}/{}\" was created using the config: {}", scopeName, streamName, streamConfig
 					);
 				} else {
 					scaleToFixedSegmentCount(controller, scopeName, streamName, scalingPolicy);
 				}
 				return streamConfig;
-			} catch(final StreamException | InterruptRunException e) {
-				throw  e;
-			} catch(final InterruptedException e) {
+			} catch (final StreamException | InterruptRunException e) {
+				throw e;
+			} catch (final InterruptedException e) {
 				throw new InterruptRunException(e);
-			} catch(final Throwable cause) {
+			} catch (final Throwable cause) {
 				throw new StreamCreateException(streamName, cause);
 			}
 		}
@@ -151,7 +129,7 @@ extends CoopStorageDriverBase<I, O>  {
 	// should be an inner class in order to access the storage driver instance's fields (serializer, writer config)
 	@Value
 	final class EventWriterCreateFunctionImpl
-	implements EventWriterCreateFunction {
+			implements EventWriterCreateFunction {
 
 		ClientFactory clientFactory;
 
@@ -179,8 +157,8 @@ extends CoopStorageDriverBase<I, O>  {
 	private final Map<String, EventStreamWriter<DataItem>> evtWriterCache = new ConcurrentHashMap<>();
 
 	public PravegaStorageDriver(
-		final String stepId, final DataInput dataInput, final Config storageConfig, final boolean verifyFlag,
-		final int batchSize
+			final String stepId, final DataInput dataInput, final Config storageConfig, final boolean verifyFlag,
+			final int batchSize
 	) throws OmgShootMyFootException, IllegalArgumentException {
 		super(stepId, dataInput, storageConfig, verifyFlag, batchSize);
 		val driverConfig = storageConfig.configVal("driver");
@@ -208,7 +186,7 @@ extends CoopStorageDriverBase<I, O>  {
 			final String addr;
 			final int port;
 			val portSepPos = nodeAddr.lastIndexOf(':');
-			if(portSepPos > 0) {
+			if (portSepPos > 0) {
 				addr = nodeAddr.substring(0, portSepPos);
 				port = Integer.parseInt(nodeAddr.substring(portSepPos + 1));
 			} else {
@@ -225,19 +203,19 @@ extends CoopStorageDriverBase<I, O>  {
 	@SuppressWarnings("UnstableApiUsage")
 	Controller createController(final URI endpointUri) {
 		val clientConfig = ClientConfig
-			.builder()
-			.controllerURI(endpointUri)
-			.build();
+				.builder()
+				.controllerURI(endpointUri)
+				.build();
 		val controllerConfig = ControllerImplConfig
-			.builder()
-			.clientConfig(clientConfig)
-			.maxBackoffMillis(MAX_BACKOFF_MILLIS)
-			.build();
+				.builder()
+				.clientConfig(clientConfig)
+				.maxBackoffMillis(MAX_BACKOFF_MILLIS)
+				.build();
 		return new ControllerImpl(controllerConfig, bgExecutor);
 	}
 
 	/**
-	 Not used in this driver implementation
+	 * Not used in this driver implementation
 	 */
 	@Override
 	protected String requestNewPath(final String path) {
@@ -245,7 +223,7 @@ extends CoopStorageDriverBase<I, O>  {
 	}
 
 	/**
-	 Not used in this driver implementation
+	 * Not used in this driver implementation
 	 */
 	@Override
 	protected String requestNewAuthToken(final Credential credential) {
@@ -254,15 +232,15 @@ extends CoopStorageDriverBase<I, O>  {
 
 	@Override
 	public List<I> list(
-		final ItemFactory<I> itemFactory, final String path, final String prefix, final int idRadix,
-		final I lastPrevItem, final int count
+			final ItemFactory<I> itemFactory, final String path, final String prefix, final int idRadix,
+			final I lastPrevItem, final int count
 	) throws IOException {
 		// TODO: Evgeny, issue SDP-50
 		return null;
 	}
 
 	/**
-	 Not used in this driver implementation
+	 * Not used in this driver implementation
 	 */
 	@Override
 	public void adjustIoBuffers(final long avgTransferSize, final OpType opType) {
@@ -272,7 +250,7 @@ extends CoopStorageDriverBase<I, O>  {
 	protected void prepare(final O operation) {
 		super.prepare(operation);
 		var endpointAddr = operation.nodeAddr();
-		if(endpointAddr == null) {
+		if (endpointAddr == null) {
 			endpointAddr = nextEndpointAddr();
 			operation.nodeAddr(endpointAddr);
 		}
@@ -280,15 +258,15 @@ extends CoopStorageDriverBase<I, O>  {
 
 	@Override
 	protected final boolean submit(final O op)
-	throws InterruptRunException, IllegalStateException {
-		if(concurrencyThrottle.tryAcquire()) {
+			throws InterruptRunException, IllegalStateException {
+		if (concurrencyThrottle.tryAcquire()) {
 			val opType = op.type();
-			if(NOOP.equals(opType)) {
+			if (NOOP.equals(opType)) {
 				submitNoop(op);
 			} else {
-				if(op instanceof DataOperation) {
+				if (op instanceof DataOperation) {
 					submitEventOperation((DataOperation) op, opType);
-				} else if(op instanceof PathOperation) {
+				} else if (op instanceof PathOperation) {
 					submitStreamOperation((PathOperation) op, opType);
 				} else {
 					throw new AssertionError(DRIVER_NAME + " storage driver doesn't support the token operations");
@@ -302,9 +280,9 @@ extends CoopStorageDriverBase<I, O>  {
 
 	@Override
 	protected final int submit(final List<O> ops, final int from, final int to)
-	throws InterruptRunException, IllegalStateException {
-		for(var i = from; i < to; i ++) {
-			if(!submit(ops.get(i))) {
+			throws InterruptRunException, IllegalStateException {
+		for (var i = from; i < to; i++) {
+			if (!submit(ops.get(i))) {
 				return i - from;
 			}
 		}
@@ -313,10 +291,10 @@ extends CoopStorageDriverBase<I, O>  {
 
 	@Override
 	protected final int submit(final List<O> ops)
-	throws InterruptRunException, IllegalStateException {
+			throws InterruptRunException, IllegalStateException {
 		val opsCount = ops.size();
-		for(var i = 0; i < opsCount; i ++) {
-			if(!submit(ops.get(i))) {
+		for (var i = 0; i < opsCount; i++) {
+			if (!submit(ops.get(i))) {
 				return i;
 			}
 		}
@@ -344,10 +322,10 @@ extends CoopStorageDriverBase<I, O>  {
 	}
 
 	boolean completeEventCreateOperation(final DataOperation evtOp, final DataItem evtItem, final Throwable thrown) {
-		if(null == thrown) {
+		if (null == thrown) {
 			try {
 				evtOp.countBytesDone(evtItem.size());
-			} catch(final IOException ignored) {
+			} catch (final IOException ignored) {
 			}
 			return completeOperation((O) evtOp, SUCC);
 		} else {
@@ -357,7 +335,7 @@ extends CoopStorageDriverBase<I, O>  {
 
 	void submitEventOperation(final DataOperation evtOp, final OpType opType) {
 		final String nodeAddr = evtOp.nodeAddr();
-		switch(opType) {
+		switch (opType) {
 			case CREATE:
 				submitEventCreateOperation(evtOp, nodeAddr);
 				break;
@@ -386,27 +364,27 @@ extends CoopStorageDriverBase<I, O>  {
 			val streamCreateFunc = streamCreateFuncCache.computeIfAbsent(scopeName, scopeCreateFunc);
 			val streamName = evtOp.dstPath();
 			scopeStreamsCache
-				.computeIfAbsent(scopeName, ScopeCreateFunction::createStreamCache)
-				.computeIfAbsent(streamName, streamCreateFunc);
+					.computeIfAbsent(scopeName, ScopeCreateFunction::createStreamCache)
+					.computeIfAbsent(streamName, streamCreateFunc);
 			// create the client factory create function if necessary
 			val clientFactoryCreateFunc = clientFactoryCreateFuncCache.computeIfAbsent(
-				endpointUri, ClientFactoryCreateFunctionImpl::new
+					endpointUri, ClientFactoryCreateFunctionImpl::new
 			);
 			// create the client factory if necessary
 			val clientFactory = clientFactoryCache.computeIfAbsent(scopeName, clientFactoryCreateFunc);
 			// create the event stream writer create function if necessary
 			val evtWriterCreateFunc = evtWriterCreateFuncCache.computeIfAbsent(
-				clientFactory, EventWriterCreateFunctionImpl::new
+					clientFactory, EventWriterCreateFunctionImpl::new
 			);
 			// create the event stream writer if necessary
 			val evtWriter = evtWriterCache.computeIfAbsent(streamName, evtWriterCreateFunc);
 			val evtItem = evtOp.item();
 			// submit the event writing
 			final CompletionStage<Void> writeEvtFuture;
-			if(createRoutingKeys) {
+			if (createRoutingKeys) {
 				val routingKey = Long.toString(
-					createRoutingKeysPeriod > 0 ? evtItem.offset() % createRoutingKeysPeriod : evtItem.offset(),
-					Character.MAX_RADIX
+						createRoutingKeysPeriod > 0 ? evtItem.offset() % createRoutingKeysPeriod : evtItem.offset(),
+						Character.MAX_RADIX
 				);
 				writeEvtFuture = evtWriter.writeEvent(routingKey, evtItem);
 			} else {
@@ -414,35 +392,62 @@ extends CoopStorageDriverBase<I, O>  {
 			}
 			evtOp.startRequest();
 			writeEvtFuture.handle((returned, thrown) -> completeEventCreateOperation(evtOp, evtItem, thrown));
-		} catch(final ScopeCreateException e) {
+		} catch (final ScopeCreateException e) {
 			LogUtil.exception(Level.WARN, e.getCause(), "{}: failed to create the scope \"{}\"", stepId, e.scopeName());
 			completeOperation((O) evtOp, RESP_FAIL_CLIENT);
-		} catch(final StreamCreateException e) {
+		} catch (final StreamCreateException e) {
 			LogUtil.exception(
-				Level.WARN, e.getCause(), "{}: failed to create the stream \"{}\"", stepId, e.streamName()
+					Level.WARN, e.getCause(), "{}: failed to create the stream \"{}\"", stepId, e.streamName()
 			);
 			completeOperation((O) evtOp, RESP_FAIL_CLIENT);
-		} catch(final NullPointerException e) {
-			if(!isStarted()) { // occurs on manual interruption which is normal so should be handled
+		} catch (final NullPointerException e) {
+			if (!isStarted()) { // occurs on manual interruption which is normal so should be handled
 				completeOperation((O) evtOp, INTERRUPTED);
 			} else {
 				completeFailedOperation((O) evtOp, e);
 			}
-		} catch(final InterruptRunException e) {
+		} catch (final InterruptRunException e) {
 			completeOperation((O) evtOp, INTERRUPTED);
 			throw e;
-		} catch(final Throwable cause) {
+		} catch (final Throwable cause) {
 			completeFailedOperation((O) evtOp, cause);
 		}
 	}
 
 	void submitEventReadOperation(final DataOperation evtOp, final String nodeAddr) {
-		// TODO: Evgeny, issue SDP-50
+		val controllerURI = URI.create(uriSchema);
+		val path = evtOp.dstPath();
+		val scopeName = path.substring(0, path.indexOf("/"));
+		val streamName = path.substring(path.indexOf("/") + 1);
+		val readerGroup = UUID.randomUUID().toString().replace("-", "");
+		val readerGroupConfig = ReaderGroupConfig.builder()
+				.stream(Stream.of(scopeName, streamName))
+				.build();
+		@Cleanup val readerGroupManager = ReaderGroupManager.withScope(scopeName, controllerURI);
+		readerGroupManager.createReaderGroup(readerGroup, readerGroupConfig);
+
+		@Cleanup val clientFactory = ClientFactory.withScope(scopeName, controllerURI);
+		@Cleanup val reader = clientFactory.createReader("reader",
+				readerGroup,
+				new JavaSerializer<String>(),
+				ReaderConfig.builder().build());
+		System.out.format("Reading all the events from %s/%s%n", scopeName, streamName);
+		EventRead<String> event = null;
+		try {
+			for (event = reader.readNextEvent(readTimeoutMillis); null != event.getEvent(); ) {
+				if (event.getEvent() != null) {
+					System.out.format("Read event '%s'%n", event.getEvent());
+				}
+			}
+		} catch (ReinitializationRequiredException e) {
+			e.printStackTrace();
+		}
+		System.out.format("No more events from %s/%s%n", scopeName, streamName);
 	}
 
 	void submitStreamOperation(final PathOperation streamOp, final OpType opType) {
 		final String nodeAddr = streamOp.nodeAddr();
-		switch(opType) {
+		switch (opType) {
 			case CREATE:
 				submitStreamCreateOperation(streamOp, nodeAddr);
 				break;
@@ -475,11 +480,11 @@ extends CoopStorageDriverBase<I, O>  {
 			final String streamName = streamOp.item().name();
 			final URI endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
 			final Controller controller = controllerCache.computeIfAbsent(endpointUri, this::createController);
-			if(controller.sealStream(scopeName, streamName).get(CONTROL_API_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
-				if(
-					controller
-						.deleteStream(scopeName, streamName)
-						.get(CONTROL_API_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)
+			if (controller.sealStream(scopeName, streamName).get(CONTROL_API_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
+				if (
+						controller
+								.deleteStream(scopeName, streamName)
+								.get(CONTROL_API_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)
 				) {
 					completeOperation((O) streamOp, SUCC);
 				} else {
@@ -494,26 +499,26 @@ extends CoopStorageDriverBase<I, O>  {
 						scopeName);
 				completeOperation((O) streamOp, RESP_FAIL_UNKNOWN);
 			}
-		} catch(final NullPointerException e) {
-			if(!isStarted()) {
+		} catch (final NullPointerException e) {
+			if (!isStarted()) {
 				completeOperation((O) streamOp, INTERRUPTED);
 			} else {
 				completeFailedOperation((O) streamOp, e);
 			}
-		} catch(final InterruptedException e) {
+		} catch (final InterruptedException e) {
 			completeOperation((O) streamOp, INTERRUPTED);
 			throw new InterruptRunException(e);
-		} catch(final InterruptRunException e) {
+		} catch (final InterruptRunException e) {
 			completeOperation((O) streamOp, INTERRUPTED);
 			throw e;
-		} catch(final Throwable cause) {
+		} catch (final Throwable cause) {
 			completeFailedOperation((O) streamOp, cause);
 		}
 	}
 
 	@Override
 	protected void doClose()
-	throws IOException {
+			throws IOException {
 		super.doClose();
 		bgExecutor.shutdownNow();
 		// clear all caches
@@ -533,29 +538,29 @@ extends CoopStorageDriverBase<I, O>  {
 	}
 
 	void closeAllWithTimeout(final Collection<? extends AutoCloseable> closeables) {
-		if(null != closeables && closeables.size() > 0) {
+		if (null != closeables && closeables.size() > 0) {
 			final ExecutorService closeExecutor = Executors.newFixedThreadPool(closeables.size());
 			closeables.forEach(
-				closeable -> closeExecutor.submit(
-					() -> {
-						try {
-							closeable.close();
-						} catch(final Exception e) {
-							LogUtil.exception(
-								Level.WARN, e, "{}: storage driver failed to close \"{}\"", stepId, closeable
-							);
-						}
-					}
-				)
+					closeable -> closeExecutor.submit(
+							() -> {
+								try {
+									closeable.close();
+								} catch (final Exception e) {
+									LogUtil.exception(
+											Level.WARN, e, "{}: storage driver failed to close \"{}\"", stepId, closeable
+									);
+								}
+							}
+					)
 			);
 			try {
-				if(!closeExecutor.awaitTermination(CLOSE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
+				if (!closeExecutor.awaitTermination(CLOSE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
 					Loggers.ERR.warn(
-						"{}: storage driver timeout while closing one of \"{}\"", stepId,
-						closeables.stream().findFirst().get().getClass().getSimpleName()
+							"{}: storage driver timeout while closing one of \"{}\"", stepId,
+							closeables.stream().findFirst().get().getClass().getSimpleName()
 					);
 				}
-			} catch(final InterruptedException e) {
+			} catch (final InterruptedException e) {
 				throw new InterruptRunException(e);
 			} finally {
 				closeExecutor.shutdownNow();
