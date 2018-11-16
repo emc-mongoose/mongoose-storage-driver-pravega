@@ -41,9 +41,6 @@ for(var i = 0; i < loadStepCount; i ++) {
 					"step" : {
 						"id" : "pravega_increase_load_" + STREAM_NAME + "_step_" + i
 					}
-				},
-				"run" : {
-					"port" : ~~(10000 + i)
 				}
 			}
 		)
