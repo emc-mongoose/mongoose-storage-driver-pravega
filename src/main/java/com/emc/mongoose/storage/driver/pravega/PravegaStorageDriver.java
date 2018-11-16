@@ -1,6 +1,7 @@
 package com.emc.mongoose.storage.driver.pravega;
 
 import static com.emc.mongoose.item.op.OpType.NOOP;
+import static com.emc.mongoose.item.op.Operation.SLASH;
 import static com.emc.mongoose.item.op.Operation.Status.FAIL_UNKNOWN;
 import static com.emc.mongoose.item.op.Operation.Status.INTERRUPTED;
 import static com.emc.mongoose.item.op.Operation.Status.RESP_FAIL_UNKNOWN;
@@ -379,7 +380,13 @@ extends CoopStorageDriverBase<I, O>  {
 			val scopeCreateFunc = scopeCreateFuncCache.computeIfAbsent(controller, ScopeCreateFunctionImpl::new);
 			// create the scope if necessary
 			val streamCreateFunc = streamCreateFuncCache.computeIfAbsent(scopeName, scopeCreateFunc);
-			val streamName = evtOp.dstPath();
+			var streamName = evtOp.dstPath();
+			if(streamName.startsWith(SLASH)) {
+				streamName = streamName.substring(1);
+			}
+			if(streamName.endsWith(SLASH) && streamName.length() > 1) {
+				streamName = streamName.substring(0, streamName.length() - 1);
+			}
 			scopeStreamsCache
 				.computeIfAbsent(scopeName, ScopeCreateFunction::createStreamCache)
 				.computeIfAbsent(streamName, streamCreateFunc);
