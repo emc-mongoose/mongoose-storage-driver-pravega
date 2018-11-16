@@ -104,7 +104,8 @@ private static final DataInput DATA_INPUT;
 			config.val("storage-auth-token", null);
 			config.val("storage-auth-secret", CREDENTIAL.getSecret());
 
-			config.val("storage-driver-create-key-enabled", false);
+			config.val("storage-driver-control-api-timeoutMillis", 10_000);
+			config.val("storage-driver-create-key-enabled", true);
 			config.val("storage-driver-create-key-count", 0);
 			config.val("storage-driver-read-timeoutMillis", 100);
 			config.val("storage-driver-scaling-type", "fixed");
