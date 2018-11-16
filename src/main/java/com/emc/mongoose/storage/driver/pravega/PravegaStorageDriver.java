@@ -1,5 +1,21 @@
 package com.emc.mongoose.storage.driver.pravega;
 
+
+import static com.emc.mongoose.item.op.OpType.NOOP;
+import static com.emc.mongoose.item.op.Operation.Status.FAIL_UNKNOWN;
+import static com.emc.mongoose.item.op.Operation.Status.INTERRUPTED;
+import static com.emc.mongoose.item.op.Operation.Status.RESP_FAIL_CLIENT;
+import static com.emc.mongoose.item.op.Operation.Status.RESP_FAIL_UNKNOWN;
+import static com.emc.mongoose.item.op.Operation.Status.SUCC;
+import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.BACKGROUND_THREAD_COUNT;
+import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.CLOSE_TIMEOUT_MILLIS;
+import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.CONTROL_API_TIMEOUT_MILLIS;
+import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.DEFAULT_SCOPE;
+import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.DEFAULT_URI_SCHEMA;
+import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.DRIVER_NAME;
+import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.MAX_BACKOFF_MILLIS;
+import static com.emc.mongoose.storage.driver.pravega.io.StreamScaleUtil.scaleToFixedSegmentCount;
+
 import com.emc.mongoose.data.DataInput;
 import com.emc.mongoose.exception.InterruptRunException;
 import com.emc.mongoose.exception.OmgShootMyFootException;
