@@ -107,7 +107,7 @@ docker run \
 
 | Name                              | Type            | Default Value | Description                                      |
 |:----------------------------------|:----------------|:--------------|:-------------------------------------------------|
-| storage-driver-control-api-timeoutMillis | integer  | 30000         | The timeout for any Pravega Controller API call
+| storage-driver-control-timeoutMillis | integer      | 30000         | The timeout for any Pravega Controller API call
 | storage-driver-create-key-enabled | boolean         | false         | Specifies if Mongoose should generate its own routing key during the events creation
 | storage-driver-create-key-count   | integer         | 0             | Specifies a max count of unique routing keys to use during the events creation (may be considered as a routing key period). 0 value means to use unique routing key for each new event
 | storage-driver-read-timeoutMillis | integer         | 100           | The event read timeout in milliseconds
