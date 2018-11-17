@@ -11,6 +11,7 @@ import io.pravega.client.stream.impl.Controller;
 import io.pravega.client.stream.impl.StreamImpl;
 
 import lombok.val;
+
 import org.apache.logging.log4j.Level;
 
 import java.util.concurrent.ExecutionException;
@@ -22,7 +23,7 @@ import java.util.stream.IntStream;
 public interface StreamScaleUtil {
 
 	static void scaleToFixedSegmentCount(
-		final Controller controller, final int timoutMillis, final String scopeName, final String streamName,
+		final Controller controller, final int timeoutMillis, final String scopeName, final String streamName,
 		final ScalingPolicy scalingPolicy
 	) throws InterruptRunException {
 		val segments = controller.getCurrentSegments(scopeName, streamName).join();
@@ -42,7 +43,7 @@ public interface StreamScaleUtil {
 				.scalingPolicy(scalingPolicy)
 				.build();
 			try {
-				if(controller.updateStream(streamConfig).get(timoutMillis, TimeUnit.MILLISECONDS)) {
+				if(controller.updateStream(streamConfig).get(timeoutMillis, TimeUnit.MILLISECONDS)) {
 					Loggers.MSG.info(
 						"Stream \"{}/{}\" has been updated w/ the config {}", scopeName, streamName, streamConfig
 					);
@@ -60,7 +61,7 @@ public interface StreamScaleUtil {
 					if(
 						controller
 							.startScale(stream, segmentList, keyRanges)
-							.get(timoutMillis, TimeUnit.MILLISECONDS)
+							.get(timeoutMillis, TimeUnit.MILLISECONDS)
 					) {
 						Loggers.MSG.info(
 							"Stream \"{}/{}\" has been scaled to the new segment count {}", scopeName, streamName,
