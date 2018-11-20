@@ -36,7 +36,7 @@ implements Closeable {
 			.createContainerCmd(IMAGE_NAME)
 			.withCmd("standalone")
 			.withName("pravega_node")
-			.withNetworkMode("host")
+			.withNetworkMode("host")//--network host
 			.withAttachStderr(true)
 			.withAttachStdout(true)
 			.exec();

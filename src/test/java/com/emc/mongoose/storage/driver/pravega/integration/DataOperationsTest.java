@@ -42,19 +42,18 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-public class DataOperationsTest {
-private final PravegaStorageDriver pravegaStorageDriver;
+public class DataOperationsTest
+extends PravegaStorageDriver<DataItem, DataOperation<DataItem>>{
 private static final DataInput DATA_INPUT;
 
 	static {
 		try {
-			DATA_INPUT = DataInput.instance(null, "7a42d9c483244167", new SizeInBytes("4MB"), 16);
+			DATA_INPUT = DataInput.instance(null, "7a42d9c483244167", new SizeInBytes("1MB"), 16);
 		} catch (final IOException e) {
 			throw new AssertionError(e);
 		}
 	}
 
-	private static final Credential CREDENTIAL = Credential.getInstance("root", "nope");
 	private static PravegaNodeContainer PRAVEGA_NODE_CONTAINER;
 
 	private static Config getConfig() {
@@ -100,9 +99,9 @@ private static final DataInput DATA_INPUT;
 			config.val("storage-net-node-port", PravegaNodeContainer.PORT);
 			config.val("storage-net-node-connAttemptsLimit", 0);
 
-			config.val("storage-auth-uid", CREDENTIAL.getUid());
+			config.val("storage-auth-uid", null);
 			config.val("storage-auth-token", null);
-			config.val("storage-auth-secret", CREDENTIAL.getSecret());
+			config.val("storage-auth-secret", null);
 
 			config.val("storage-driver-control-timeoutMillis", 10_000);
 			config.val("storage-driver-create-key-enabled", true);
@@ -115,7 +114,7 @@ private static final DataInput DATA_INPUT;
 			config.val("storage-driver-threads", 0);
 			config.val("storage-driver-limit-queue-input", 1_000_000);
 			config.val("storage-driver-limit-queue-output", 1_000_000);
-			config.val("storage-driver-limit-concurrency", 1);
+			config.val("storage-driver-limit-concurrency", 0);
 			return config;
 		} catch (final Throwable cause) {
 			throw new RuntimeException(cause);
@@ -128,10 +127,9 @@ private static final DataInput DATA_INPUT;
 	}
 
 	private DataOperationsTest(final Config config)
-	throws OmgShootMyFootException {
-		pravegaStorageDriver = new PravegaStorageDriver(
-			"test-data-pravega-driver", DATA_INPUT, config.configVal("storage"), true,
-			config.configVal("load").intVal("batch-size")
+			throws OmgShootMyFootException {
+		super("test-data-pravega-driver", DATA_INPUT, config.configVal("storage"), true,
+				config.configVal("load").intVal("batch-size")
 		);
 	}
 
@@ -153,8 +151,30 @@ private static final DataInput DATA_INPUT;
 
 
 	@Test
-	public final void testCreateFile()
-	throws Exception {
+	public final void testCreateEvent()
+			throws Exception {
+		final DataItem dataItem = new DataItemImpl(0, MIB, 0);
+		dataItem.name("0000");
+		dataItem.dataInput(DATA_INPUT);
+		final DataOperation<DataItem> createTask = new DataOperationImpl<>(
+				0, OpType.CREATE, dataItem, null, "default", credential, null, 0, null
+		);
+
+
+		prepare(createTask);
+		createTask.status(Operation.Status.ACTIVE);
+		//while(Operation.Status.ACTIVE.equals(createTask.status())) {
+			submit(createTask);
+		//}
+		DataOperation<DataItem> result = get();
+		while(result==null){
+			result = get();
+		}//need to wait for operation to be executed
+		assertEquals(Operation.Status.SUCC, result.status());
+		assertEquals(dataItem.size(), createTask.countBytesDone());
+
+		//assertEquals(dataItem.size(),pravegaStream.getSize());
+		//how to get size of the stream to check that its size == dataItem.size() ?
 	}
 
 	@Test
