@@ -456,7 +456,46 @@ extends CoopStorageDriverBase<I, O>  {
 	}
 
 	void submitStreamCreateOperation(final PathOperation streamOp, final String nodeAddr) {
-		// TODO: Vlad, issue SDP-47
+		try {
+			val endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
+			val controller = controllerCache.computeIfAbsent(endpointUri, this::createController);
+			val scopeName = DEFAULT_SCOPE;
+			var streamName = streamOp.item().name();
+			if(streamName.startsWith(SLASH)) {
+				streamName = streamName.substring(1);
+			}
+			if(streamName.endsWith(SLASH) && streamName.length() > 1) {
+				streamName = streamName.substring(0, streamName.length() - 1);
+			}
+			val streamConfig = StreamConfiguration
+					.builder()
+					.scalingPolicy(scalingPolicy)
+					.streamName(streamName)
+					.scope(scopeName)
+					.build();
+			if(controller.createStream(streamConfig).get(controlApiTimeoutMillis, TimeUnit.MILLISECONDS)) {
+				completeOperation((O) streamOp, SUCC);
+			} else {
+				Loggers.ERR.debug(
+						"The stream {} already exists in the scope {}", streamName,
+						scopeName);
+				completeOperation((O) streamOp, RESP_FAIL_UNKNOWN);
+			}
+		} catch(final NullPointerException e) {
+			if(!isStarted()) {
+				completeOperation((O) streamOp, INTERRUPTED);
+			} else {
+				completeFailedOperation((O) streamOp, e);
+			}
+		} catch(final InterruptedException e) {
+			completeOperation((O) streamOp, INTERRUPTED);
+			throw new InterruptRunException(e);
+		} catch(final InterruptRunException e) {
+			completeOperation((O) streamOp, INTERRUPTED);
+			throw e;
+		} catch(final Throwable cause) {
+			completeFailedOperation((O) streamOp, cause);
+		}
 	}
 
 	void submitStreamReadOperation(final PathOperation streamOp, final String nodeAddr) {
