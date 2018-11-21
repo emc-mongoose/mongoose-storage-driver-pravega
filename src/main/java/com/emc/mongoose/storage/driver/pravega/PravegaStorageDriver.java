@@ -172,6 +172,8 @@ extends CoopStorageDriverBase<I, O>  {
 	// * event writers
 	private final Map<ClientFactory, EventWriterCreateFunction> evtWriterCreateFuncCache = new ConcurrentHashMap<>();
 	private final Map<String, EventStreamWriter<DataItem>> evtWriterCache = new ConcurrentHashMap<>();
+	// * scopes with StreamConfigs
+	private final Map<String, StreamConfiguration> scopeStreamConfigsCache = new ConcurrentHashMap<>();
 
 	public PravegaStorageDriver(
 		final String stepId, final DataInput dataInput, final Config storageConfig, final boolean verifyFlag,
@@ -381,12 +383,7 @@ extends CoopStorageDriverBase<I, O>  {
 			// create the scope if necessary
 			val streamCreateFunc = streamCreateFuncCache.computeIfAbsent(scopeName, scopeCreateFunc);
 			var streamName = evtOp.dstPath();
-			if(streamName.startsWith(SLASH)) {
-				streamName = streamName.substring(1);
-			}
-			if(streamName.endsWith(SLASH) && streamName.length() > 1) {
-				streamName = streamName.substring(0, streamName.length() - 1);
-			}
+			streamName = eraseSlashFromString(streamName);
 			scopeStreamsCache
 				.computeIfAbsent(scopeName, ScopeCreateFunction::createStreamCache)
 				.computeIfAbsent(streamName, streamCreateFunc);
@@ -460,19 +457,11 @@ extends CoopStorageDriverBase<I, O>  {
 			val endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
 			val controller = controllerCache.computeIfAbsent(endpointUri, this::createController);
 			val scopeName = DEFAULT_SCOPE;
+			val scopeCreateFunc = scopeCreateFuncCache.computeIfAbsent(controller, ScopeCreateFunctionImpl::new);
+			val streamCreateFunc = streamCreateFuncCache.computeIfAbsent(scopeName, scopeCreateFunc);
+			val streamConfig = scopeStreamConfigsCache.computeIfAbsent(scopeName,streamCreateFunc);
 			var streamName = streamOp.item().name();
-			if(streamName.startsWith(SLASH)) {
-				streamName = streamName.substring(1);
-			}
-			if(streamName.endsWith(SLASH) && streamName.length() > 1) {
-				streamName = streamName.substring(0, streamName.length() - 1);
-			}
-			val streamConfig = StreamConfiguration
-					.builder()
-					.scalingPolicy(scalingPolicy)
-					.streamName(streamName)
-					.scope(scopeName)
-					.build();
+			streamName = eraseSlashFromString(streamName);
 			if(controller.createStream(streamConfig).get(controlApiTimeoutMillis, TimeUnit.MILLISECONDS)) {
 				completeOperation((O) streamOp, SUCC);
 			} else {
@@ -594,6 +583,16 @@ extends CoopStorageDriverBase<I, O>  {
 				closeExecutor.shutdownNow();
 			}
 		}
+	}
+
+	private String eraseSlashFromString(String str) {
+		if(str.startsWith(SLASH)) {
+			str = str.substring(1);
+		}
+		if(str.endsWith(SLASH) && str.length() > 1) {
+			str = str.substring(0, str.length() - 1);
+		}
+		return str;
 	}
 
 	@Override
