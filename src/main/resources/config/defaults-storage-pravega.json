@@ -1,10 +1,13 @@
 {
 	"storage": {
 		"driver": {
+			"control": {
+				"timeoutMillis": 10000
+			},
 			"create": {
 				"key": {
-					"enabled": true,
-					"count": 1
+					"enabled": false,
+					"count": 0
 				}
 			},
 			"read": {

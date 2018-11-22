@@ -12,6 +12,9 @@
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3.2.2.1. [Additional Node](#3221-additional-node)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3.2.2.2. [Entry Node](#3222-entry-node)<br/>
 &nbsp;&nbsp;3.3. [Specific Configuration Options](#33-specific-configuration-options)<br/>
+&nbsp;&nbsp;3.4. [Specific Cases](#33-specific-cases)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;3.4.1. [Manual Scaling](#341-manual-scaling)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;3.4.2. [Multiple Destination Streams](#342-multiple-destination-streams)<br/>
 4. [Design](#4-design)<br/>
 &nbsp;&nbsp;4.1. [Event Operations](#41-event-operations)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;4.1.1. [Create](#411-create)<br/>
@@ -107,8 +110,9 @@ docker run \
 
 | Name                              | Type            | Default Value | Description                                      |
 |:----------------------------------|:----------------|:--------------|:-------------------------------------------------|
-| storage-driver-create-key-enabled | boolean         | true          | Specifies if Mongoose should generate its own routing key during the events creation
-| storage-driver-create-key-count   | integer         | 1             | Specifies a max count of unique routing keys to use during the events creation (may be considered as a routing key period). 0 value means to use unique routing key for each new event
+| storage-driver-control-timeoutMillis | integer      | 30000         | The timeout for any Pravega Controller API call
+| storage-driver-create-key-enabled | boolean         | false         | Specifies if Mongoose should generate its own routing key during the events creation
+| storage-driver-create-key-count   | integer         | 0             | Specifies a max count of unique routing keys to use during the events creation (may be considered as a routing key period). 0 value means to use unique routing key for each new event
 | storage-driver-read-timeoutMillis | integer         | 100           | The event read timeout in milliseconds
 | storage-driver-scaling-type       | one of: "fixed", "event_rate", "byte_rate" | fixed | The scaling policy type to use. [See the Pravega documentation](http://pravega.io/docs/latest/terminology/) for details
 | storage-driver-scaling-rate       | integer         | 0             | The scaling policy target rate. May be meausred in events per second either kilobytes per second depending on the scaling policy type
@@ -116,6 +120,33 @@ docker run \
 | storage-driver-scaling-segments   | integer         | 1             | From the Pravega javadoc: *the minimum number of segments that a stream can have independent of the number of scale down events.*
 | storage-net-node-addrs            | list of strings | 127.0.0.1     | The list of the Pravega storage nodes to use for the load
 | storage-net-node-port             | integer         | 9020          | The default port of the Pravega storage nodes, should be explicitly set to 9090 (the value used by Pravega by default)
+
+## 3.4. Specific Cases
+
+### 3.4.1. Manual Scaling
+
+It's required to make a manual destination stream scaling while the event writing load is in progress in order to see
+if the rate changes. The additional load step may be used to perform such scaling. In order to not perform any
+additional load it should be explicitly configured to do a minimal work:
+* load operations count limit: 1
+* concurrency limit: 1
+* payload size: 1 bytes
+
+For more details see the corresponding [scenario content](https://github.com/emc-mongoose/mongoose-storage-driver-pravega/blob/master/src/main/resources/example/scenario/js/pravega/manual_scaling.js).
+
+### 3.4.2. Multiple Destination Streams
+
+The [configuration parameterization](https://github.com/emc-mongoose/mongoose/tree/4.0.2/doc/interfaces/input/configuration#2-parameterization)
+feature may be used to specify multiple destination streams to write the events. The example of the command to write
+the events into 1000 destination streams (in the random order):
+
+```bash
+java -jar mongoose-4.0.2.jar \
+    --storage-driver-type=pravega \
+    --storage-net-node-port=9090 \
+    --item-data-size=1000 \
+    --item-output-path=stream-%p\{1000\;1\}
+```
 
 # 4. Design
 
