@@ -185,10 +185,10 @@ extends CoopStorageDriverBase<I, O>  {
 	private final Map<ClientFactory, EventWriterCreateFunction> evtWriterCreateFuncCache = new ConcurrentHashMap<>();
 	private final Map<String, EventStreamWriter<DataItem>> evtWriterCache = new ConcurrentHashMap<>();
 	// * reader group managers
-	private final Map<URI, ReaderGroupManagerCreateFunction> readerGroupManagerCreateFunctionMapCache = new ConcurrentHashMap<>();
+	private final Map<URI, ReaderGroupManagerCreateFunction> readerGroupManagerCreateFuncCache = new ConcurrentHashMap<>();
 	private final Map<String, ReaderGroupManager> readerGroupManagerCache = new ConcurrentHashMap<>();
 	// * event stream reader
-	private final Map<ClientFactory, ReaderCreateFunction> eventStreamReaderCreateFunctionMapCache = new ConcurrentHashMap<>();
+	private final Map<ClientFactory, ReaderCreateFunction> eventStreamReaderCreateFuncCache = new ConcurrentHashMap<>();
 	private final Map<String, EventStreamReader> eventStreamReaderCache = new ConcurrentHashMap<>();
 
 	public PravegaStorageDriver(
@@ -357,6 +357,18 @@ extends CoopStorageDriverBase<I, O>  {
 		return completeOperation(op, FAIL_UNKNOWN);
 	}
 
+	boolean completeEventReadOperation(final DataOperation evtOp, final DataItem evtItem, final Throwable thrown) {
+		if (null == thrown) {
+			try {
+				evtOp.countBytesDone(evtItem.size());
+			} catch (final IOException ignored) {
+			}
+			return completeOperation((O) evtOp, SUCC);
+		} else {
+			return completeFailedOperation((O) evtOp, thrown);
+		}
+	}
+
 	boolean completeEventCreateOperation(final DataOperation evtOp, final DataItem evtItem, final Throwable thrown) {
 		if(null == thrown) {
 			try {
@@ -452,12 +464,19 @@ extends CoopStorageDriverBase<I, O>  {
 		val endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
 		val path = evtOp.dstPath();
 		val scopeName = DEFAULT_SCOPE;
-		val streamName = path.substring(path.indexOf("/") + 1);
+		var streamName = evtOp.dstPath();
+		if (streamName.startsWith(SLASH)) {
+			streamName = streamName.substring(1);
+		}
+		if (streamName.endsWith(SLASH) && streamName.length() > 1) {
+			streamName = streamName.substring(0, streamName.length() - 1);
+		}
+		scopeStreamsCache.computeIfAbsent(scopeName, ScopeCreateFunction::createStreamCache);
 		val readerGroup = UUID.randomUUID().toString().replace("-", "");
 		val readerGroupConfig = ReaderGroupConfig.builder()
 				.stream(Stream.of(scopeName, streamName))
 				.build();
-		val readerGroupManagerCreateFunc = readerGroupManagerCreateFunctionMapCache.computeIfAbsent(
+		val readerGroupManagerCreateFunc = readerGroupManagerCreateFuncCache.computeIfAbsent(
 				endpointUri, ReaderGroupManagerCreateFunctionImpl::new
 		);
 		val readerGroupManager = readerGroupManagerCache.computeIfAbsent(scopeName, readerGroupManagerCreateFunc);
@@ -467,20 +486,21 @@ extends CoopStorageDriverBase<I, O>  {
 				endpointUri, ClientFactoryCreateFunctionImpl::new
 		);
 		@Cleanup val clientFactory = clientFactoryCache.computeIfAbsent(scopeName, clientFactoryCreateFunc);
-
-		// READER
-		val readerCreateFunc = eventStreamReaderCreateFunctionMapCache.computeIfAbsent(clientFactory, ReaderCreateFunctionImpl::new);
-		@Cleanup val reader = eventStreamReaderCache.computeIfAbsent(readerGroup, readerCreateFunc);
+		val readerCreateFunc = eventStreamReaderCreateFuncCache.computeIfAbsent(clientFactory, ReaderCreateFunctionImpl::new);
+		@Cleanup val evtReader = eventStreamReaderCache.computeIfAbsent(readerGroup, readerCreateFunc);
 
 		Loggers.MSG.trace("Reading all the events from {} {}", scopeName, streamName);
 		EventRead<String> event = null;
+		final CompletionStage<Void> readEvtFuture;
 		try {
-			for (event = reader.readNextEvent(readTimeoutMillis); null != event.getEvent(); ) {
+			for (event = evtReader.readNextEvent(readTimeoutMillis); null != event.getEvent(); ) {
 				Loggers.MSG.trace("Read event {}", event.getEvent());
 			}
 		} catch (ReinitializationRequiredException e) {
 			e.printStackTrace();
 		}
+		// Don't know how to check success
+		// readEvtFuture.handle((returned, thrown) -> completeEventReadOperation(Operation(evtOp, thrown));
 		Loggers.MSG.trace("No more events from {} {}", scopeName, streamName);
 	}
 
