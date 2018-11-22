@@ -47,10 +47,12 @@ import io.pravega.client.stream.impl.Controller;
 import io.pravega.client.stream.impl.ControllerImpl;
 import io.pravega.client.stream.impl.ControllerImplConfig;
 
+import lombok.Cleanup;
 import lombok.Value;
 import lombok.experimental.var;
 import lombok.val;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.logging.log4j.Level;
 
 import java.io.IOException;
@@ -172,6 +174,12 @@ extends CoopStorageDriverBase<I, O>  {
 	// * event writers
 	private final Map<ClientFactory, EventWriterCreateFunction> evtWriterCreateFuncCache = new ConcurrentHashMap<>();
 	private final Map<String, EventStreamWriter<DataItem>> evtWriterCache = new ConcurrentHashMap<>();
+	// * reader group managers
+	private final Map<URI, ReaderGroupManagerCreateFunction> readerGroupManagerCreateFunctionMapCache = new ConcurrentHashMap<>();
+	private final Map<String, ReaderGroupManager> readerGroupManagerCache = new ConcurrentHashMap<>();
+	// * event stream reader
+	private final Map<ClientFactory, ReaderCreateFunction> eventStreamReaderCreateFunctionMapCache = new ConcurrentHashMap<>();
+	private final Map<String, EventStreamReader> eventStreamReaderCache = new ConcurrentHashMap<>();
 
 	public PravegaStorageDriver(
 		final String stepId, final DataInput dataInput, final Config storageConfig, final boolean verifyFlag,
@@ -431,7 +439,39 @@ extends CoopStorageDriverBase<I, O>  {
 	}
 
 	void submitEventReadOperation(final DataOperation evtOp, final String nodeAddr) {
-		// TODO: Evgeny, issue SDP-50
+		val endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
+		val path = evtOp.dstPath();
+		val scopeName = DEFAULT_SCOPE;
+		val streamName = path.substring(path.indexOf("/") + 1);
+		val readerGroup = UUID.randomUUID().toString().replace("-", "");
+		val readerGroupConfig = ReaderGroupConfig.builder()
+				.stream(Stream.of(scopeName, streamName))
+				.build();
+		val readerGroupManagerCreateFunc = readerGroupManagerCreateFunctionMapCache.computeIfAbsent(
+				endpointUri, ReaderGroupManagerCreateFunctionImpl::new
+		);
+		val readerGroupManager = readerGroupManagerCache.computeIfAbsent(scopeName, readerGroupManagerCreateFunc);
+
+		readerGroupManager.createReaderGroup(readerGroup, readerGroupConfig);
+		val clientFactoryCreateFunc = clientFactoryCreateFuncCache.computeIfAbsent(
+				endpointUri, ClientFactoryCreateFunctionImpl::new
+		);
+		@Cleanup val clientFactory = clientFactoryCache.computeIfAbsent(scopeName, clientFactoryCreateFunc);
+
+		// READER
+		val readerCreateFunc = eventStreamReaderCreateFunctionMapCache.computeIfAbsent(clientFactory, ReaderCreateFunctionImpl::new);
+		@Cleanup val reader = eventStreamReaderCache.computeIfAbsent(readerGroup, readerCreateFunc);
+
+		Loggers.MSG.trace("Reading all the events from {} {}", scopeName, streamName);
+		EventRead<String> event = null;
+		try {
+			for (event = reader.readNextEvent(readTimeoutMillis); null != event.getEvent(); ) {
+				Loggers.MSG.trace("Read event {}", event.getEvent());
+			}
+		} catch (ReinitializationRequiredException e) {
+			e.printStackTrace();
+		}
+		Loggers.MSG.trace("No more events from {} {}", scopeName, streamName);
 	}
 
 	void submitStreamOperation(final PathOperation streamOp, final OpType opType) {
