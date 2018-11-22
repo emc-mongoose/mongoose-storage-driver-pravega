@@ -5,7 +5,7 @@ import io.pravega.client.admin.ReaderGroupManager;
 import java.util.function.Function;
 
 /**
- A function to create the client factory using the scope name as the function argument
+ A function to create the reader group manager using the scope name as the function argument
  */
 public interface ReaderGroupManagerCreateFunction
 extends Function<String, ReaderGroupManager> {
