@@ -489,13 +489,8 @@ extends CoopStorageDriverBase<I, O>  {
 			/*We need to use StreamConfiguration.builder() because scopeCreateFuncForStreamConfig returns
 			StreamConfig without streamName field. So this looks like implementation of StreamManager.createStream()
 			 */
-			if(controller.createStream(StreamConfiguration
-				.builder()
-				.scalingPolicy(streamConfig.getScalingPolicy())
-				.streamName(streamName)
-				.scope(streamConfig.getScope())
-				.build()
-			).get(controlApiTimeoutMillis, TimeUnit.MILLISECONDS)) {
+			if(controller.createStream(combineStreamConfigAndName(streamName, streamConfig))
+			.get(controlApiTimeoutMillis, TimeUnit.MILLISECONDS)) {
 				completeOperation((O) streamOp, SUCC);
 			} else {
 				Loggers.ERR.debug(
@@ -616,6 +611,15 @@ extends CoopStorageDriverBase<I, O>  {
 				closeExecutor.shutdownNow();
 			}
 		}
+	}
+
+	static StreamConfiguration combineStreamConfigAndName(final String streamName, final StreamConfiguration config){
+		return StreamConfiguration
+			.builder()
+			.scalingPolicy(config.getScalingPolicy())
+			.streamName(streamName)
+			.scope(config.getScope())
+			.build();
 	}
 
 	static String extractStreamName(final String itemPath) {
