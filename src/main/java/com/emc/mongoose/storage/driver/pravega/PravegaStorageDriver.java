@@ -200,7 +200,7 @@ extends CoopStorageDriverBase<I, O>  {
 		this.controlApiTimeoutMillis = driverConfig.intVal("control-timeoutMillis");
 		val scalingConfig = driverConfig.configVal("scaling");
 		this.scalingPolicy = PravegaScalingConfig.scalingPolicy(scalingConfig);
-		this.uriSchema = DEFAULT_URI_SCHEMA;
+		this.uriSchema = storageConfig.stringVal("net-uri-schema");
 		val nodeConfig = storageConfig.configVal("net-node");
 		nodePort = storageConfig.intVal("net-node-port");
 		val endpointAddrList = nodeConfig.listVal("addrs");

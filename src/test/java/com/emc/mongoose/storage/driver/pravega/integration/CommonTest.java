@@ -98,7 +98,7 @@ public class CommonTest {
 				config.val("storage-net-node-addrs", Collections.singletonList("127.0.0.1"));
 				config.val("storage-net-node-port", PravegaNodeContainer.PORT);
 				config.val("storage-net-node-connAttemptsLimit", 0);
-
+				config.val("storage-net-uri-schema", "tcp");
 				config.val("storage-auth-uid", CREDENTIAL.getUid());
 				config.val("storage-auth-token", null);
 				config.val("storage-auth-secret", CREDENTIAL.getSecret());
