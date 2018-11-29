@@ -11,6 +11,9 @@
 			"tcpNoDelay": "boolean",
 			"timeoutMilliSec": "int32",
 			"ssl": "boolean",
+			"uri": {
+				"schema": "string"
+			},
 			"node": {
 				"addrs": "list",
 				"port": "int32",
