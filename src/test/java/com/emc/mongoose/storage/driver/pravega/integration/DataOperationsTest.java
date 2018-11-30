@@ -11,7 +11,9 @@ import com.emc.mongoose.item.op.data.DataOperation;
 import com.emc.mongoose.item.op.data.DataOperationImpl;
 import com.emc.mongoose.storage.Credential;
 
+import com.emc.mongoose.storage.driver.pravega.PravegaConstants;
 import com.emc.mongoose.storage.driver.pravega.PravegaStorageDriver;
+import com.emc.mongoose.storage.driver.pravega.io.ByteBufferSerializer;
 import com.emc.mongoose.storage.driver.pravega.util.docker.PravegaNodeContainer;
 import com.github.akurilov.commons.collection.Range;
 import com.github.akurilov.commons.collection.TreeUtil;
@@ -19,6 +21,10 @@ import com.github.akurilov.commons.system.SizeInBytes;
 import com.github.akurilov.confuse.Config;
 import com.github.akurilov.confuse.SchemaProvider;
 import com.github.akurilov.confuse.impl.BasicConfig;
+import io.pravega.client.ClientFactory;
+import io.pravega.client.admin.ReaderGroupManager;
+import io.pravega.client.stream.*;
+import io.pravega.client.stream.impl.JavaSerializer;
 import lombok.val;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -27,16 +33,13 @@ import org.junit.Test;
 
 import java.io.IOException;
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static com.emc.mongoose.Constants.APP_NAME;
 import static com.emc.mongoose.Constants.MIB;
+import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.DEFAULT_SCOPE;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -153,14 +156,19 @@ private static final DataInput DATA_INPUT;
 	@Test
 	public final void testCreateEvent()
 			throws Exception {
+
+		//final URI controllerURI = URI.create(getConfig().listVal("storage-net-node-addrs").get(0)+":"+String.valueOf(getConfig().intVal("storage-net-node-port")));
+		//System.out.println(controllerURI.toString());
 		final DataItem dataItem = new DataItemImpl(0, MIB, 0);
 		dataItem.name("0000");
 		dataItem.dataInput(DATA_INPUT);
+		String streamName = "default";
 		final DataOperation<DataItem> createTask = new DataOperationImpl<>(
-				0, OpType.CREATE, dataItem, null, "default", credential, null, 0, null
+				0, OpType.CREATE, dataItem, null, streamName, credential, null, 0, null
 		);
 
 
+		String scope = DEFAULT_SCOPE;
 		prepare(createTask);
 		createTask.status(Operation.Status.ACTIVE);
 		//while(Operation.Status.ACTIVE.equals(createTask.status())) {
@@ -173,6 +181,30 @@ private static final DataInput DATA_INPUT;
 		assertEquals(Operation.Status.SUCC, result.status());
 		assertEquals(dataItem.size(), createTask.countBytesDone());
 
+
+		final URI controllerURI = URI.create("tcp://"+getConfig().listVal("storage-net-node-addrs").get(0)+":"+String.valueOf(getConfig().intVal("storage-net-node-port")));
+		final String readerGroup = UUID.randomUUID().toString().replace("-", "");
+		final ReaderGroupConfig readerGroupConfig = ReaderGroupConfig.builder()
+				.stream(Stream.of(scope, streamName))
+				.build();
+		try (final ReaderGroupManager readerGroupManager = ReaderGroupManager.withScope(scope, controllerURI)) {
+			readerGroupManager.createReaderGroup(readerGroup, readerGroupConfig);
+		}
+
+		try (final ClientFactory clientFactory = ClientFactory.withScope(scope, controllerURI);
+			 EventStreamReader<Integer> reader = clientFactory.createReader("reader",
+					 readerGroup,
+			new ByteBufferSerializer(),
+					 ReaderConfig.builder().build())) {
+			System.out.format("Reading all the events from %s/%s%n", scope, streamName);
+			EventRead<Integer> event = null;
+			event = reader.readNextEvent(readTimeoutMillis);
+			if (event.getEvent() != null) {
+
+				assertEquals("we didn't read the same size we had put into stream",
+				(int)dataItem.size(),(int)event.getEvent());
+			}
+		}
 		//assertEquals(dataItem.size(),pravegaStream.getSize());
 		//how to get size of the stream to check that its size == dataItem.size() ?
 	}
