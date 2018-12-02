@@ -91,6 +91,7 @@ private static final DataInput DATA_INPUT;
 			config.val("storage-net-keepAlive", true);
 			config.val("storage-net-rcvBuf", 0);
 			config.val("storage-net-sndBuf", 0);
+			config.val("storage-net-uri-schema", "tcp");
 			config.val("storage-net-ssl", false);
 			config.val("storage-net-tcpNoDelay", false);
 			config.val("storage-net-interestOpQueued", false);

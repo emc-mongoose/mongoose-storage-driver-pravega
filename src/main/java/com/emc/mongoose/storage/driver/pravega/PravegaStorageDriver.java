@@ -29,6 +29,11 @@ import com.emc.mongoose.storage.Credential;
 import com.emc.mongoose.storage.driver.coop.CoopStorageDriverBase;
 import com.emc.mongoose.storage.driver.pravega.cache.ClientFactoryCreateFunction;
 import com.emc.mongoose.storage.driver.pravega.cache.ClientFactoryCreateFunctionImpl;
+import com.emc.mongoose.storage.driver.pravega.cache.EventWriterCreateFunction;
+import com.emc.mongoose.storage.driver.pravega.cache.ReaderCreateFunction;
+import com.emc.mongoose.storage.driver.pravega.cache.ReaderCreateFunctionImpl;
+import com.emc.mongoose.storage.driver.pravega.cache.ReaderGroupManagerCreateFunction;
+import com.emc.mongoose.storage.driver.pravega.cache.ReaderGroupManagerCreateFunctionImpl;
 import com.emc.mongoose.storage.driver.pravega.cache.ScopeCreateFunction;
 import com.emc.mongoose.storage.driver.pravega.cache.StreamCreateFunction;
 import com.emc.mongoose.storage.driver.pravega.cache.EventWriterCreateFunction;
@@ -38,19 +43,25 @@ import com.github.akurilov.confuse.Config;
 
 import io.pravega.client.ClientConfig;
 import io.pravega.client.ClientFactory;
+import io.pravega.client.admin.ReaderGroupManager;
+import io.pravega.client.stream.EventRead;
+import io.pravega.client.stream.EventStreamReader;
 import io.pravega.client.stream.EventStreamWriter;
 import io.pravega.client.stream.EventWriterConfig;
+import io.pravega.client.stream.ReaderGroupConfig;
+import io.pravega.client.stream.ReinitializationRequiredException;
 import io.pravega.client.stream.ScalingPolicy;
 import io.pravega.client.stream.Serializer;
+import io.pravega.client.stream.Stream;
 import io.pravega.client.stream.StreamConfiguration;
 import io.pravega.client.stream.impl.Controller;
 import io.pravega.client.stream.impl.ControllerImpl;
 import io.pravega.client.stream.impl.ControllerImplConfig;
 
+import lombok.Cleanup;
 import lombok.Value;
 import lombok.experimental.var;
 import lombok.val;
-
 import org.apache.logging.log4j.Level;
 
 import java.io.IOException;
@@ -59,6 +70,7 @@ import java.net.URISyntaxException;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -172,6 +184,12 @@ extends CoopStorageDriverBase<I, O>  {
 	// * event writers
 	private final Map<ClientFactory, EventWriterCreateFunction> evtWriterCreateFuncCache = new ConcurrentHashMap<>();
 	private final Map<String, EventStreamWriter<DataItem>> evtWriterCache = new ConcurrentHashMap<>();
+	// * reader group managers
+	private final Map<URI, ReaderGroupManagerCreateFunction> readerGroupManagerCreateFuncCache = new ConcurrentHashMap<>();
+	private final Map<String, ReaderGroupManager> readerGroupManagerCache = new ConcurrentHashMap<>();
+	// * event stream reader
+	private final Map<ClientFactory, ReaderCreateFunction> eventStreamReaderCreateFuncCache = new ConcurrentHashMap<>();
+	private final Map<String, EventStreamReader> eventStreamReaderCache = new ConcurrentHashMap<>();
 
 	public PravegaStorageDriver(
 		final String stepId, final DataInput dataInput, final Config storageConfig, final boolean verifyFlag,
@@ -182,7 +200,7 @@ extends CoopStorageDriverBase<I, O>  {
 		this.controlApiTimeoutMillis = driverConfig.intVal("control-timeoutMillis");
 		val scalingConfig = driverConfig.configVal("scaling");
 		this.scalingPolicy = PravegaScalingConfig.scalingPolicy(scalingConfig);
-		this.uriSchema = DEFAULT_URI_SCHEMA;
+		this.uriSchema = storageConfig.stringVal("net-uri-schema");
 		val nodeConfig = storageConfig.configVal("net-node");
 		nodePort = storageConfig.intVal("net-node-port");
 		val endpointAddrList = nodeConfig.listVal("addrs");
@@ -339,6 +357,18 @@ extends CoopStorageDriverBase<I, O>  {
 		return completeOperation(op, FAIL_UNKNOWN);
 	}
 
+	boolean completeEventReadOperation(final DataOperation evtOp, final DataItem evtItem, final Throwable thrown) {
+		if (null == thrown) {
+			try {
+				evtOp.countBytesDone(evtItem.size());
+			} catch (final IOException ignored) {
+			}
+			return completeOperation((O) evtOp, SUCC);
+		} else {
+			return completeFailedOperation((O) evtOp, thrown);
+		}
+	}
+
 	boolean completeEventCreateOperation(final DataOperation evtOp, final DataItem evtItem, final Throwable thrown) {
 		if(null == thrown) {
 			try {
@@ -431,7 +461,47 @@ extends CoopStorageDriverBase<I, O>  {
 	}
 
 	void submitEventReadOperation(final DataOperation evtOp, final String nodeAddr) {
-		// TODO: Evgeny, issue SDP-50
+		val endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
+		val path = evtOp.dstPath();
+		val scopeName = DEFAULT_SCOPE;
+		var streamName = evtOp.dstPath();
+		if (streamName.startsWith(SLASH)) {
+			streamName = streamName.substring(1);
+		}
+		if (streamName.endsWith(SLASH) && streamName.length() > 1) {
+			streamName = streamName.substring(0, streamName.length() - 1);
+		}
+		scopeStreamsCache.computeIfAbsent(scopeName, ScopeCreateFunction::createStreamCache);
+		val readerGroup = UUID.randomUUID().toString().replace("-", "");
+		val readerGroupConfig = ReaderGroupConfig.builder()
+				.stream(Stream.of(scopeName, streamName))
+				.build();
+		val readerGroupManagerCreateFunc = readerGroupManagerCreateFuncCache.computeIfAbsent(
+				endpointUri, ReaderGroupManagerCreateFunctionImpl::new
+		);
+		val readerGroupManager = readerGroupManagerCache.computeIfAbsent(scopeName, readerGroupManagerCreateFunc);
+
+		readerGroupManager.createReaderGroup(readerGroup, readerGroupConfig);
+		val clientFactoryCreateFunc = clientFactoryCreateFuncCache.computeIfAbsent(
+				endpointUri, ClientFactoryCreateFunctionImpl::new
+		);
+		@Cleanup val clientFactory = clientFactoryCache.computeIfAbsent(scopeName, clientFactoryCreateFunc);
+		val readerCreateFunc = eventStreamReaderCreateFuncCache.computeIfAbsent(clientFactory, ReaderCreateFunctionImpl::new);
+		@Cleanup val evtReader = eventStreamReaderCache.computeIfAbsent(readerGroup, readerCreateFunc);
+
+		Loggers.MSG.trace("Reading all the events from {} {}", scopeName, streamName);
+		EventRead<String> event = null;
+		final CompletionStage<Void> readEvtFuture;
+		try {
+			for (event = evtReader.readNextEvent(readTimeoutMillis); null != event.getEvent(); ) {
+				Loggers.MSG.trace("Read event {}", event.getEvent());
+			}
+		} catch (ReinitializationRequiredException e) {
+			e.printStackTrace();
+		}
+		// Don't know how to check success
+		// readEvtFuture.handle((returned, thrown) -> completeEventReadOperation(Operation(evtOp, thrown));
+		Loggers.MSG.trace("No more events from {} {}", scopeName, streamName);
 	}
 
 	void submitStreamOperation(final PathOperation streamOp, final OpType opType) {
