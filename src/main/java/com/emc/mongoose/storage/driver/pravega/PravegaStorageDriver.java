@@ -623,12 +623,12 @@ extends CoopStorageDriverBase<I, O>  {
 	}
 
 	static String extractStreamName(final String itemPath) {
-		String result = "";
-		if(itemPath.startsWith(SLASH)) {
-			result = itemPath.substring(1);
+		String result = itemPath;
+		if(result.startsWith(SLASH)) {
+			result = result.substring(1);
 		}
-		if(itemPath.endsWith(SLASH) && itemPath.length() > 1) {
-			result = itemPath.substring(0, itemPath.length() - 1);
+		if(result.endsWith(SLASH) && result.length() > 1) {
+			result = result.substring(0, result.length() - 1);
 		}
 		return result;
 	}
