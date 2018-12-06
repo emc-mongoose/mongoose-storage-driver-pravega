@@ -37,7 +37,9 @@ import com.emc.mongoose.storage.driver.pravega.cache.ReaderGroupManagerCreateFun
 import com.emc.mongoose.storage.driver.pravega.cache.ScopeCreateFunction;
 import com.emc.mongoose.storage.driver.pravega.cache.StreamCreateFunction;
 import com.emc.mongoose.storage.driver.pravega.cache.EventWriterCreateFunction;
+import com.emc.mongoose.storage.driver.pravega.cache.ScopeCreateFunctionForStreamConfig;
 import com.emc.mongoose.storage.driver.pravega.io.DataItemSerializer;
+
 
 import com.github.akurilov.confuse.Config;
 
@@ -62,6 +64,7 @@ import lombok.Cleanup;
 import lombok.Value;
 import lombok.experimental.var;
 import lombok.val;
+
 import org.apache.logging.log4j.Level;
 
 import java.io.IOException;
@@ -117,6 +120,35 @@ extends CoopStorageDriverBase<I, O>  {
 				LogUtil.exception(Level.WARN, cause, "{}: failed to create the scope \"{}\"", stepId, scopeName);
 			}
 			return new StreamCreateFunctionImpl(controller, scopeName);
+		}
+	}
+
+	// should be an inner class in order to access the storage driver instance stream config field
+	@Value
+	final class ScopeCreateFunctionForStreamConfigImpl
+	implements ScopeCreateFunctionForStreamConfig {
+
+		Controller controller;
+
+		@Override
+		public final StreamConfiguration apply(final String scopeName) {
+			final StreamConfiguration streamConfig = StreamConfiguration
+				.builder()
+				.scalingPolicy(scalingPolicy)
+				.scope(scopeName)
+				.build();
+			try {
+				if(controller.createScope(scopeName).get(controlApiTimeoutMillis, TimeUnit.MILLISECONDS)) {
+					Loggers.MSG.trace("Scope \"{}\" was created", scopeName);
+				} else {
+					Loggers.MSG.info("Scope \"{}\" was not created, may be already existing before", scopeName);
+				}
+			} catch(final InterruptedException e) {
+				throw new InterruptRunException(e);
+			} catch(final Throwable cause) {
+				LogUtil.exception(Level.WARN, cause, "{}: failed to create the scope \"{}\"", stepId, scopeName);
+			}
+			return streamConfig;
 		}
 	}
 
@@ -190,6 +222,9 @@ extends CoopStorageDriverBase<I, O>  {
 	// * event stream reader
 	private final Map<ClientFactory, ReaderCreateFunction> eventStreamReaderCreateFuncCache = new ConcurrentHashMap<>();
 	private final Map<String, EventStreamReader> eventStreamReaderCache = new ConcurrentHashMap<>();
+	// * scopes with StreamConfigs
+	private final Map<Controller, ScopeCreateFunctionForStreamConfig> scopeCreateFuncForStreamConfigCache = new ConcurrentHashMap<>();
+	private final Map<String, StreamConfiguration> scopeStreamConfigsCache = new ConcurrentHashMap<>();
 
 	public PravegaStorageDriver(
 		final String stepId, final DataInput dataInput, final Config storageConfig, final boolean verifyFlag,
@@ -410,13 +445,7 @@ extends CoopStorageDriverBase<I, O>  {
 			val scopeCreateFunc = scopeCreateFuncCache.computeIfAbsent(controller, ScopeCreateFunctionImpl::new);
 			// create the scope if necessary
 			val streamCreateFunc = streamCreateFuncCache.computeIfAbsent(scopeName, scopeCreateFunc);
-			var streamName = evtOp.dstPath();
-			if(streamName.startsWith(SLASH)) {
-				streamName = streamName.substring(1);
-			}
-			if(streamName.endsWith(SLASH) && streamName.length() > 1) {
-				streamName = streamName.substring(0, streamName.length() - 1);
-			}
+			val streamName = extractStreamName(evtOp.dstPath());
 			scopeStreamsCache
 				.computeIfAbsent(scopeName, ScopeCreateFunction::createStreamCache)
 				.computeIfAbsent(streamName, streamCreateFunc);
@@ -526,7 +555,41 @@ extends CoopStorageDriverBase<I, O>  {
 	}
 
 	void submitStreamCreateOperation(final PathOperation streamOp, final String nodeAddr) {
-		// TODO: Vlad, issue SDP-47
+		try {
+			val endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
+			val controller = controllerCache.computeIfAbsent(endpointUri, this::createController);
+			val scopeName = DEFAULT_SCOPE;
+			val scopeCreateFuncForStreamConfig = scopeCreateFuncForStreamConfigCache.computeIfAbsent(controller,
+				ScopeCreateFunctionForStreamConfigImpl::new);
+			val streamConfig = scopeStreamConfigsCache.computeIfAbsent(scopeName, scopeCreateFuncForStreamConfig);
+			val streamName = extractStreamName(streamOp.item().name());
+			/*We need to use StreamConfiguration.builder() because scopeCreateFuncForStreamConfig returns
+			StreamConfig without streamName field. So this looks like implementation of StreamManager.createStream()
+			 */
+			if(controller.createStream(combineStreamConfigAndName(streamName, streamConfig))
+			.get(controlApiTimeoutMillis, TimeUnit.MILLISECONDS)) {
+				completeOperation((O) streamOp, SUCC);
+			} else {
+				Loggers.ERR.debug(
+					"The stream {} already exists in the scope {}", streamName, scopeName
+				);
+				completeOperation((O) streamOp, RESP_FAIL_UNKNOWN);
+			}
+		} catch(final NullPointerException e) {
+			if(!isStarted()) {
+				completeOperation((O) streamOp, INTERRUPTED);
+			} else {
+				completeFailedOperation((O) streamOp, e);
+			}
+		} catch(final InterruptedException e) {
+			completeOperation((O) streamOp, INTERRUPTED);
+			throw new InterruptRunException(e);
+		} catch(final InterruptRunException e) {
+			completeOperation((O) streamOp, INTERRUPTED);
+			throw e;
+		} catch(final Throwable cause) {
+			completeFailedOperation((O) streamOp, cause);
+		}
 	}
 
 	void submitStreamReadOperation(final PathOperation streamOp, final String nodeAddr) {
@@ -625,6 +688,26 @@ extends CoopStorageDriverBase<I, O>  {
 				closeExecutor.shutdownNow();
 			}
 		}
+	}
+
+	static StreamConfiguration combineStreamConfigAndName(final String streamName, final StreamConfiguration config){
+		return StreamConfiguration
+			.builder()
+			.scalingPolicy(config.getScalingPolicy())
+			.streamName(streamName)
+			.scope(config.getScope())
+			.build();
+	}
+
+	static String extractStreamName(final String itemPath) {
+		String result = itemPath;
+		if(result.startsWith(SLASH)) {
+			result = result.substring(1);
+		}
+		if(result.endsWith(SLASH) && result.length() > 1) {
+			result = result.substring(0, result.length() - 1);
+		}
+		return result;
 	}
 
 	@Override
