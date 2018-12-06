@@ -1,7 +1,5 @@
 language: java
 
-services:
-  - docker
 
 sudo: true
 
@@ -26,11 +24,11 @@ jobs:
   - stage: "Tests"
     script: "./gradlew test"
 
-  - stage: "End-to-end tests"
-    env:
-    - SUITE=api.storage
-    - TEST=create_events
-    script: "./gradlew robotest"
+#  - stage: "End-to-end tests"
+#    env:
+#    - SUITE=api.storage
+#    - TEST=create_events
+#    script: "./gradlew robotest"
 
   - stage: "Deploy to DockerHub"
     script:
