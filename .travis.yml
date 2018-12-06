@@ -1,6 +1,5 @@
 language: java
 
-
 sudo: true
 
 addons:
@@ -24,12 +23,6 @@ jobs:
   - stage: "Tests"
     script: "./gradlew test"
 
-#  - stage: "End-to-end tests"
-#    env:
-#    - SUITE=api.storage
-#    - TEST=create_events
-#    script: "./gradlew robotest"
-
   - stage: "Deploy to DockerHub"
     script:
     - ./gradlew clean jar
@@ -50,4 +43,3 @@ jobs:
         file: "./build/libs/mongoose-storage-driver-pravega.jar"
       on:
         tags: true
-
