@@ -1,0 +1,11 @@
+FROM emcmongoose/mongoose-robotest-base
+
+ADD build /root/mongoose/build
+ADD docker/entrypoint_robotest.sh /root/mongoose/docker/entrypoint_robotest.sh
+ADD src/test/robot /root/mongoose/src/test/robot
+
+RUN chmod ugo+x /root/mongoose/docker/entrypoint_robotest.sh
+
+WORKDIR /root/mongoose
+
+ENTRYPOINT ["/root/mongoose/docker/entrypoint_robotest.sh"]
