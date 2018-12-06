@@ -5,7 +5,7 @@ Test Setup  Start Containers
 Test Teardown  Stop Containers
 
 *** Variables ***
-${MONGOOSE_IMAGE_NAME} =  mongoose-storage-driver-pravega
+${MONGOOSE_IMAGE_NAME} =  emcmongoose/mongoose-storage-driver-pravega
 ${MONGOOSE_IMAGE_VERSION} =  testing
 ${MONGOOSE_CONTAINER_NAME} =  mongoose-storage-driver-pravega
 
