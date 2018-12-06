@@ -1,11 +1,18 @@
-FROM emcmongoose/mongoose-robotest-base
+FROM docker:dind
 
-ADD build /root/mongoose/build
-ADD docker/entrypoint_robotest.sh /root/mongoose/docker/entrypoint_robotest.sh
-ADD src/test/robot /root/mongoose/src/test/robot
+RUN apk add --no-cache --update python py-pip \
+    && pip install -U virtualenv \
+    && pip install -U robotframework \
+    && pip install -U robotframework-csvlibrary
 
-RUN chmod ugo+x /root/mongoose/docker/entrypoint_robotest.sh
+ENV PYTHONPATH=$PYTHONPATH:/usr/lib/python2.7/site-packages:/root/mongoose-storage-driver-pravega/src/test/robot/lib
 
-WORKDIR /root/mongoose
+ADD build /root/mongoose-storage-driver-pravega/build
+ADD docker/entrypoint_robotest.sh /root/mongoose-storage-driver-pravega/docker/entrypoint_robotest.sh
+ADD src/test/robot /root/mongoose-storage-driver-pravega/src/test/robot
 
-ENTRYPOINT ["/root/mongoose/docker/entrypoint_robotest.sh"]
+RUN chmod ugo+x /root/mongoose-storage-driver-pravega/docker/entrypoint_robotest.sh
+
+WORKDIR /root/mongoose-storage-driver-pravega
+
+ENTRYPOINT ["/root/mongoose-storage-driver-pravega/docker/entrypoint_robotest.sh"]

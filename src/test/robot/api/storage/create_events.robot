@@ -1,4 +1,5 @@
 *** Settings ***
+Force Tags  create_events
 Library  OperatingSystem
 Library  CSVLibrary
 Test Setup  Start Containers

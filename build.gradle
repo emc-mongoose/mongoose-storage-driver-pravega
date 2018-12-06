@@ -270,8 +270,9 @@ task buildImage(type: DockerBuildImage, dependsOn: jar) {
     inputDir = rootProject.projectDir
     dockerFile = project.file("docker${File.separator}Dockerfile")
     imageId = "emcmogoose/mongoose-storage-driver-pravega"
+    buildArgs = ["MONGOOSE_VERSION":"${depVersion.mongoose}"]
     tags = [
-            "emcmogoose/mongoose-storage-driver-pravega:${version}".toString(),
+            "emcmongoose/mongoose-storage-driver-pravega:${version}".toString(),
             "emcmongoose/mongoose-storage-driver-pravega:testing",
     ]
 }
@@ -299,12 +300,12 @@ task createRobotestContainer(type: DockerCreateContainer, dependsOn: [buildImage
     attachStdout = true
     autoRemove = true
     binds = [
-            "${rootProject.buildDir}": "/root/mongoose/build",
+            "${rootProject.buildDir}": "/root/mongoose-storage-driver-pravega/build",
             "/var/run/docker.sock": "/var/run/docker.sock"
     ]
     envVars = [
             "HOST_WORKING_DIR": rootProject.projectDir.absolutePath,
-            "MONGOOSE_VERSION": version,
+            "MONGOOSE_VERSION": "${depVersion.mongoose}",
             "SUITE": System.getenv("SUITE"),
             "TEST": System.getenv("TEST"),
     ]
