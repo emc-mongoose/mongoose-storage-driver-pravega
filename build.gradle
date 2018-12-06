@@ -1,16 +1,10 @@
 plugins {
-    id 'com.bmuschko.docker-remote-api' version '3.6.2'
+    id 'com.bmuschko.docker-remote-api' version '4.0.5'
 }
 
 description = "Pravega storage driver for Mongoose"
 
-apply plugin: "java"
-apply plugin: "maven"
-apply plugin: "signing"
-apply plugin: 'com.bmuschko.docker-remote-api'
 
-group = "com.github.emc-mongoose"
-version = "0.1.0"
 
 tasks.withType(JavaCompile) {
     sourceCompatibility = JavaVersion.VERSION_1_8
@@ -44,209 +38,228 @@ ext {
     ]
 }
 
-configurations {
-    provided
-    testCompile {
-        extendsFrom(compileOnly, provided)
+allprojects {
+    buildscript {
+        repositories {
+            mavenCentral()
+        }
     }
-    all*.exclude group: "com.sun.jersey", module: "jersey-core"
-}
 
-sourceSets {
-    main {
-        compileClasspath += configurations.provided
+    repositories {
+        jcenter()
+        mavenCentral()
     }
-}
 
-configurations.all {
-    exclude module: "slf4j-log4j12"
-}
+    apply plugin: "java"
+    apply plugin: "maven"
+    apply plugin: "signing"
 
-dependencies {
+    group = "com.github.emc-mongoose"
+    version = "0.1.0"
 
-    compileOnly(
-        "com.github.emc-mongoose:mongoose:${depVersion.mongoose}",
-        "com.github.emc-mongoose:mongoose-storage-driver-coop:${depVersion.mongoose}",
-        "com.github.emc-mongoose:mongoose-storage-driver-coop-nio:${depVersion.mongoose}",
-        "com.github.akurilov:java-commons:${depVersion.commonsJava}",
-        "org.apache.logging.log4j:log4j-api:${depVersion.log4j}",
-    )
+    configurations {
+        provided
+        testCompile {
+            extendsFrom(compileOnly, provided)
+        }
+        all*.exclude group: "com.sun.jersey", module: "jersey-core"
+    }
 
-    provided(
-		"io.pravega:pravega-client:${depVersion.pravega}",
-	)
+    sourceSets {
+        main {
+            compileClasspath += configurations.provided
+        }
+    }
 
-    testCompile(
-        "junit:junit:[4,)",
-        "com.github.docker-java:docker-java:${depVersion.dockerJava}",
-        "org.apache.commons:commons-csv:1.1",
-    )
+    configurations.all {
+        exclude module: "slf4j-log4j12"
+    }
 
-    testRuntime(
-        "com.lmax:disruptor:${depVersion.disruptor}",
-    )
-}
+    dependencies {
 
-test {
-    /*
+        compileOnly(
+                "com.github.emc-mongoose:mongoose:${depVersion.mongoose}",
+                "com.github.emc-mongoose:mongoose-storage-driver-coop:${depVersion.mongoose}",
+                "com.github.emc-mongoose:mongoose-storage-driver-coop-nio:${depVersion.mongoose}",
+                "com.github.akurilov:java-commons:${depVersion.commonsJava}",
+                "org.apache.logging.log4j:log4j-api:${depVersion.log4j}",
+        )
+
+        provided(
+                "io.pravega:pravega-client:${depVersion.pravega}",
+        )
+
+        testCompile(
+                "junit:junit:[4,)",
+                "com.github.docker-java:docker-java:${depVersion.dockerJava}",
+                "org.apache.commons:commons-csv:1.1",
+        )
+
+        testRuntime(
+                "com.lmax:disruptor:${depVersion.disruptor}",
+        )
+    }
+
+    test {
+        /*
     systemProperty "com.sun.management.jmxremote", "true"
     systemProperty "com.sun.management.jmxremote.port", "9010"
     systemProperty "com.sun.management.jmxremote.local.only", "false"
     systemProperty "com.sun.management.jmxremote.authenticate", "false"
     systemProperty "com.sun.management.jmxremote.ssl", "false"
     */
-    testLogging {
-        events "passed", "skipped", "failed", "standardOut"
-        showExceptions = true
-        showStandardStreams = true
+        testLogging {
+            events "passed", "skipped", "failed", "standardOut"
+            showExceptions = true
+            showStandardStreams = true
+        }
     }
-}
 
-test.dependsOn += jar
+    test.dependsOn += jar
 
 // travis deploy stage runs "./gradlew check" again which is unnecessary
-check.dependsOn -= test
+    check.dependsOn -= test
 
-jar {
+    jar {
 
-    archiveName "$project.name.$extension"
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+        archiveName "$project.name.$extension"
+        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 
-    manifest {
-        attributes (
-            "Implementation-Version": version,
-            "Implementation-Title": project.description,
-        )
+        manifest {
+            attributes(
+                    "Implementation-Version": version,
+                    "Implementation-Title": project.description,
+            )
+        }
+
+        from configurations
+                .provided
+                .collect {
+            zipTree(it)
+        }
+
+        exclude "META-INF/*.RSA", "META-INF/*.SF", "META-INF/*.DSA"
     }
 
-	from configurations
-		.provided
-		.collect {
-			zipTree(it)
-		}
-
-    exclude "META-INF/*.RSA", "META-INF/*.SF", "META-INF/*.DSA"
-}
-
-task sourcesJar(type: Jar, dependsOn: classes) {
-    classifier = "sources"
-    archiveName "$project.name-$classifier.$extension"
-    from sourceSets.main.allSource
-}
-
-task javadocJar(type: Jar, dependsOn: javadoc) {
-    classifier = "javadoc"
-    archiveName "$project.name-$classifier.$extension"
-    from javadoc.destinationDir
-}
-
-artifacts {
-    archives jar
-    archives sourcesJar
-    archives javadocJar
-}
-
-def ossrhUsername = project.hasProperty("ossrhUsername") ? project.property("ossrhUsername") : null
-def ossrhPassword = project.hasProperty("ossrhPassword") ? project.property("ossrhPassword") : null
-
-signing {
-    required {
-        gradle.taskGraph.hasTask("uploadArchives")
+    task sourcesJar(type: Jar, dependsOn: classes) {
+        classifier = "sources"
+        archiveName "$project.name-$classifier.$extension"
+        from sourceSets.main.allSource
     }
-    sign configurations.archives
-}
+
+    task javadocJar(type: Jar, dependsOn: javadoc) {
+        classifier = "javadoc"
+        archiveName "$project.name-$classifier.$extension"
+        from javadoc.destinationDir
+    }
+
+    artifacts {
+        archives jar
+        archives sourcesJar
+        archives javadocJar
+    }
+
+    def ossrhUsername = project.hasProperty("ossrhUsername") ? project.property("ossrhUsername") : null
+    def ossrhPassword = project.hasProperty("ossrhPassword") ? project.property("ossrhPassword") : null
+
+    signing {
+        required {
+            gradle.taskGraph.hasTask("uploadArchives")
+        }
+        sign configurations.archives
+    }
 
 // see http://central.sonatype.org/pages/gradle.html for details
-uploadArchives {
+    uploadArchives {
 
-    // prevent the execution for empty (not leaf) subprojects and tests packages
-    if(project.name.contains("tests")) {
-        return
-    }
+        // prevent the execution for empty (not leaf) subprojects and tests packages
+        if (project.name.contains("tests")) {
+            return
+        }
 
-    repositories {
-        mavenDeployer {
-            beforeDeployment {
-                MavenDeployment deployment -> signing.signPom(deployment)
-            }
+        repositories {
+            mavenDeployer {
+                beforeDeployment {
+                    MavenDeployment deployment -> signing.signPom(deployment)
+                }
 
-            repository(url: "https://oss.sonatype.org/service/local/staging/deploy/maven2/") {
-                authentication(userName: ossrhUsername, password: ossrhPassword)
-            }
+                repository(url: "https://oss.sonatype.org/service/local/staging/deploy/maven2/") {
+                    authentication(userName: ossrhUsername, password: ossrhPassword)
+                }
 
-            snapshotRepository(url: "https://oss.sonatype.org/content/repositories/snapshots/") {
-                authentication(userName: ossrhUsername, password: ossrhPassword)
-            }
+                snapshotRepository(url: "https://oss.sonatype.org/content/repositories/snapshots/") {
+                    authentication(userName: ossrhUsername, password: ossrhPassword)
+                }
 
-            pom {
+                pom {
 
-                groupId = rootProject.group
-                name = "mongoose-storage-driver-pravega"
-                artifactId = name
+                    groupId = rootProject.group
+                    name = "mongoose-storage-driver-pravega"
+                    artifactId = name
 
-                project {
-                    description = rootProject.description
+                    project {
+                        description = rootProject.description
 
-                    url "https://github.com/emc-mongoose/mongoose-storage-driver-pravega/wiki"
+                        url "https://github.com/emc-mongoose/mongoose-storage-driver-pravega/wiki"
 
-                    scm {
-                        connection "https://github.com/emc-mongoose/mongoose-storage-driver-pravega.git"
-                        developerConnection "https://github.com/emc-mongoose/mongoose-storage-driver-pravega.git"
-                        url "https://github.com/emc-mongoose/mongoose-storage-driver-pravega.git"
-                    }
-
-                    licenses {
-                        license {
-                            name "The MIT License (MIT)"
-                            url "https://github.com/emc-mongoose/mongoose-storage-driver-pravega/wiki/License"
+                        scm {
+                            connection "https://github.com/emc-mongoose/mongoose-storage-driver-pravega.git"
+                            developerConnection "https://github.com/emc-mongoose/mongoose-storage-driver-pravega.git"
+                            url "https://github.com/emc-mongoose/mongoose-storage-driver-pravega.git"
                         }
-                    }
 
-                    developers {
-						developers {
-							developer {
-								id "akurilov"
-								name "Andrey Kurilov"
-								email "akurilov123@gmail.com"
-							}
-							developer {
-								id "dadlex"
-								name "Alexander Aphonin"
-								email "alex15051997@yandex.ru"
-							}
-							developer {
-								id "hoklet"
-								name "Alexander Aphonin"
-								email "hokletka@gmail.com"
-							}
-							developer {
-								id "veronikaKochugova"
-								name "Veronika Kochugova"
-								email "Veronika.Kochugova@dell.com"
-							}
-							developer {
-								id "vladislav-kulakovsky"
-								name "Vladislav Kulakovsky"
-								email "kulakovsky.vladislav@gmail.com"
-							}
-							developer {
-								id "yurkov-anton"
-								name "Anton Yurkov"
-								email "ayourkov@gmail.com"
-							}
-							developer {
-								id "zhenytim"
-								name "Evgeny Timoshchuk"
-								email "zheny.tim@gmail.com"
-							}
-						}
+                        licenses {
+                            license {
+                                name "The MIT License (MIT)"
+                                url "https://github.com/emc-mongoose/mongoose-storage-driver-pravega/wiki/License"
+                            }
+                        }
+
+                        developers {
+                            developers {
+                                developer {
+                                    id "akurilov"
+                                    name "Andrey Kurilov"
+                                    email "akurilov123@gmail.com"
+                                }
+                                developer {
+                                    id "dadlex"
+                                    name "Alexander Aphonin"
+                                    email "alex15051997@yandex.ru"
+                                }
+                                developer {
+                                    id "hoklet"
+                                    name "Alexander Aphonin"
+                                    email "hokletka@gmail.com"
+                                }
+                                developer {
+                                    id "veronikaKochugova"
+                                    name "Veronika Kochugova"
+                                    email "Veronika.Kochugova@dell.com"
+                                }
+                                developer {
+                                    id "vladislav-kulakovsky"
+                                    name "Vladislav Kulakovsky"
+                                    email "kulakovsky.vladislav@gmail.com"
+                                }
+                                developer {
+                                    id "yurkov-anton"
+                                    name "Anton Yurkov"
+                                    email "ayourkov@gmail.com"
+                                }
+                                developer {
+                                    id "zhenytim"
+                                    name "Evgeny Timoshchuk"
+                                    email "zheny.tim@gmail.com"
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
     }
 }
-
 
 // Docker tasks ////////////////////////////////////////
 
@@ -289,12 +302,12 @@ task createRobotestContainer(type: DockerCreateContainer, dependsOn: [buildImage
             "${rootProject.buildDir}": "/root/mongoose/build",
             "/var/run/docker.sock": "/var/run/docker.sock"
     ]
-   /* envVars = [
+    envVars = [
             "HOST_WORKING_DIR": rootProject.projectDir.absolutePath,
             "MONGOOSE_VERSION": version,
             "SUITE": System.getenv("SUITE"),
             "TEST": System.getenv("TEST"),
-    ]*/
+    ]
     imageId = buildRobotestImage.getImageId()
     network = "host"
     tty = true
