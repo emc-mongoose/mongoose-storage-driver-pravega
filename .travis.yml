@@ -23,6 +23,12 @@ jobs:
   - stage: "Tests"
     script: "./gradlew test"
 
+  - stage: "System tests"
+    env:
+      - SUITE=api.storage
+      - TEST=create_events
+    script: "./gradlew robotest"
+
   - stage: "Deploy to DockerHub"
     script:
     - ./gradlew clean jar
