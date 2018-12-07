@@ -25,8 +25,8 @@ jobs:
 
   - stage: "System tests"
     env:
-      - SUITE=api.storage
-      - TEST=create_events
+    - SUITE=api.storage
+    - TEST=create_events
     script: "./gradlew robotest"
 
   - stage: "Deploy to DockerHub"
