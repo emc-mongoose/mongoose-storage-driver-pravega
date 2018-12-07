@@ -33,9 +33,8 @@ Create Events Test
     Log  ${std_out}
     Validate Metrics Total Log File  ${step_id}  CREATE  10  0  10485760
 
-
 *** Keyword ***
-Execute Mongoose Node
+Execute Mongoose Scenario
     [Timeout]  5 minutes
     [Arguments]  ${args}
     ${host_working_dir} =  Get Environment Variable  HOST_WORKING_DIR
