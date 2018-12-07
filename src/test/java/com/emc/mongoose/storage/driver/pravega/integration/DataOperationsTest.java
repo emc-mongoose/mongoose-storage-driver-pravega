@@ -33,8 +33,10 @@ import org.junit.Test;
 
 import java.io.IOException;
 import java.net.URI;
+import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.stream.Collectors;
+
 import java.util.stream.IntStream;
 
 import static com.emc.mongoose.Constants.APP_NAME;
@@ -192,17 +194,17 @@ private static final DataInput DATA_INPUT;
 		}
 
 		try (final ClientFactory clientFactory = ClientFactory.withScope(scope, controllerURI);
-			 EventStreamReader<Integer> reader = clientFactory.createReader("reader",
+			 EventStreamReader<ByteBuffer> reader = clientFactory.createReader("reader",
 					 readerGroup,
 			new ByteBufferSerializer(),
 					 ReaderConfig.builder().build())) {
 			System.out.format("Reading all the events from %s/%s%n", scope, streamName);
-			EventRead<Integer> event = null;
+			EventRead<ByteBuffer> event = null;
 			event = reader.readNextEvent(readTimeoutMillis);
 			if (event.getEvent() != null) {
 
 				assertEquals("we didn't read the same size we had put into stream",
-				(int)dataItem.size(),(int)event.getEvent());
+				(int)dataItem.size(),event.getEvent().remaining());
 			}
 		}
 		//assertEquals(dataItem.size(),pravegaStream.getSize());
