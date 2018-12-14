@@ -5,17 +5,16 @@ plugins {
 description = "Pravega storage driver for Mongoose"
 
 
-
 tasks.withType(JavaCompile) {
     sourceCompatibility = JavaVersion.VERSION_1_8
     targetCompatibility = JavaVersion.VERSION_1_8
 }
 
 task("create-dirs").doLast(
-    {
-        sourceSets*.java.srcDirs*.each { it.mkdirs() }
-        sourceSets*.resources.srcDirs*.each { it.mkdirs() }
-    }
+        {
+            sourceSets*.java.srcDirs*.each { it.mkdirs() }
+            sourceSets*.resources.srcDirs*.each { it.mkdirs() }
+        }
 )
 
 repositories {
@@ -24,17 +23,17 @@ repositories {
 
 ext {
     depVersion = [
-        commonsJava: "2.1.3",
-        disruptor: "3.4.2",
-        dockerJava: "3.0.14",
-		grpc: "1.8.0",
-		guava: "20.0",
-        log4j: "2.8.2",
-        mongoose: "4.0.2",
-	    netty: "4.1.16.Final",
-	    opencensus: "0.8.0",
-		pravega: "0.3.2",
-	    protobuf: "3.4.0",
+            commonsJava: "2.1.3",
+            disruptor  : "3.4.2",
+            dockerJava : "3.0.14",
+            grpc       : "1.8.0",
+            guava      : "20.0",
+            log4j      : "2.8.2",
+            mongoose   : "4.1.0",
+            netty      : "4.1.16.Final",
+            opencensus : "0.8.0",
+            pravega    : "0.3.2",
+            protobuf   : "3.4.0",
     ]
 }
 
@@ -214,44 +213,41 @@ allprojects {
                                 url "https://github.com/emc-mongoose/mongoose-storage-driver-pravega/wiki/License"
                             }
                         }
-
                         developers {
-                            developers {
-                                developer {
-                                    id "akurilov"
-                                    name "Andrey Kurilov"
-                                    email "akurilov123@gmail.com"
-                                }
-                                developer {
-                                    id "dadlex"
-                                    name "Alexander Aphonin"
-                                    email "alex15051997@yandex.ru"
-                                }
-                                developer {
-                                    id "hoklet"
-                                    name "Alexander Aphonin"
-                                    email "hokletka@gmail.com"
-                                }
-                                developer {
-                                    id "veronikaKochugova"
-                                    name "Veronika Kochugova"
-                                    email "Veronika.Kochugova@dell.com"
-                                }
-                                developer {
-                                    id "vladislav-kulakovsky"
-                                    name "Vladislav Kulakovsky"
-                                    email "kulakovsky.vladislav@gmail.com"
-                                }
-                                developer {
-                                    id "yurkov-anton"
-                                    name "Anton Yurkov"
-                                    email "ayourkov@gmail.com"
-                                }
-                                developer {
-                                    id "zhenytim"
-                                    name "Evgeny Timoshchuk"
-                                    email "zheny.tim@gmail.com"
-                                }
+                            developer {
+                                id "akurilov"
+                                name "Andrey Kurilov"
+                                email "akurilov123@gmail.com"
+                            }
+                            developer {
+                                id "dadlex"
+                                name "Alexander Aphonin"
+                                email "alex15051997@yandex.ru"
+                            }
+                            developer {
+                                id "hoklet"
+                                name "Alexander Aphonin"
+                                email "hokletka@gmail.com"
+                            }
+                            developer {
+                                id "veronikaKochugova"
+                                name "Veronika Kochugova"
+                                email "Veronika.Kochugova@dell.com"
+                            }
+                            developer {
+                                id "vladislav-kulakovsky"
+                                name "Vladislav Kulakovsky"
+                                email "kulakovsky.vladislav@gmail.com"
+                            }
+                            developer {
+                                id "yurkov-anton"
+                                name "Anton Yurkov"
+                                email "ayourkov@gmail.com"
+                            }
+                            developer {
+                                id "zhenytim"
+                                name "Evgeny Timoshchuk"
+                                email "zheny.tim@gmail.com"
                             }
                         }
                     }
@@ -260,6 +256,7 @@ allprojects {
         }
     }
 }
+
 
 // Docker tasks ////////////////////////////////////////
 
@@ -270,7 +267,7 @@ task buildImage(type: DockerBuildImage, dependsOn: jar) {
     inputDir = rootProject.projectDir
     dockerFile = project.file("docker${File.separator}Dockerfile")
     imageId = "emcmogoose/mongoose-storage-driver-pravega"
-    buildArgs = ["MONGOOSE_VERSION":"${depVersion.mongoose}"]
+    buildArgs = ["MONGOOSE_VERSION": "${depVersion.mongoose}"]
     tags = [
             "emcmongoose/mongoose-storage-driver-pravega:${version}".toString(),
             "emcmongoose/mongoose-storage-driver-pravega:testing",
@@ -301,13 +298,13 @@ task createRobotestContainer(type: DockerCreateContainer, dependsOn: [buildImage
     autoRemove = true
     binds = [
             "${rootProject.buildDir}": "/root/mongoose-storage-driver-pravega/build",
-            "/var/run/docker.sock": "/var/run/docker.sock"
+            "/var/run/docker.sock"   : "/var/run/docker.sock"
     ]
     envVars = [
             "HOST_WORKING_DIR": rootProject.projectDir.absolutePath,
             "MONGOOSE_VERSION": "${depVersion.mongoose}",
-            "SUITE": System.getenv("SUITE"),
-            "TEST": System.getenv("TEST"),
+            "SUITE"           : System.getenv("SUITE"),
+            "TEST"            : System.getenv("TEST"),
     ]
     imageId = buildRobotestImage.getImageId()
     network = "host"
@@ -326,7 +323,7 @@ task robotest(type: DockerWaitContainer, dependsOn: startRobotestContainer) {
     targetContainerId createRobotestContainer.getContainerId()
     timeout = 600
     doLast {
-        if(0 != exitCode) {
+        if (0 != exitCode) {
             throw new GradleException("Some robotests FAILED")
         } else {
             println "robotests PASSED"
