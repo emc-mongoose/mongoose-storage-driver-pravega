@@ -159,9 +159,6 @@ private static final DataInput DATA_INPUT;
 	@Test
 	public final void testCreateEvent()
 			throws Exception {
-
-		//final URI controllerURI = URI.create(getConfig().listVal("storage-net-node-addrs").get(0)+":"+String.valueOf(getConfig().intVal("storage-net-node-port")));
-		//System.out.println(controllerURI.toString());
 		final DataItem dataItem = new DataItemImpl(0, MIB, 0);
 		dataItem.name("0000");
 		dataItem.dataInput(DATA_INPUT);
@@ -174,9 +171,8 @@ private static final DataInput DATA_INPUT;
 		String scope = DEFAULT_SCOPE;
 		prepare(createTask);
 		createTask.status(Operation.Status.ACTIVE);
-		//while(Operation.Status.ACTIVE.equals(createTask.status())) {
-			submit(createTask);
-		//}
+		submit(createTask);
+
 		DataOperation<DataItem> result = get();
 		while(result==null){
 			result = get();
@@ -208,13 +204,43 @@ private static final DataInput DATA_INPUT;
 				(int)dataItem.size(),event.getEvent().remaining());
 			}
 		}
-		//assertEquals(dataItem.size(),pravegaStream.getSize());
-		//how to get size of the stream to check that its size == dataItem.size() ?
 	}
 
 	@Test
-	public final void testCopyFile()
+	public final void testReadEvent()
 	throws Exception {
+		final DataItem dataItem = new DataItemImpl(0, MIB, 0);
+		dataItem.name("0000");
+		dataItem.dataInput(DATA_INPUT);
+		String streamName = "default";
+		final DataOperation<DataItem> createTask = new DataOperationImpl<>(
+		0, OpType.CREATE, dataItem, null, streamName, credential, null, 0, null
+		);
+
+
+		String scope = DEFAULT_SCOPE;
+		prepare(createTask);
+		createTask.status(Operation.Status.ACTIVE);
+		submit(createTask);
+
+		DataOperation<DataItem> result = get();
+		while(result==null){
+			result = get();
+		}//need to wait for operation to be executed
+		assertEquals(Operation.Status.SUCC, result.status());
+		assertEquals(dataItem.size(), createTask.countBytesDone());
+
+		final DataItem dataItem2 = new DataItemImpl(0, MIB, 0);
+		dataItem2.name("0000");
+		final DataOperation<DataItem> createTask2 = new DataOperationImpl<>(
+		0, OpType.READ, dataItem2, null, streamName, credential, null, 0, null
+		);
+
+
+		prepare(createTask);
+		createTask2.status(Operation.Status.ACTIVE);
+		boolean results = submit(createTask2);
+		assertEquals(results,true);
 	}
 
 	@Test
