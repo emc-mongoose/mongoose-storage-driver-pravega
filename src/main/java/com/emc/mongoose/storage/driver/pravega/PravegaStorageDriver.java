@@ -554,8 +554,10 @@ extends CoopStorageDriverBase<I, O>  {
 		}
 	}
 
-	boolean completeStreamCreateOperation(final PathOperation streamOp, final boolean result, final Throwable thrown,
-	final String scopeName, final String streamName) { // TODO erase code duplication
+	boolean completeStreamCreateOperation(final PathOperation streamOp, final boolean result, final Throwable thrown) {
+		// TODO erase code duplication
+		val scopeName = DEFAULT_SCOPE;
+		val streamName = extractStreamName(streamOp.item().name());
 		if(null == thrown) {
 			if(result){
 				return completeOperation((O) streamOp, SUCC);
@@ -585,7 +587,7 @@ extends CoopStorageDriverBase<I, O>  {
 			 */
 			val createStreamFuture = controller.createStream(combineStreamConfigAndName(streamName, streamConfig));
 			createStreamFuture.handle((returned, thrown) ->
-				completeStreamCreateOperation(streamOp,returned,thrown,scopeName,streamName)
+				completeStreamCreateOperation(streamOp,returned,thrown)
 			);
 		} catch(final NullPointerException e) {
 			if(!isStarted()) {
@@ -605,8 +607,10 @@ extends CoopStorageDriverBase<I, O>  {
 		// TODO: Alex, issue SDP-51
 	}
 
-	boolean completeStreamDeleteOperation(final PathOperation streamOp, final boolean result, final Throwable thrown,
-	final String scopeName, final String streamName) { // TODO erase code duplication
+	boolean completeStreamDeleteOperation(final PathOperation streamOp, final boolean result, final Throwable thrown) {
+		// TODO erase code duplication
+		val scopeName = DEFAULT_SCOPE;
+		val streamName = extractStreamName(streamOp.item().name());
 		if(null == thrown) {
 			if(result){
 				return completeOperation((O) streamOp, SUCC);
@@ -635,7 +639,7 @@ extends CoopStorageDriverBase<I, O>  {
 			}
 			val deleteStreamFuture = controller.deleteStream(scopeName,streamName);
 			deleteStreamFuture.handle((returned, thrown) ->
-					completeStreamDeleteOperation(streamOp, returned, thrown, scopeName, streamName)
+					completeStreamDeleteOperation(streamOp, returned, thrown)
 			);
 		} catch(final NullPointerException e) {
 			if(!isStarted()) {
