@@ -554,6 +554,25 @@ extends CoopStorageDriverBase<I, O>  {
 		}
 	}
 
+	boolean completeStreamCreateOperation(final PathOperation streamOp, final boolean result, final Throwable thrown) {
+		// TODO erase code duplication
+		val scopeName = DEFAULT_SCOPE;
+		val streamName = extractStreamName(streamOp.item().name());
+		if(null == thrown) {
+			if(result){
+				return completeOperation((O) streamOp, SUCC);
+			} else {
+				//Should I give stream and scope name to this method?
+				Loggers.ERR.debug(
+						"The stream {} already exists in the scope {}", streamName, scopeName
+				);
+				return completeOperation((O) streamOp, RESP_FAIL_UNKNOWN);
+			}
+		} else {
+			return completeFailedOperation((O) streamOp, thrown);
+		}
+	}
+
 	void submitStreamCreateOperation(final PathOperation streamOp, final String nodeAddr) {
 		try {
 			val endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
@@ -566,24 +585,16 @@ extends CoopStorageDriverBase<I, O>  {
 			/*We need to use StreamConfiguration.builder() because scopeCreateFuncForStreamConfig returns
 			StreamConfig without streamName field. So this looks like implementation of StreamManager.createStream()
 			 */
-			if(controller.createStream(combineStreamConfigAndName(streamName, streamConfig))
-			.get(controlApiTimeoutMillis, TimeUnit.MILLISECONDS)) {
-				completeOperation((O) streamOp, SUCC);
-			} else {
-				Loggers.ERR.debug(
-					"The stream {} already exists in the scope {}", streamName, scopeName
-				);
-				completeOperation((O) streamOp, RESP_FAIL_UNKNOWN);
-			}
+			val createStreamFuture = controller.createStream(combineStreamConfigAndName(streamName, streamConfig));
+			createStreamFuture.handle((returned, thrown) ->
+				completeStreamCreateOperation(streamOp,returned,thrown)
+			);
 		} catch(final NullPointerException e) {
 			if(!isStarted()) {
 				completeOperation((O) streamOp, INTERRUPTED);
 			} else {
 				completeFailedOperation((O) streamOp, e);
 			}
-		} catch(final InterruptedException e) {
-			completeOperation((O) streamOp, INTERRUPTED);
-			throw new InterruptRunException(e);
 		} catch(final InterruptRunException e) {
 			completeOperation((O) streamOp, INTERRUPTED);
 			throw e;
@@ -596,31 +607,40 @@ extends CoopStorageDriverBase<I, O>  {
 		// TODO: Alex, issue SDP-51
 	}
 
+	boolean completeStreamDeleteOperation(final PathOperation streamOp, final boolean result, final Throwable thrown) {
+		// TODO erase code duplication
+		val scopeName = DEFAULT_SCOPE;
+		val streamName = extractStreamName(streamOp.item().name());
+		if(null == thrown) {
+			if(result){
+				return completeOperation((O) streamOp, SUCC);
+			} else {
+				//Should I give stream and scope name to this method?
+				Loggers.ERR.debug(
+					"Failed to delete the stream {} in the scope {}", streamName, scopeName
+				);
+				return completeOperation((O) streamOp, RESP_FAIL_UNKNOWN);
+			}
+		} else {
+			return completeFailedOperation((O) streamOp, thrown);
+		}
+	}
+
 	void submitStreamDeleteOperation(final PathOperation streamOp, final String nodeAddr) {
 		try {
-			final String scopeName = DEFAULT_SCOPE; // TODO make this configurable
-			final String streamName = streamOp.item().name();
-			final URI endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
-			final Controller controller = controllerCache.computeIfAbsent(endpointUri, this::createController);
-			if(controller.sealStream(scopeName, streamName).get(controlApiTimeoutMillis, TimeUnit.MILLISECONDS)) {
-				if(
-					controller
-						.deleteStream(scopeName, streamName)
-						.get(controlApiTimeoutMillis, TimeUnit.MILLISECONDS)
-				) {
-					completeOperation((O) streamOp, SUCC);
-				} else {
-					Loggers.ERR.debug(
-							"Failed to delete the stream {} in the scope {}", streamName,
-							scopeName);
-					completeOperation((O) streamOp, RESP_FAIL_UNKNOWN);
-				}
-			} else {
+			val scopeName = DEFAULT_SCOPE; // TODO make this configurable
+			val streamName = extractStreamName(streamOp.item().name());
+			val endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
+			val controller = controllerCache.computeIfAbsent(endpointUri, this::createController);
+			if(!controller.sealStream(scopeName, streamName).get(controlApiTimeoutMillis, TimeUnit.MILLISECONDS)) {
 				Loggers.ERR.debug(
-						"Failed to seal the stream {} in the scope {}", streamName,
-						scopeName);
-				completeOperation((O) streamOp, RESP_FAIL_UNKNOWN);
+					"Failed to seal the stream {} in the scope {}", streamName, scopeName
+				);
 			}
+			val deleteStreamFuture = controller.deleteStream(scopeName,streamName);
+			deleteStreamFuture.handle((returned, thrown) ->
+					completeStreamDeleteOperation(streamOp, returned, thrown)
+			);
 		} catch(final NullPointerException e) {
 			if(!isStarted()) {
 				completeOperation((O) streamOp, INTERRUPTED);
