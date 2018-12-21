@@ -31,7 +31,7 @@ jobs:
 
   - env:
        - SUITE=api.storage
-       - Test=create_stream
+       - TEST=create_stream
     script: "./gradlew robotest"
 
   - stage: "Deploy to DockerHub"
