@@ -89,7 +89,7 @@ private static final DataInput DATA_INPUT;
 			val config = new BasicConfig("-", configSchema);
 
 			config.val("load-batch-size", 4096);
-
+			config.val("storage-namespace-scope", "goose");
 			config.val("storage-net-reuseAddr", true);
 			config.val("storage-net-bindBacklogSize", 0);
 			config.val("storage-net-keepAlive", true);
