@@ -18,6 +18,9 @@
 				"rate": "int",
 				"factor": "int",
 				"segments": "int"
+			},
+			"namespace": {
+				"scope": "string"
 			}
 		},
 		"net": {
@@ -39,9 +42,6 @@
 				"port": "int",
 				"connAttemptsLimit": "int"
 			}
-		},
-		"namespace": {
-			"scope": "string"
 		}
 	}
 }
