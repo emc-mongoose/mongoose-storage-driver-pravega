@@ -1,5 +1,5 @@
 *** Settings ***
-Force Tags  create_events
+Force Tags  create_stream
 Library  OperatingSystem
 Library  CSVLibrary
 Test Setup  Start Containers
@@ -7,7 +7,7 @@ Test Teardown  Stop Containers
 
 *** Variables ***
 ${MONGOOSE_IMAGE_NAME} =  emcmongoose/mongoose-storage-driver-pravega
-${MONGOOSE_IMAGE_VERSION} =  latest
+${MONGOOSE_IMAGE_VERSION} =  testing
 ${MONGOOSE_CONTAINER_NAME} =  mongoose-storage-driver-pravega
 
 ${PRAVEGA_IMAGE_NAME} =  pravega/pravega
@@ -83,7 +83,6 @@ Stop Containers
 Validate Metrics Log File
     [Arguments]  ${step_id}  ${stream_name}
     ${result} =  Grep File  ${LOG_DIR}/${step_id}/3rdparty.log  Stream created successfully: ${stream_name}
-#    ${length} =  Get Length  ${result}
     Run Keyword If  "${result}"!="${EMPTY}"
     ...  Log  passed
     ...  ELSE  Fail  Stream ${stream_name} not created
