@@ -89,7 +89,6 @@ private static final DataInput DATA_INPUT;
 			val config = new BasicConfig("-", configSchema);
 
 			config.val("load-batch-size", 4096);
-
 			config.val("storage-net-reuseAddr", true);
 			config.val("storage-net-bindBacklogSize", 0);
 			config.val("storage-net-keepAlive", true);
@@ -121,6 +120,8 @@ private static final DataInput DATA_INPUT;
 			config.val("storage-driver-limit-queue-input", 1_000_000);
 			config.val("storage-driver-limit-queue-output", 1_000_000);
 			config.val("storage-driver-limit-concurrency", 0);
+			config.val("storage-namespace-scope", "goose");
+
 			return config;
 		} catch (final Throwable cause) {
 			throw new RuntimeException(cause);

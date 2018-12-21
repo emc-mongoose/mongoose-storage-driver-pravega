@@ -40,10 +40,10 @@
 				],
 				"port": 9090,
 				"connAttemptsLimit": 0
-			},
-			"namespace": {
-				"scope": "goose"
 			}
-		}
+		},
+        "namespace": {
+          "scope": "goose"
+        }
 	}
 }
