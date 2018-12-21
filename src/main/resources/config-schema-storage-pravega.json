@@ -39,6 +39,9 @@
 				"port": "int",
 				"connAttemptsLimit": "int"
 			}
+		},
+		"namespace": {
+			"scope": "string"
 		}
 	}
 }
