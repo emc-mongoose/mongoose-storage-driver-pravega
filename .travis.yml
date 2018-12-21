@@ -30,8 +30,8 @@ jobs:
     script: "./gradlew robotest"
 
   - env:
-       - SUITE=api.storage
-       - TEST=create_stream
+    - SUITE=api.storage
+    - TEST=create_stream
     script: "./gradlew robotest"
 
   - stage: "Deploy to DockerHub"
