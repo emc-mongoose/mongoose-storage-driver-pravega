@@ -18,6 +18,9 @@
 				"rate": 0,
 				"factor": 0,
 				"segments": 1
+			},
+			"namespace": {
+				"scope": "goose"
 			}
 		},
 		"net": {
@@ -41,9 +44,6 @@
 				"port": 9090,
 				"connAttemptsLimit": 0
 			}
-		},
-        "namespace": {
-          "scope": "goose"
-        }
+		}
 	}
 }

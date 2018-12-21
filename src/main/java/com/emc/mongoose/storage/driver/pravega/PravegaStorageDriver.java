@@ -235,7 +235,7 @@ extends CoopStorageDriverBase<I, O>  {
 		val scalingConfig = driverConfig.configVal("scaling");
 		this.scalingPolicy = PravegaScalingConfig.scalingPolicy(scalingConfig);
 		this.uriSchema = storageConfig.stringVal("net-uri-schema");
-		this.scopeName = storageConfig.stringVal("namespace-scope");
+		this.scopeName = driverConfig.stringVal("namespace-scope");
 		val nodeConfig = storageConfig.configVal("net-node");
 		nodePort = storageConfig.intVal("net-node-port");
 		val endpointAddrList = nodeConfig.listVal("addrs");
