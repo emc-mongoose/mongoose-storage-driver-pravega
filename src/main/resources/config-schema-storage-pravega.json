@@ -42,7 +42,6 @@
 				"port": "int",
 				"connAttemptsLimit": "int"
 			}
-			//fghjkl;
 		}
 	}
 }
