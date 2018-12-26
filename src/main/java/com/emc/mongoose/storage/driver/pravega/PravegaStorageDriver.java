@@ -7,8 +7,6 @@ import static com.emc.mongoose.item.op.Operation.Status.INTERRUPTED;
 import static com.emc.mongoose.item.op.Operation.Status.RESP_FAIL_UNKNOWN;
 import static com.emc.mongoose.item.op.Operation.Status.SUCC;
 import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.BACKGROUND_THREAD_COUNT;
-import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.DEFAULT_SCOPE;
-import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.DEFAULT_URI_SCHEMA;
 import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.DRIVER_NAME;
 import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.MAX_BACKOFF_MILLIS;
 import static com.emc.mongoose.storage.driver.pravega.io.StreamScaleUtil.scaleToFixedSegmentCount;
@@ -86,6 +84,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 extends CoopStorageDriverBase<I, O>  {
 
 	protected final String uriSchema;
+	protected final String scopeName;
 	protected final String[] endpointAddrs;
 	protected final int nodePort;
 	protected final int controlApiTimeoutMillis;
@@ -236,6 +235,7 @@ extends CoopStorageDriverBase<I, O>  {
 		val scalingConfig = driverConfig.configVal("scaling");
 		this.scalingPolicy = PravegaScalingConfig.scalingPolicy(scalingConfig);
 		this.uriSchema = storageConfig.stringVal("net-uri-schema");
+		this.scopeName = driverConfig.stringVal("namespace-scope");
 		val nodeConfig = storageConfig.configVal("net-node");
 		nodePort = storageConfig.intVal("net-node-port");
 		val endpointAddrList = nodeConfig.listVal("addrs");
@@ -441,7 +441,6 @@ extends CoopStorageDriverBase<I, O>  {
 			// prepare
 			val endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
 			val controller = controllerCache.computeIfAbsent(endpointUri, this::createController);
-			val scopeName = DEFAULT_SCOPE; // TODO make this configurable
 			val scopeCreateFunc = scopeCreateFuncCache.computeIfAbsent(controller, ScopeCreateFunctionImpl::new);
 			// create the scope if necessary
 			val streamCreateFunc = streamCreateFuncCache.computeIfAbsent(scopeName, scopeCreateFunc);
@@ -492,7 +491,6 @@ extends CoopStorageDriverBase<I, O>  {
 	void submitEventReadOperation(final DataOperation evtOp, final String nodeAddr) {
 		val endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
 		val path = evtOp.dstPath();
-		val scopeName = DEFAULT_SCOPE;
 		var streamName = evtOp.dstPath();
 		if (streamName.startsWith(SLASH)) {
 			streamName = streamName.substring(1);
@@ -556,7 +554,6 @@ extends CoopStorageDriverBase<I, O>  {
 
 	boolean completeStreamCreateOperation(final PathOperation streamOp, final boolean result, final Throwable thrown) {
 		// TODO erase code duplication
-		val scopeName = DEFAULT_SCOPE;
 		val streamName = extractStreamName(streamOp.item().name());
 		if(null == thrown) {
 			if(result){
@@ -577,7 +574,6 @@ extends CoopStorageDriverBase<I, O>  {
 		try {
 			val endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
 			val controller = controllerCache.computeIfAbsent(endpointUri, this::createController);
-			val scopeName = DEFAULT_SCOPE;
 			val scopeCreateFuncForStreamConfig = scopeCreateFuncForStreamConfigCache.computeIfAbsent(controller,
 				ScopeCreateFunctionForStreamConfigImpl::new);
 			val streamConfig = scopeStreamConfigsCache.computeIfAbsent(scopeName, scopeCreateFuncForStreamConfig);
@@ -609,7 +605,6 @@ extends CoopStorageDriverBase<I, O>  {
 
 	boolean completeStreamDeleteOperation(final PathOperation streamOp, final boolean result, final Throwable thrown) {
 		// TODO erase code duplication
-		val scopeName = DEFAULT_SCOPE;
 		val streamName = extractStreamName(streamOp.item().name());
 		if(null == thrown) {
 			if(result){
@@ -628,7 +623,6 @@ extends CoopStorageDriverBase<I, O>  {
 
 	void submitStreamDeleteOperation(final PathOperation streamOp, final String nodeAddr) {
 		try {
-			val scopeName = DEFAULT_SCOPE; // TODO make this configurable
 			val streamName = extractStreamName(streamOp.item().name());
 			val endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
 			val controller = controllerCache.computeIfAbsent(endpointUri, this::createController);

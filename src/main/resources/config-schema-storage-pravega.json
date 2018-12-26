@@ -18,6 +18,9 @@
 				"rate": "int",
 				"factor": "int",
 				"segments": "int"
+			},
+			"namespace": {
+				"scope": "string"
 			}
 		},
 		"net": {
