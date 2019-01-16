@@ -29,7 +29,8 @@ jobs:
     - docker login -u $DOCKER_USER -p $DOCKER_PASS
     - export REPO=emcmongoose/mongoose-storage-driver-pravega
     - export TAG=`if [ "$TRAVIS_BRANCH" == "master" ]; then echo "latest"; else echo $TRAVIS_BRANCH; fi`
-    - docker build --build-arg MONGOOSE_VERSION=4.0.2 -f docker/Dockerfile -t $REPO:$COMMIT .
+    - export MONGOOSE_VERSION=$(cat build.gradle | grep "mongoose:" | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
+    - docker build --build-arg MONGOOSE_VERSION=${MONGOOSE_VERSION} -f docker/Dockerfile -t $REPO:$COMMIT .
     - docker tag $REPO:$COMMIT $REPO:$TAG
     - docker tag $REPO:$COMMIT $REPO:travis-$TRAVIS_BUILD_NUMBER
     - docker push $REPO
@@ -43,4 +44,3 @@ jobs:
       file: "./build/libs/mongoose-storage-driver-pravega.jar"
       on:
         tags: true
-
