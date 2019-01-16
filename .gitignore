@@ -21,5 +21,10 @@ MANIFEST.MF
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
 
+# robot framework output
+log.html
+output.xml
+report.html
+
 # protect the gradle wrapper
 !gradle/wrapper/gradle-wrapper.jar

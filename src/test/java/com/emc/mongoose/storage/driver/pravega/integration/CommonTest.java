@@ -84,7 +84,6 @@ public class CommonTest {
 				val config = new BasicConfig("-", configSchema);
 
 				config.val("load-batch-size", 4096);
-
 				config.val("storage-net-reuseAddr", true);
 				config.val("storage-net-bindBacklogSize", 0);
 				config.val("storage-net-keepAlive", true);
@@ -98,7 +97,7 @@ public class CommonTest {
 				config.val("storage-net-node-addrs", Collections.singletonList("127.0.0.1"));
 				config.val("storage-net-node-port", PravegaNodeContainer.PORT);
 				config.val("storage-net-node-connAttemptsLimit", 0);
-
+				config.val("storage-net-uri-schema", "tcp");
 				config.val("storage-auth-uid", CREDENTIAL.getUid());
 				config.val("storage-auth-token", null);
 				config.val("storage-auth-secret", CREDENTIAL.getSecret());
@@ -115,6 +114,7 @@ public class CommonTest {
 				config.val("storage-driver-limit-queue-input", 1_000_000);
 				config.val("storage-driver-limit-queue-output", 1_000_000);
 				config.val("storage-driver-limit-concurrency", 1);
+				config.val("storage-driver-namespace-scope", "goose");
 				return config;
 			} catch(final Throwable cause) {
 				throw new RuntimeException(cause);

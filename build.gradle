@@ -1,3 +1,7 @@
+plugins {
+    id 'com.bmuschko.docker-remote-api' version '4.0.5'
+}
+
 description = "Pravega storage driver for Mongoose"
 
 apply plugin: "java"
@@ -19,8 +23,15 @@ task("create-dirs").doLast(
     }
 )
 
+buildscript {
+	repositories {
+		mavenCentral()
+	}
+}
+
 repositories {
     mavenCentral()
+	jcenter()
 }
 
 ext {
@@ -238,6 +249,80 @@ uploadArchives {
                     }
                 }
             }
+        }
+    }
+}
+
+
+// Docker tasks ////////////////////////////////////////
+
+import com.bmuschko.gradle.docker.tasks.image.*
+import com.bmuschko.gradle.docker.tasks.container.*
+
+task buildImage(type: DockerBuildImage, dependsOn: jar) {
+    inputDir = rootProject.projectDir
+    dockerFile = project.file("docker${File.separator}Dockerfile")
+    imageId = "emcmogoose/mongoose-storage-driver-pravega"
+    buildArgs = ["MONGOOSE_VERSION": "${depVersion.mongoose}"]
+    tags = [
+            "emcmongoose/mongoose-storage-driver-pravega:${version}".toString(),
+            "emcmongoose/mongoose-storage-driver-pravega:testing",
+    ]
+}
+
+task pushProductionImage(type: DockerPushImage, dependsOn: buildImage) {
+    imageName = "emcmongoose/mongoose-storage-driver-pravega"
+    tag = "emcmongoose/mongoose-storage-driver-pravega:${version}".toString()
+}
+
+task pushTestingImage(type: DockerPushImage, dependsOn: buildImage) {
+    imageName = "emcmongoose/mongoose-storage-driver-pravega:testing".toString()
+}
+
+task buildRobotestImage(type: DockerBuildImage) {
+    inputDir = rootProject.projectDir
+    dockerFile = project.file("docker${File.separator}Dockerfile.robotest")
+    imageId = "emcmongoose/mongoose-storage-driver-pravega-robotest"
+    tags = [
+            "emcmongoose/mongoose-storage-driver-pravega-robotest:${version}"
+    ]
+}
+
+task createRobotestContainer(type: DockerCreateContainer, dependsOn: [buildImage, buildRobotestImage]) {
+    attachStderr = true
+    attachStdout = true
+    autoRemove = true
+    binds = [
+            "${rootProject.buildDir}": "/root/mongoose-storage-driver-pravega/build",
+            "/var/run/docker.sock"   : "/var/run/docker.sock"
+    ]
+    envVars = [
+            "HOST_WORKING_DIR": rootProject.projectDir.absolutePath,
+            "MONGOOSE_VERSION": "${depVersion.mongoose}",
+            "SUITE"           : System.getenv("SUITE"),
+            "TEST"            : System.getenv("TEST"),
+    ]
+    imageId = buildRobotestImage.getImageId()
+    network = "host"
+    tty = true
+    doLast {
+        println "Created container for the ${System.env.SUITE}.${System.env.TEST} test"
+    }
+
+}
+
+task startRobotestContainer(type: DockerStartContainer, dependsOn: createRobotestContainer) {
+    targetContainerId createRobotestContainer.getContainerId()
+}
+
+task robotest(type: DockerWaitContainer, dependsOn: startRobotestContainer) {
+    targetContainerId createRobotestContainer.getContainerId()
+    timeout = 600
+    doLast {
+        if (0 != exitCode) {
+            throw new GradleException("Some robotests FAILED")
+        } else {
+            println "robotests PASSED"
         }
     }
 }
