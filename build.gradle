@@ -23,9 +23,11 @@ task("create-dirs").doLast(
     }
 )
 
-buildscript {
-	repositories {
-		mavenCentral()
+allprojects {
+	buildscript {
+		repositories {
+			mavenCentral()
+		}
 	}
 }
 
