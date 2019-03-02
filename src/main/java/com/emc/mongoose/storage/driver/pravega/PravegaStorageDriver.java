@@ -68,10 +68,7 @@ import org.apache.logging.log4j.Level;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -306,8 +303,13 @@ extends CoopStorageDriverBase<I, O>  {
 		final ItemFactory<I> itemFactory, final String path, final String prefix, final int idRadix,
 		final I lastPrevItem, final int count
 	) throws IOException {
-		// TODO: Evgeny, issue SDP-50
-		return null;
+		val countLimit = count < 1 ? Integer.MAX_VALUE : count;
+		val buff = new ArrayList<I>(countLimit);
+		val sizeOfItem = 128; //TODO Should we make this confirugable?
+		for(int i = 0; i < countLimit; i++) {
+			buff.add(itemFactory.getItem(path + prefix, i, sizeOfItem));
+		}
+		return buff;
 	}
 
 	/**
