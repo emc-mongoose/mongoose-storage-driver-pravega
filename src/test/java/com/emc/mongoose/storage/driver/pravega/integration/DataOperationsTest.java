@@ -231,13 +231,13 @@ private static final DataInput DATA_INPUT;
 		assertEquals(dataItem.size(), createTask.countBytesDone());
 
 		final DataItem dataItem2 = new DataItemImpl(0, MIB, 0);
-		dataItem2.name("0000");
+		dataItem2.name("0001");
 		final DataOperation<DataItem> createTask2 = new DataOperationImpl<>(
 		0, OpType.READ, dataItem2, null, streamName, credential, null, 0, null
 		);
 
 
-		prepare(createTask);
+		prepare(createTask2);
 		createTask2.status(Operation.Status.ACTIVE);
 		boolean results = submit(createTask2);
 		assertEquals(results,true);

@@ -400,13 +400,21 @@ extends CoopStorageDriverBase<I, O>  {
 		thrown.printStackTrace();
 		return completeOperation(op, FAIL_UNKNOWN);
 	}
-
-	boolean completeEventReadOperation(final DataOperation evtOp, final int bytesDone, final Throwable thrown) {
-		if (null == thrown) {
-			//try {
+	//TODO: avoid code duplication, but save the name of the function
+	boolean completeEventReadOperation(final DataOperation evtOp, final DataItem evtItem, final Throwable thrown) {
+		if(null == thrown) {
+			try {
+				evtOp.countBytesDone(evtItem.size());
+			} catch(final IOException ignored) {
+			}
+			return completeOperation((O) evtOp, SUCC);
+		} else {
+			return completeFailedOperation((O) evtOp, thrown);
+		}
+	}
+	boolean completeStreamReadOperation(final DataOperation evtOp, final int bytesDone, final Throwable thrown) {
+		if(null == thrown) {
 				evtOp.countBytesDone(bytesDone);
-			//} catch (final IOException ignored) {
-			//}
 			return completeOperation((O) evtOp, SUCC);
 		} else {
 			return completeFailedOperation((O) evtOp, thrown);
@@ -502,8 +510,7 @@ extends CoopStorageDriverBase<I, O>  {
 	void submitEventReadOperation(final Operation Op, final String nodeAddr) {
 		val endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
 		val scopeName = DEFAULT_SCOPE;
-		String streamName;
-		streamName = (Op instanceof DataOperation)?  extractStreamName(Op.dstPath())://dataOp
+		val streamName = (Op instanceof DataOperation)?  extractStreamName(Op.dstPath())://dataOp
 		 		extractStreamName(Op.item().name());//pathOp
 		scopeStreamsCache.computeIfAbsent(scopeName, ScopeCreateFunction::createStreamCache);
 		val readerGroup = UUID.randomUUID().toString().replace("-", "");
@@ -524,39 +531,57 @@ extends CoopStorageDriverBase<I, O>  {
 		@Cleanup val evtReader = eventStreamReaderCache.computeIfAbsent(readerGroup, readerCreateFunc);
 		final CompletionStage<Void> readEvtFuture;
 		Loggers.MSG.trace("Reading all the events from {} {}", scopeName, streamName);
-		/*readEvtFuture = ? */ (Op instanceof DataOperation)?  readEvent(evtReader)://dataOp
-		readStream(evtReader);//pathOp
+		/*readEvtFuture = ? */
+		if(Op instanceof DataOperation) {
+			readEvent((DataOperation)Op,evtReader);
+		} else {//dataOp
+			readStream((PathOperation) Op, evtReader);//pathOp
+		}
 		//readEvtFuture.handle((returned, thrown) ->completeEventReadOperation(Op, bytesDone, thrown);
 		Loggers.MSG.trace("No more events from {} {}", scopeName, streamName);
 
 	}
 
-	void readEvent(EventStreamReader<ByteBuffer> evtReader)
+	void readEvent(DataOperation dataOp, EventStreamReader<ByteBuffer> evtReader)
 	{
 		EventRead<ByteBuffer> event = null;
 		int bytesDone=0;
+		Exception thrown = null;
 		try {
 			for (event = evtReader.readNextEvent(readTimeoutMillis); null != event.getEvent(); ) {
 				Loggers.MSG.trace("Read event {}", event.getEvent());
 				bytesDone = event.getEvent().remaining();
+				dataOp.item().size(bytesDone);
+				//calling this after every read, so we break on the second concurrencyThrottle.release().
+				//Probably should do the metrics some other way here
+				completeEventReadOperation(dataOp, dataOp.item(), thrown);
 			}
-		} catch (ReinitializationRequiredException e) {
-			e.printStackTrace();
+		} catch (Exception e) { //including ReinitializationRequiredException
+			thrown = e;
+			completeEventReadOperation(dataOp, dataOp.item(), thrown);
 		}
+
 	}
 
-	void readStream(EventStreamReader<ByteBuffer> evtReader)
+	void readStream(PathOperation pathOp,EventStreamReader<ByteBuffer> evtReader)
 	{
+		/*
 		EventRead<ByteBuffer> event = null;
 		int bytesDone=0;
+		Exception thrown = null;
 		try {
 			for (event = evtReader.readNextEvent(readTimeoutMillis); null != event.getEvent(); ) {
 				Loggers.MSG.trace("Read event {}", event.getEvent());
 				bytesDone += event.getEvent().remaining();
 			}
-		} catch (ReinitializationRequiredException e) {
-			e.printStackTrace();
-		}
+			//pathOp.item().size(bytesDone);
+			//no such method*/
+			//completeStreamReadOperation(pathOp, /*dataOp.item()*/bytesDone, thrown);
+		//} catch (Exception e) { //including ReinitializationRequiredException
+		//	thrown = e;
+			//completeEventReadOperation(pathOp, /*dataOp.item()*/bytesDone, thrown);
+		//}
+
 	}
 
 	void submitStreamOperation(final PathOperation streamOp, final OpType opType) {
