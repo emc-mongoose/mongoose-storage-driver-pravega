@@ -309,9 +309,9 @@ extends CoopStorageDriverBase<I, O>  {
 	) throws IOException {
 		val countLimit = count < 1 ? Integer.MAX_VALUE : count;
 		val buff = new ArrayList<I>(countLimit);
-		val sizeOfItem = 128; //TODO Should we make this confirugable?
+		val sizeOfItem = 0; //TODO Should we make this confirugable?
 		for(int i = 0; i < countLimit; i++) {
-			buff.add(itemFactory.getItem(path + prefix, i, sizeOfItem));
+			buff.add(itemFactory.getItem(path + prefix, 0, sizeOfItem));
 		}
 		return buff;
 	}
