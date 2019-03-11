@@ -35,7 +35,7 @@
 # 1. Introduction
 
 The storage driver extends the Mongoose's Abstract Coop Storage Driver and uses the following libraries:
-* `pravega-client` version 0.4.0
+* `pravega-client` version 0.3.2
 
 # 2. Features
 

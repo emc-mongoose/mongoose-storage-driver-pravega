@@ -47,7 +47,7 @@ ext {
         mongoose: "4.1.1",
 	    netty: "4.1.16.Final",
 	    opencensus: "0.8.0",
-		pravega: "0.4.0",
+		pravega: "0.3.2",
 	    protobuf: "3.4.0",
     ]
 }
