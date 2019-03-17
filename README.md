@@ -58,11 +58,11 @@ The storage driver extends the Mongoose's Abstract Coop Storage Driver and uses 
 
 Get the latest pre-built jar file which is available at:
 http://repo.maven.apache.org/maven2/com/github/emc-mongoose/mongoose-storage-driver-pravega/
-The jar file may be downloaded manually and placed into the <USER_HOME_DIR>/.mongoose/4.1.0/ext directory of
+The jar file may be downloaded manually and placed into the <USER_HOME_DIR>/.mongoose/4.1.1/ext directory of
 Mongoose to be automatically loaded into the runtime.
 
 ```bash
-java -jar mongoose-4.1.0.jar \
+java -jar mongoose-<MONGOOSE_VERSION>.jar \
     --storage-driver-type=pravega \
     --storage-net-node-addrs=<NODE_IP_ADDRS> \
     --storage-net-node-port=<NODE_PORT> \
@@ -136,12 +136,12 @@ For more details see the corresponding [scenario content](https://github.com/emc
 
 ### 3.4.2. Multiple Destination Streams
 
-The [configuration parameterization](https://github.com/emc-mongoose/mongoose/tree/4.1.0/doc/interfaces/input/configuration#2-parameterization)
+The [configuration parameterization](https://gitlab.com/emcmongoose/mongoose/tree/master/doc/interfaces/input/configuration#2-parameterization)
 feature may be used to specify multiple destination streams to write the events. The example of the command to write
 the events into 1000 destination streams (in the random order):
 
 ```bash
-java -jar mongoose-4.1.0.jar \
+java -jar mongoose-<MONGOOSE_VERSION>.jar \
     --storage-driver-type=pravega \
     --storage-net-node-port=9090 \
     --item-data-size=1000 \
@@ -152,7 +152,7 @@ java -jar mongoose-4.1.0.jar \
 
 Mongoose and Pravega are using quite different concepts. So it's necessary to determine how
 [Pravega-specific terms](http://pravega.io/docs/latest/terminology/) are mapped to the
-[Mongoose abstractions]((https://github.com/emc-mongoose/mongoose/tree/master/doc/design/architecture#1-basic-terms)).
+[Mongoose abstractions]((https://gitlab.com/emcmongoose/mongoose/tree/master/doc/design/architecture#1-basic-terms)).
 
 | Pravega | Mongoose |
 |---------|----------|
@@ -268,7 +268,7 @@ TODO
 1. Build the storage driver
 2. Copy the storage driver's jar file into the mongoose's `ext` directory:
 ```bash
-cp -f build/libs/mongoose-storage-driver-pravega.jar ~/.mongoose/4.1.0/ext/
+cp -f build/libs/mongoose-storage-driver-pravega.jar ~/.mongoose/<MONGOOSE_VERSION>/ext/
 ```
 3. Run the Pravega standalone node:
 ```bash
@@ -276,7 +276,7 @@ docker run --network host pravega/pravega standalone
 ```
 4. Run Mongoose's default scenario with some specific command-line arguments:
 ```bash
-java -jar mongoose-4.1.0.jar \
+java -jar mongoose-<MONGOOSE_VERSION>.jar \
     --storage-driver-type=pravega \
     --storage-net-node-port=9090 \
     --storage-driver-limit-concurrency=10 \
