@@ -412,7 +412,7 @@ extends CoopStorageDriverBase<I, O>  {
 			return completeFailedOperation((O) evtOp, thrown);
 		}
 	}
-	boolean completeStreamReadOperation(final DataOperation evtOp, final int bytesDone, final Throwable thrown) {
+	boolean completeStreamReadOperation(final PathOperation evtOp, final int bytesDone, final Throwable thrown) {
 		if(null == thrown) {
 				evtOp.countBytesDone(bytesDone);
 			return completeOperation((O) evtOp, SUCC);
@@ -533,8 +533,8 @@ extends CoopStorageDriverBase<I, O>  {
 		Loggers.MSG.trace("Reading all the events from {} {}", scopeName, streamName);
 		/*readEvtFuture = ? */
 		if(Op instanceof DataOperation) {
-			readEvent((DataOperation)Op,evtReader);
-		} else {//dataOp
+			readEvent((DataOperation)Op,evtReader);//dataOp
+		} else {
 			readStream((PathOperation) Op, evtReader);//pathOp
 		}
 		//readEvtFuture.handle((returned, thrown) ->completeEventReadOperation(Op, bytesDone, thrown);
@@ -548,14 +548,13 @@ extends CoopStorageDriverBase<I, O>  {
 		int bytesDone=0;
 		Exception thrown = null;
 		try {
-			for (event = evtReader.readNextEvent(readTimeoutMillis); null != event.getEvent(); ) {
+			event = evtReader.readNextEvent(readTimeoutMillis);
+			event.getEvent();
 				Loggers.MSG.trace("Read event {}", event.getEvent());
 				bytesDone = event.getEvent().remaining();
 				dataOp.item().size(bytesDone);
-				//calling this after every read, so we break on the second concurrencyThrottle.release().
-				//Probably should do the metrics some other way here
+
 				completeEventReadOperation(dataOp, dataOp.item(), thrown);
-			}
 		} catch (Exception e) { //including ReinitializationRequiredException
 			thrown = e;
 			completeEventReadOperation(dataOp, dataOp.item(), thrown);
@@ -565,7 +564,6 @@ extends CoopStorageDriverBase<I, O>  {
 
 	void readStream(PathOperation pathOp,EventStreamReader<ByteBuffer> evtReader)
 	{
-		/*
 		EventRead<ByteBuffer> event = null;
 		int bytesDone=0;
 		Exception thrown = null;
@@ -574,13 +572,14 @@ extends CoopStorageDriverBase<I, O>  {
 				Loggers.MSG.trace("Read event {}", event.getEvent());
 				bytesDone += event.getEvent().remaining();
 			}
-			//pathOp.item().size(bytesDone);
-			//no such method*/
-			//completeStreamReadOperation(pathOp, /*dataOp.item()*/bytesDone, thrown);
-		//} catch (Exception e) { //including ReinitializationRequiredException
+			//pathOp.countBytesDone(bytesDone);
+			//we need to set the size of the item instead of the countBytesDone
+			completeStreamReadOperation(pathOp, bytesDone, thrown);
+		} catch (Exception e) { //including ReinitializationRequiredException
 		//	thrown = e;
-			//completeEventReadOperation(pathOp, /*dataOp.item()*/bytesDone, thrown);
-		//}
+			/*pathOp.item() should be instead */
+			completeStreamReadOperation(pathOp, bytesDone, thrown);
+		}
 
 	}
 

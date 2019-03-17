@@ -49,7 +49,7 @@ import static org.junit.Assert.fail;
 
 public class DataOperationsTest
 extends PravegaStorageDriver<DataItem, DataOperation<DataItem>>{
-private static final DataInput DATA_INPUT;
+	private static final DataInput DATA_INPUT;
 
 	static {
 		try {
@@ -64,27 +64,27 @@ private static final DataInput DATA_INPUT;
 	private static Config getConfig() {
 		try {
 			val configSchemas = Extension
-				.load(Thread.currentThread().getContextClassLoader())
-				.stream()
-				.map(Extension::schemaProvider)
-				.filter(Objects::nonNull)
-				.map(
-					schemaProvider -> {
-						try {
-							return schemaProvider.schema();
-						} catch (final Exception e) {
-							fail(e.getMessage());
-						}
-						return null;
-					}
-				)
-				.filter(Objects::nonNull)
-				.collect(Collectors.toList());
+			.load(Thread.currentThread().getContextClassLoader())
+			.stream()
+			.map(Extension::schemaProvider)
+			.filter(Objects::nonNull)
+			.map(
+			schemaProvider -> {
+				try {
+					return schemaProvider.schema();
+				} catch (final Exception e) {
+					fail(e.getMessage());
+				}
+				return null;
+			}
+			)
+			.filter(Objects::nonNull)
+			.collect(Collectors.toList());
 			SchemaProvider
-				.resolve(APP_NAME, Thread.currentThread().getContextClassLoader())
-				.stream()
-				.findFirst()
-				.ifPresent(configSchemas::add);
+			.resolve(APP_NAME, Thread.currentThread().getContextClassLoader())
+			.stream()
+			.findFirst()
+			.ifPresent(configSchemas::add);
 			val configSchema = TreeUtil.reduceForest(configSchemas);
 			val config = new BasicConfig("-", configSchema);
 
@@ -133,9 +133,9 @@ private static final DataInput DATA_INPUT;
 	}
 
 	private DataOperationsTest(final Config config)
-			throws OmgShootMyFootException {
+	throws OmgShootMyFootException {
 		super("test-data-pravega-driver", DATA_INPUT, config.configVal("storage"), true,
-				config.configVal("load").intVal("batch-size")
+		config.configVal("load").intVal("batch-size")
 		);
 	}
 
@@ -158,13 +158,13 @@ private static final DataInput DATA_INPUT;
 
 	@Test
 	public final void testCreateEvent()
-			throws Exception {
+	throws Exception {
 		final DataItem dataItem = new DataItemImpl(0, MIB, 0);
 		dataItem.name("0000");
 		dataItem.dataInput(DATA_INPUT);
 		String streamName = "default";
 		final DataOperation<DataItem> createTask = new DataOperationImpl<>(
-				0, OpType.CREATE, dataItem, null, streamName, credential, null, 0, null
+		0, OpType.CREATE, dataItem, null, streamName, credential, null, 0, null
 		);
 
 
@@ -184,17 +184,17 @@ private static final DataInput DATA_INPUT;
 		final URI controllerURI = URI.create("tcp://"+getConfig().listVal("storage-net-node-addrs").get(0)+":"+String.valueOf(getConfig().intVal("storage-net-node-port")));
 		final String readerGroup = UUID.randomUUID().toString().replace("-", "");
 		final ReaderGroupConfig readerGroupConfig = ReaderGroupConfig.builder()
-				.stream(Stream.of(scope, streamName))
-				.build();
+		.stream(Stream.of(scope, streamName))
+		.build();
 		try (final ReaderGroupManager readerGroupManager = ReaderGroupManager.withScope(scope, controllerURI)) {
 			readerGroupManager.createReaderGroup(readerGroup, readerGroupConfig);
 		}
 
 		try (final ClientFactory clientFactory = ClientFactory.withScope(scope, controllerURI);
 			 EventStreamReader<ByteBuffer> reader = clientFactory.createReader("reader",
-					 readerGroup,
-			new ByteBufferSerializer(),
-					 ReaderConfig.builder().build())) {
+			 readerGroup,
+			 new ByteBufferSerializer(),
+			 ReaderConfig.builder().build())) {
 			System.out.format("Reading all the events from %s/%s%n", scope, streamName);
 			EventRead<ByteBuffer> event = null;
 			event = reader.readNextEvent(readTimeoutMillis);
@@ -241,6 +241,8 @@ private static final DataInput DATA_INPUT;
 		createTask2.status(Operation.Status.ACTIVE);
 		boolean results = submit(createTask2);
 		assertEquals(results,true);
+		//assertEquals("we didn't read the same size we had put into stream",
+		//(int)dataItem.size(),event.getEvent().remaining());
 	}
 
 	@Test
