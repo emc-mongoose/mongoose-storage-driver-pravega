@@ -36,7 +36,9 @@ import com.emc.mongoose.storage.driver.pravega.cache.ReaderGroupManagerCreateFun
 import com.emc.mongoose.storage.driver.pravega.cache.ScopeCreateFunction;
 import com.emc.mongoose.storage.driver.pravega.cache.ScopeCreateFunctionForStreamConfig;
 import com.emc.mongoose.storage.driver.pravega.cache.StreamCreateFunction;
+
 import com.emc.mongoose.storage.driver.pravega.io.ByteBufferSerializer;
+
 import com.emc.mongoose.storage.driver.pravega.io.DataItemSerializer;
 import com.github.akurilov.confuse.Config;
 import io.pravega.client.ClientConfig;
@@ -49,7 +51,9 @@ import io.pravega.client.stream.impl.ControllerImplConfig;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -79,9 +83,11 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
   protected final long createRoutingKeysPeriod;
   protected final int readTimeoutMillis;
   protected final Serializer<DataItem> evtSerializer = new DataItemSerializer(false);
+
   protected final Serializer<ByteBuffer> evtDeserializer = new ByteBufferSerializer();
   protected final EventWriterConfig evtWriterConfig = EventWriterConfig.builder().build();
   protected final ReaderConfig evtReaderConfig = ReaderConfig.builder().build();
+
   protected final ScalingPolicy scalingPolicy;
   // round-robin counter to select the endpoint node for each load operation in order to distribute
   // them uniformly
@@ -208,6 +214,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
     }
   }
 
+
   // caches allowing the lazy creation of the necessary things:
   // * endpoints
   private final Map<String, URI> endpointCache = new ConcurrentHashMap<>();
@@ -324,8 +331,12 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
       final I lastPrevItem,
       final int count)
       throws IOException {
-    // TODO: Evgeny, issue SDP-50
-    return null;
+
+    val buff = new ArrayList<I>(count);
+    for (int i = 0; i < count; i++) {
+      buff.add(itemFactory.getItem(path + prefix, 0, 0));
+    }
+    return buff;
   }
 
   /** Not used in this driver implementation */
@@ -406,7 +417,8 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
     thrown.printStackTrace();
     return completeOperation(op, FAIL_UNKNOWN);
   }
-  // TODO: avoid code duplication, but save the name of the function
+
+
   boolean completeEventReadOperation(
       final DataOperation evtOp, final DataItem evtItem, final Throwable thrown) {
     if (null == thrown) {
@@ -519,6 +531,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
     }
   }
 
+
   void submitEventReadOperation(final Operation Op, final String nodeAddr) {
     val endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
     val scopeName = DEFAULT_SCOPE;
@@ -547,6 +560,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
         eventStreamReaderCreateFuncCache.computeIfAbsent(
             clientFactory, ReaderCreateFunctionImpl::new);
     @Cleanup val evtReader = eventStreamReaderCache.computeIfAbsent(readerGroup, readerCreateFunc);
+
     final CompletionStage<Void> readEvtFuture;
     Loggers.MSG.trace("Reading all the events from {} {}", scopeName, streamName);
     /*readEvtFuture = ? */
@@ -594,6 +608,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
       /*pathOp.item() should be instead */
       completeStreamReadOperation(pathOp, bytesDone, thrown);
     }
+
   }
 
   void submitStreamOperation(final PathOperation streamOp, final OpType opType) {
