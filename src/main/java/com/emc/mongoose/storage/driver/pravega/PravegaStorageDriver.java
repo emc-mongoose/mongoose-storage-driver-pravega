@@ -7,6 +7,7 @@ import static com.emc.mongoose.item.op.Operation.Status.INTERRUPTED;
 import static com.emc.mongoose.item.op.Operation.Status.RESP_FAIL_UNKNOWN;
 import static com.emc.mongoose.item.op.Operation.Status.SUCC;
 import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.BACKGROUND_THREAD_COUNT;
+import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.DEFAULT_SCOPE;
 import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.DRIVER_NAME;
 import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.MAX_BACKOFF_MILLIS;
 import static com.emc.mongoose.storage.driver.pravega.io.StreamScaleUtil.scaleToFixedSegmentCount;
@@ -30,33 +31,28 @@ import com.emc.mongoose.storage.driver.pravega.cache.ClientFactoryCreateFunction
 import com.emc.mongoose.storage.driver.pravega.cache.ClientFactoryCreateFunctionImpl;
 import com.emc.mongoose.storage.driver.pravega.cache.EventWriterCreateFunction;
 import com.emc.mongoose.storage.driver.pravega.cache.ReaderCreateFunction;
-import com.emc.mongoose.storage.driver.pravega.cache.ReaderCreateFunctionImpl;
 import com.emc.mongoose.storage.driver.pravega.cache.ReaderGroupManagerCreateFunction;
 import com.emc.mongoose.storage.driver.pravega.cache.ReaderGroupManagerCreateFunctionImpl;
 import com.emc.mongoose.storage.driver.pravega.cache.ScopeCreateFunction;
 import com.emc.mongoose.storage.driver.pravega.cache.ScopeCreateFunctionForStreamConfig;
 import com.emc.mongoose.storage.driver.pravega.cache.StreamCreateFunction;
+
+import com.emc.mongoose.storage.driver.pravega.io.ByteBufferSerializer;
+
 import com.emc.mongoose.storage.driver.pravega.io.DataItemSerializer;
 import com.github.akurilov.confuse.Config;
 import io.pravega.client.ClientConfig;
 import io.pravega.client.ClientFactory;
 import io.pravega.client.admin.ReaderGroupManager;
-import io.pravega.client.stream.EventRead;
-import io.pravega.client.stream.EventStreamReader;
-import io.pravega.client.stream.EventStreamWriter;
-import io.pravega.client.stream.EventWriterConfig;
-import io.pravega.client.stream.ReaderGroupConfig;
-import io.pravega.client.stream.ReinitializationRequiredException;
-import io.pravega.client.stream.ScalingPolicy;
-import io.pravega.client.stream.Serializer;
-import io.pravega.client.stream.Stream;
-import io.pravega.client.stream.StreamConfiguration;
+import io.pravega.client.stream.*;
 import io.pravega.client.stream.impl.Controller;
 import io.pravega.client.stream.impl.ControllerImpl;
 import io.pravega.client.stream.impl.ControllerImplConfig;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -87,7 +83,11 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
   protected final long createRoutingKeysPeriod;
   protected final int readTimeoutMillis;
   protected final Serializer<DataItem> evtSerializer = new DataItemSerializer(false);
+
+  protected final Serializer<ByteBuffer> evtDeserializer = new ByteBufferSerializer();
   protected final EventWriterConfig evtWriterConfig = EventWriterConfig.builder().build();
+  protected final ReaderConfig evtReaderConfig = ReaderConfig.builder().build();
+
   protected final ScalingPolicy scalingPolicy;
   // round-robin counter to select the endpoint node for each load operation in order to distribute
   // them uniformly
@@ -201,6 +201,20 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
     }
   }
 
+  // should be an inner class in order to access the storage driver instance's fields (serializer,
+  // reader config)
+  @Value
+  public final class ReaderCreateFunctionImpl implements ReaderCreateFunction {
+
+    ClientFactory clientFactory;
+
+    @Override
+    public EventStreamReader<ByteBuffer> apply(String readerGroup) {
+      return clientFactory.createReader("reader", readerGroup, evtDeserializer, evtReaderConfig);
+    }
+  }
+
+
   // caches allowing the lazy creation of the necessary things:
   // * endpoints
   private final Map<String, URI> endpointCache = new ConcurrentHashMap<>();
@@ -228,7 +242,8 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
   // * event stream reader
   private final Map<ClientFactory, ReaderCreateFunction> eventStreamReaderCreateFuncCache =
       new ConcurrentHashMap<>();
-  private final Map<String, EventStreamReader> eventStreamReaderCache = new ConcurrentHashMap<>();
+  private final Map<String, EventStreamReader<ByteBuffer>> eventStreamReaderCache =
+      new ConcurrentHashMap<>();
   // * scopes with StreamConfigs
   private final Map<Controller, ScopeCreateFunctionForStreamConfig>
       scopeCreateFuncForStreamConfigCache = new ConcurrentHashMap<>();
@@ -316,6 +331,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
       final I lastPrevItem,
       final int count)
       throws IOException {
+
     val buff = new ArrayList<I>(count);
     for (int i = 0; i < count; i++) {
       buff.add(itemFactory.getItem(path + prefix, 0, 0));
@@ -402,6 +418,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
     return completeOperation(op, FAIL_UNKNOWN);
   }
 
+
   boolean completeEventReadOperation(
       final DataOperation evtOp, final DataItem evtItem, final Throwable thrown) {
     if (null == thrown) {
@@ -409,6 +426,16 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
         evtOp.countBytesDone(evtItem.size());
       } catch (final IOException ignored) {
       }
+      return completeOperation((O) evtOp, SUCC);
+    } else {
+      return completeFailedOperation((O) evtOp, thrown);
+    }
+  }
+
+  boolean completeStreamReadOperation(
+      final PathOperation evtOp, final int bytesDone, final Throwable thrown) {
+    if (null == thrown) {
+      evtOp.countBytesDone(bytesDone);
       return completeOperation((O) evtOp, SUCC);
     } else {
       return completeFailedOperation((O) evtOp, thrown);
@@ -504,16 +531,15 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
     }
   }
 
-  void submitEventReadOperation(final DataOperation evtOp, final String nodeAddr) {
+
+  void submitEventReadOperation(final Operation Op, final String nodeAddr) {
     val endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
-    val path = evtOp.dstPath();
-    var streamName = evtOp.dstPath();
-    if (streamName.startsWith(SLASH)) {
-      streamName = streamName.substring(1);
-    }
-    if (streamName.endsWith(SLASH) && streamName.length() > 1) {
-      streamName = streamName.substring(0, streamName.length() - 1);
-    }
+    val scopeName = DEFAULT_SCOPE;
+    val streamName =
+        (Op instanceof DataOperation)
+            ? extractStreamName(Op.dstPath())
+            : // dataOp
+            extractStreamName(Op.item().name()); // pathOp
     scopeStreamsCache.computeIfAbsent(scopeName, ScopeCreateFunction::createStreamCache);
     val readerGroup = UUID.randomUUID().toString().replace("-", "");
     val readerGroupConfig =
@@ -535,20 +561,54 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
             clientFactory, ReaderCreateFunctionImpl::new);
     @Cleanup val evtReader = eventStreamReaderCache.computeIfAbsent(readerGroup, readerCreateFunc);
 
-    Loggers.MSG.trace("Reading all the events from {} {}", scopeName, streamName);
-    EventRead<String> event = null;
     final CompletionStage<Void> readEvtFuture;
+    Loggers.MSG.trace("Reading all the events from {} {}", scopeName, streamName);
+    /*readEvtFuture = ? */
+    if (Op instanceof DataOperation) {
+      readEvent((DataOperation) Op, evtReader); // dataOp
+    } else {
+      readStream((PathOperation) Op, evtReader); // pathOp
+    }
+    // readEvtFuture.handle((returned, thrown) ->completeEventReadOperation(Op, bytesDone, thrown);
+    Loggers.MSG.trace("No more events from {} {}", scopeName, streamName);
+  }
+
+  void readEvent(DataOperation dataOp, EventStreamReader<ByteBuffer> evtReader) {
+    EventRead<ByteBuffer> event = null;
+    int bytesDone = 0;
+    Exception thrown = null;
+    try {
+      event = evtReader.readNextEvent(readTimeoutMillis);
+      event.getEvent();
+      Loggers.MSG.trace("Read event {}", event.getEvent());
+      bytesDone = event.getEvent().remaining();
+      dataOp.item().size(bytesDone);
+
+      completeEventReadOperation(dataOp, dataOp.item(), thrown);
+    } catch (Exception e) { // including ReinitializationRequiredException
+      thrown = e;
+      completeEventReadOperation(dataOp, dataOp.item(), thrown);
+    }
+  }
+
+  void readStream(PathOperation pathOp, EventStreamReader<ByteBuffer> evtReader) {
+    EventRead<ByteBuffer> event = null;
+    int bytesDone = 0;
+    Exception thrown = null;
     try {
       for (event = evtReader.readNextEvent(readTimeoutMillis); null != event.getEvent(); ) {
         Loggers.MSG.trace("Read event {}", event.getEvent());
+        bytesDone += event.getEvent().remaining();
       }
-    } catch (ReinitializationRequiredException e) {
-      e.printStackTrace();
+      // pathOp.countBytesDone(bytesDone);
+      // we need to set the size of the item instead of the countBytesDone
+      completeStreamReadOperation(pathOp, bytesDone, thrown);
+    } catch (Exception e) { // including ReinitializationRequiredException
+      //	thrown = e;
+      /*pathOp.item() should be instead */
+      completeStreamReadOperation(pathOp, bytesDone, thrown);
     }
-    // Don't know how to check success
-    // readEvtFuture.handle((returned, thrown) -> completeEventReadOperation(Operation(evtOp,
-    // thrown));
-    Loggers.MSG.trace("No more events from {} {}", scopeName, streamName);
+
   }
 
   void submitStreamOperation(final PathOperation streamOp, final OpType opType) {
