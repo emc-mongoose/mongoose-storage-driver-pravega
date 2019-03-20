@@ -69,7 +69,7 @@ test_integration:
   stage: test
   variables:
     # unset because pravega container should use its own jvm
-    JAVA_HOME:
+    JAVA_HOME: ~
   services:
     - name: pravega/pravega:0.3.2
       alias: storage
