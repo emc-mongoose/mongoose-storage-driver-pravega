@@ -17,7 +17,7 @@ import com.emc.mongoose.item.op.data.DataOperation;
 import com.emc.mongoose.item.op.data.DataOperationImpl;
 import com.emc.mongoose.storage.driver.pravega.PravegaStorageDriver;
 import com.emc.mongoose.storage.driver.pravega.io.ByteBufferSerializer;
-import com.emc.mongoose.storage.driver.pravega.util.docker.PravegaNodeContainer;
+import com.emc.mongoose.storage.driver.pravega.util.PravegaNode;
 import com.github.akurilov.commons.collection.TreeUtil;
 import com.github.akurilov.commons.system.SizeInBytes;
 import com.github.akurilov.confuse.Config;
@@ -32,8 +32,6 @@ import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.stream.Collectors;
 import lombok.val;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
 
@@ -47,8 +45,6 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
       throw new AssertionError(e);
     }
   }
-
-  private static PravegaNodeContainer PRAVEGA_NODE_CONTAINER;
 
   private static Config getConfig() {
     try {
@@ -86,8 +82,8 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
       config.val("storage-net-interestOpQueued", false);
       config.val("storage-net-linger", 0);
       config.val("storage-net-timeoutMillis", 0);
-      config.val("storage-net-node-addrs", Collections.singletonList("127.0.0.1"));
-      config.val("storage-net-node-port", PravegaNodeContainer.PORT);
+      config.val("storage-net-node-addrs", PravegaNode.addr());
+      config.val("storage-net-node-port", PravegaNode.PORT);
       config.val("storage-net-node-connAttemptsLimit", 0);
 
       config.val("storage-auth-uid", null);
@@ -125,20 +121,6 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
         config.configVal("storage"),
         true,
         config.configVal("load").intVal("batch-size"));
-  }
-
-  @BeforeClass
-  public static void setUpClass() throws Exception {
-    try {
-      PRAVEGA_NODE_CONTAINER = new PravegaNodeContainer();
-    } catch (final Exception e) {
-      throw new AssertionError(e);
-    }
-  }
-
-  @AfterClass
-  public static void tearDownClass() throws Exception {
-    PRAVEGA_NODE_CONTAINER.close();
   }
 
   @Test

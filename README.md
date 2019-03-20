@@ -78,7 +78,6 @@ docker run \
     --network host \
     emcmongoose/mongoose-storage-driver-pravega \
     --storage-net-node-addrs=<NODE_IP_ADDRS> \
-    --storage-net-node-port=<NODE_PORT> \
     ...
 ```
 
@@ -102,7 +101,6 @@ docker run \
     emcmongoose/mongoose-storage-driver-pravega \
     --load-step-node-addrs=<ADDR1,ADDR2,...> \
     --storage-net-node-addrs=<NODE_IP_ADDRS> \
-    --storage-net-node-port=<NODE_PORT> \
     ...
 ```
 
@@ -119,7 +117,7 @@ docker run \
 | storage-driver-scaling-factor     | integer         | 0             | The scaling policy factor. From the Pravega javadoc: *the maximum number of splits of a segment for a scale-up event.*
 | storage-driver-scaling-segments   | integer         | 1             | From the Pravega javadoc: *the minimum number of segments that a stream can have independent of the number of scale down events.*
 | storage-net-node-addrs            | list of strings | 127.0.0.1     | The list of the Pravega storage nodes to use for the load
-| storage-net-node-port             | integer         | 9020          | The default port of the Pravega storage nodes, should be explicitly set to 9090 (the value used by Pravega by default)
+| storage-net-node-port             | integer         | ?             | The default port of the Pravega storage nodes, should be explicitly set to 9090 (the value used by Pravega by default)
 
 ## 3.4. Specific Cases
 
@@ -268,7 +266,7 @@ TODO
 1. Build the storage driver
 2. Copy the storage driver's jar file into the mongoose's `ext` directory:
 ```bash
-cp -f build/libs/mongoose-storage-driver-pravega.jar ~/.mongoose/<MONGOOSE_VERSION>/ext/
+cp -f build/libs/mongoose-storage-driver-pravega-*.jar ~/.mongoose/<MONGOOSE_BASE_VERSION>/ext/
 ```
 3. Run the Pravega standalone node:
 ```bash
@@ -276,7 +274,7 @@ docker run --network host pravega/pravega standalone
 ```
 4. Run Mongoose's default scenario with some specific command-line arguments:
 ```bash
-java -jar mongoose-<MONGOOSE_VERSION>.jar \
+java -jar mongoose-<MONGOOSE_BASE_VERSION>.jar \
     --storage-driver-type=pravega \
     --storage-net-node-port=9090 \
     --storage-driver-limit-concurrency=10 \
