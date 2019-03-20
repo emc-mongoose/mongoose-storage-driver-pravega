@@ -1,13 +1,15 @@
 package com.emc.mongoose.storage.driver.pravega.integration;
 
-import com.emc.mongoose.storage.driver.pravega.util.PravegaNode;
+import com.emc.mongoose.storage.driver.pravega.util.docker.PravegaNodeContainer;
+
 import io.pravega.client.ClientFactory;
 import io.pravega.client.admin.ReaderGroupManager;
 import io.pravega.client.admin.StreamManager;
 import io.pravega.client.stream.*;
 import io.pravega.client.stream.impl.JavaSerializer;
 import lombok.val;
-import org.junit.Ignore;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.net.URI;
@@ -18,6 +20,23 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
 public class PravegaEventReadTest {
+	private static PravegaNodeContainer PRAVEGA_NODE_CONTAINER;
+
+	@BeforeClass
+	public static void setUpClass()
+			throws Exception {
+		try {
+			PRAVEGA_NODE_CONTAINER = new PravegaNodeContainer();
+		} catch (final Exception e) {
+			throw new AssertionError(e);
+		}
+	}
+
+	@AfterClass
+	public static void tearDownClass()
+			throws Exception {
+		PRAVEGA_NODE_CONTAINER.close();
+	}
 
 	@Test
 	public void testEventRead()
@@ -25,51 +44,24 @@ public class PravegaEventReadTest {
 		/* writing */
 		val scopeName = "Scope";
 		val streamName = "Stream";
-		val controllerURI = URI.create("tcp://" + PravegaNode.addr() + ":" + PravegaNode.PORT);
-		System.out.println("Controller uri: " + controllerURI);
+		val controllerURI = URI.create("tcp://localhost:9090");
 		val routingKey = "RoutingKey";
 		val testEvent = "TestEvent";
 		val readerTimeoutMs = 100;
-		System.out.println("Stream manager creating...");
 		val streamManager = StreamManager.create(controllerURI);
-		System.out.println("Stream manager created");
 		val scopeIsNew = streamManager.createScope(scopeName);
-		System.out.println("Scope created");
 		val streamConfig = StreamConfiguration.builder()
 			.scalingPolicy(ScalingPolicy.fixed(1))
 			.build();
-		System.out.println("Stream config created");
 		streamManager.createStream(scopeName, streamName, streamConfig);
-		System.out.println("Stream created");
+
 		try(
 			val clientFactory = ClientFactory.withScope(scopeName, controllerURI);
 			val writer = clientFactory.createEventWriter(
 				streamName, new JavaSerializer<>(), EventWriterConfig.builder().build()
 			)
 		) {
-			System.out.println("Writing the event...");
-			final var future = writer.writeEvent(routingKey, testEvent);
-			future.handle(
-				(v, t) -> {
-					System.out.println("Writing the event: " + v + ", " + t);
-					return future;
-				}
-			);
-			while(true) {
-				if(future.isCancelled()) {
-					System.out.println("Writing the event cancelled");
-					break;
-				}
-				if(future.isCompletedExceptionally()) {
-					System.out.println("Writing the event completed exceptionally");
-					break;
-				}
-				if(future.isDone()) {
-					System.out.println("Writing the event done");
-					break;
-				}
-				TimeUnit.SECONDS.sleep(5);
-			}
+			writer.writeEvent(routingKey, testEvent);
 			System.out.format(
 				"Writing message: '%s' with routing-key: '%s' to stream '%s / %s'%n", testEvent, routingKey, scopeName,
 				streamName
