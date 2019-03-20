@@ -213,39 +213,39 @@ publishing {
 				}
 				developers {
 					developer {
-						id "akurilov"
-						name "Andrey Kurilov"
-						email "akurilov123@gmail.com"
+						id = "akurilov"
+						name = "Andrey Kurilov"
+						email = "akurilov123@gmail.com"
 					}
 					developer {
-						id "dadlex"
-						name "Alexander Aphonin"
-						email "alex15051997@yandex.ru"
+						id = "dadlex"
+						name = "Alexander Aphonin"
+						email = "alex15051997@yandex.ru"
 					}
 					developer {
-						id "hoklet"
-						name "Igor Konev"
-						email "hokletka@gmail.com"
+						id = "hoklet"
+						name = "Igor Konev"
+						email = "hokletka@gmail.com"
 					}
 					developer {
-						id "veronikaKochugova"
-						name "Veronika Kochugova"
-						email "Veronika.Kochugova@dell.com"
+						id = "veronikaKochugova"
+						name = "Veronika Kochugova"
+						email = "Veronika.Kochugova@dell.com"
 					}
 					developer {
-						id "vladislav-kulakovsky"
-						name "Vladislav Kulakovsky"
-						email "kulakovsky.vladislav@gmail.com"
+						id = "vladislav-kulakovsky"
+						name = "Vladislav Kulakovsky"
+						email = "kulakovsky.vladislav@gmail.com"
 					}
 					developer {
-						id "yurkov-anton"
-						name "Anton Yurkov"
-						email "ayourkov@gmail.com"
+						id = "yurkov-anton"
+						name = "Anton Yurkov"
+						email = "ayourkov@gmail.com"
 					}
 					developer {
-						id "zhenytim"
-						name "Evgeny Timoshchuk"
-						email "zheny.tim@gmail.com"
+						id = "zhenytim"
+						name = "Evgeny Timoshchuk"
+						email = "zheny.tim@gmail.com"
 					}
 				}
 			}
