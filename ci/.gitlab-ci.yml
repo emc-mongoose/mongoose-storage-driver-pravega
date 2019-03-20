@@ -70,6 +70,8 @@ test_integration:
   services:
     - name: pravega/pravega:0.3.2
       alias: storage
+      command:
+        - standalone
   script:
     - ./gradlew integrationTest
   artifacts:
@@ -92,6 +94,8 @@ build_docker_image:
   services:
     - name: pravega/pravega:0.3.2
       alias: storage
+      command:
+        - standalone
   variables:
     HOST_WORKING_DIR: ${CI_PROJECT_DIR}
     PYTHONPATH: ${PYTHONPATH}:/usr/lib/python2.7/site-packages:src/test/robot/lib
