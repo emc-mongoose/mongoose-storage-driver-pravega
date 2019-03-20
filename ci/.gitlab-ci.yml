@@ -77,7 +77,7 @@ test_integration:
         - standalone
   script:
     - export JAVA_HOME=/opt/jdk-11.0.2+9
-    - ./gradlew integrationTest --tests com.emc.mongoose.storage.driver.pravega.integration.PravegaEventReadTest
+    - ./gradlew integrationTest
   artifacts:
     paths:
       - build/reports/tests/test/*
