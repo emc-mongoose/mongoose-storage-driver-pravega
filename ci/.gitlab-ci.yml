@@ -67,12 +67,16 @@ test_unit:
 
 test_integration:
   stage: test
+  variables:
+    # unset because pravega container should use its own jvm
+    JAVA_HOME:
   services:
     - name: pravega/pravega:0.3.2
       alias: storage
       command:
         - standalone
   script:
+    - export JAVA_HOME=/opt/jdk-11.0.2+9
     - ./gradlew integrationTest
   artifacts:
     paths:
