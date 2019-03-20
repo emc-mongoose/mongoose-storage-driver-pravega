@@ -5,31 +5,31 @@ storage:
       timeoutMillis: int
     create:
       key:
-        enabled: boolean,
+        enabled: boolean
         count: long
     read:
       timeoutMillis: int
     scaling:
-      type: string,
-      rate: int,
-      factor: int,
+      type: string
+      rate: int
+      factor: int
       segments: int
     namespace:
       scope: string
   net:
-    bindBacklogSize: int,
-    interestOpQueued: boolean,
-    keepAlive: boolean,
-    linger: int,
-    reuseAddr: boolean,
-    rcvBuf: int,
-    sndBuf: int,
-    tcpNoDelay: boolean,
-    timeoutMillis: int,
-    ssl: boolean,
+    bindBacklogSize: int
+    interestOpQueued: boolean
+    keepAlive: boolean
+    linger: int
+    reuseAddr: boolean
+    rcvBuf: int
+    sndBuf: int
+    tcpNoDelay: boolean
+    timeoutMillis: int
+    ssl: boolean
     uri:
       schema: string
     node:
-      addrs: list,
-      port: int,
+      addrs: list
+      port: int
       connAttemptsLimit: int
