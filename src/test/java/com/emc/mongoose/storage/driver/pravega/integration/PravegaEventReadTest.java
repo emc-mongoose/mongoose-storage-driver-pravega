@@ -19,29 +19,34 @@ import static org.junit.Assert.assertNull;
 public class PravegaEventReadTest {
 
 	@Test
-	@Ignore // temporary
 	public void testEventRead()
 			throws Exception {
 		/* writing */
 		val scopeName = "Scope";
 		val streamName = "Stream";
 		val controllerURI = URI.create("tcp://" + PravegaNode.addr() + ":" + PravegaNode.PORT);
+		System.out.println("Controller uri: " + controllerURI);
 		val routingKey = "RoutingKey";
 		val testEvent = "TestEvent";
 		val readerTimeoutMs = 100;
+		System.out.println("Stream manager creating...");
 		val streamManager = StreamManager.create(controllerURI);
+		System.out.println("Stream manager created");
 		val scopeIsNew = streamManager.createScope(scopeName);
+		System.out.println("Scope created");
 		val streamConfig = StreamConfiguration.builder()
 			.scalingPolicy(ScalingPolicy.fixed(1))
 			.build();
+		System.out.println("Stream config created");
 		streamManager.createStream(scopeName, streamName, streamConfig);
-
+		System.out.println("Stream created");
 		try(
 			val clientFactory = ClientFactory.withScope(scopeName, controllerURI);
 			val writer = clientFactory.createEventWriter(
 				streamName, new JavaSerializer<>(), EventWriterConfig.builder().build()
 			)
 		) {
+			System.out.println("Writing the event...");
 			writer.writeEvent(routingKey, testEvent);
 			System.out.format(
 				"Writing message: '%s' with routing-key: '%s' to stream '%s / %s'%n", testEvent, routingKey, scopeName,
