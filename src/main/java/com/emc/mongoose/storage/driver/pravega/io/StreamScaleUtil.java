@@ -1,9 +1,7 @@
 package com.emc.mongoose.storage.driver.pravega.io;
 
-import com.emc.mongoose.exception.InterruptRunException;
-import com.emc.mongoose.logging.LogUtil;
-import com.emc.mongoose.logging.Loggers;
-
+import com.emc.mongoose.base.logging.LogUtil;
+import com.emc.mongoose.base.logging.Loggers;
 import io.pravega.client.segment.impl.Segment;
 import io.pravega.client.stream.ScalingPolicy;
 import io.pravega.client.stream.StreamConfiguration;
@@ -20,12 +18,14 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import static com.github.akurilov.commons.lang.Exceptions.throwUnchecked;
+
 public interface StreamScaleUtil {
 
 	static void scaleToFixedSegmentCount(
 		final Controller controller, final int timeoutMillis, final String scopeName, final String streamName,
 		final ScalingPolicy scalingPolicy
-	) throws InterruptRunException {
+	) {
 		val segments = controller.getCurrentSegments(scopeName, streamName).join();
 		val segmentCount = segments.getSegments().size();
 		val targetSegmentCount = scalingPolicy.getMinNumSegments();
@@ -79,7 +79,7 @@ public interface StreamScaleUtil {
 					);
 				}
 			} catch(final InterruptedException e) {
-				throw new InterruptRunException(e);
+				throwUnchecked(e);
 			} catch(final ExecutionException | TimeoutException e) {
 				LogUtil.exception(
 					Level.WARN, e, "Failed to update the stream \"{}/{}\" w/ the config: {}", scopeName, streamName,

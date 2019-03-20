@@ -1,7 +1,7 @@
 package com.emc.mongoose.storage.driver.pravega.io;
 
-import com.emc.mongoose.item.DataItem;
-import com.emc.mongoose.logging.Loggers;
+import com.emc.mongoose.base.item.DataItem;
+import com.emc.mongoose.base.logging.Loggers;
 
 import com.github.akurilov.commons.system.SizeInBytes;
 

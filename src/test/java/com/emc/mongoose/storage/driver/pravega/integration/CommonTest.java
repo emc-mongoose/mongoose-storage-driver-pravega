@@ -1,12 +1,11 @@
 package com.emc.mongoose.storage.driver.pravega.integration;
 
-import static com.emc.mongoose.Constants.APP_NAME;
+import static com.emc.mongoose.base.Constants.APP_NAME;
 import static org.junit.Assert.fail;
 
-import com.emc.mongoose.data.DataInput;
-import com.emc.mongoose.env.Extension;
-import com.emc.mongoose.exception.OmgShootMyFootException;
-import com.emc.mongoose.storage.Credential;
+import com.emc.mongoose.base.data.DataInput;
+import com.emc.mongoose.base.env.Extension;
+import com.emc.mongoose.base.storage.Credential;
 import com.emc.mongoose.storage.driver.pravega.PravegaStorageDriver;
 import com.emc.mongoose.storage.driver.pravega.util.PravegaNode;
 import com.github.akurilov.commons.collection.TreeUtil;
@@ -95,11 +94,11 @@ public class CommonTest {
     }
   }
 
-  public CommonTest() throws OmgShootMyFootException {
+  public CommonTest() {
     this(getConfig());
   }
 
-  private CommonTest(final Config config) throws OmgShootMyFootException {
+  private CommonTest(final Config config) {
     pravegaStorageDriver =
         new PravegaStorageDriver(
             "test-data-pravega-driver",

@@ -1,14 +1,14 @@
 package com.emc.mongoose.storage.driver.pravega.io;
 
-import com.emc.mongoose.data.DataInput;
-import com.emc.mongoose.item.DataItemImpl;
-import static com.emc.mongoose.Constants.MIB;
-
+import com.emc.mongoose.base.data.DataInput;
+import com.emc.mongoose.base.item.DataItemImpl;
 import com.github.akurilov.commons.system.SizeInBytes;
 
 import lombok.val;
 
 import org.junit.Test;
+
+import static com.emc.mongoose.base.Constants.MIB;
 import static org.junit.Assert.assertEquals;
 
 public class DataItemSerializerTest {

@@ -1,20 +1,19 @@
 package com.emc.mongoose.storage.driver.pravega.integration;
 
-import static com.emc.mongoose.Constants.APP_NAME;
-import static com.emc.mongoose.Constants.MIB;
+import static com.emc.mongoose.base.Constants.APP_NAME;
+import static com.emc.mongoose.base.Constants.MIB;
 import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.DEFAULT_SCOPE;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
-import com.emc.mongoose.data.DataInput;
-import com.emc.mongoose.env.Extension;
-import com.emc.mongoose.exception.OmgShootMyFootException;
-import com.emc.mongoose.item.DataItem;
-import com.emc.mongoose.item.DataItemImpl;
-import com.emc.mongoose.item.op.OpType;
-import com.emc.mongoose.item.op.Operation;
-import com.emc.mongoose.item.op.data.DataOperation;
-import com.emc.mongoose.item.op.data.DataOperationImpl;
+import com.emc.mongoose.base.data.DataInput;
+import com.emc.mongoose.base.env.Extension;
+import com.emc.mongoose.base.item.DataItem;
+import com.emc.mongoose.base.item.DataItemImpl;
+import com.emc.mongoose.base.item.op.OpType;
+import com.emc.mongoose.base.item.op.Operation;
+import com.emc.mongoose.base.item.op.data.DataOperation;
+import com.emc.mongoose.base.item.op.data.DataOperationImpl;
 import com.emc.mongoose.storage.driver.pravega.PravegaStorageDriver;
 import com.emc.mongoose.storage.driver.pravega.io.ByteBufferSerializer;
 import com.emc.mongoose.storage.driver.pravega.util.PravegaNode;
@@ -110,11 +109,11 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
     }
   }
 
-  public DataOperationsTest() throws OmgShootMyFootException {
+  public DataOperationsTest() {
     this(getConfig());
   }
 
-  private DataOperationsTest(final Config config) throws OmgShootMyFootException {
+  private DataOperationsTest(final Config config) {
     super(
         "test-data-pravega-driver",
         DATA_INPUT,
