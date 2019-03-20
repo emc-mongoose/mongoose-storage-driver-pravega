@@ -71,7 +71,7 @@ test_integration:
     # unset because pravega container should use its own jvm
     JAVA_HOME: ""
   services:
-    - name: pravega/pravega:0.3.2
+    - name: pravega/pravega:0.4.0
       alias: storage
       command:
         - standalone
@@ -96,7 +96,7 @@ build_docker_image:
 .test_robot:
   stage: test_functional
   services:
-    - name: pravega/pravega:0.3.2
+    - name: pravega/pravega:0.4.0
       alias: storage
       command:
         - standalone
