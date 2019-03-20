@@ -12,6 +12,7 @@ import org.junit.Test;
 
 import java.net.URI;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
@@ -47,7 +48,28 @@ public class PravegaEventReadTest {
 			)
 		) {
 			System.out.println("Writing the event...");
-			writer.writeEvent(routingKey, testEvent);
+			final var future = writer.writeEvent(routingKey, testEvent);
+			future.handle(
+				(v, t) -> {
+					System.out.println("Writing the event: " + v + ", " + t);
+					return future;
+				}
+			);
+			while(true) {
+				if(future.isCancelled()) {
+					System.out.println("Writing the event cancelled");
+					break;
+				}
+				if(future.isCompletedExceptionally()) {
+					System.out.println("Writing the event completed exceptionally");
+					break;
+				}
+				if(future.isDone()) {
+					System.out.println("Writing the event done");
+					break;
+				}
+				TimeUnit.SECONDS.sleep(5);
+			}
 			System.out.format(
 				"Writing message: '%s' with routing-key: '%s' to stream '%s / %s'%n", testEvent, routingKey, scopeName,
 				streamName
