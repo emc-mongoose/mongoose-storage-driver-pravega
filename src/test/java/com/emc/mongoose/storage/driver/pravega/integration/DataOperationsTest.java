@@ -213,26 +213,4 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
     // assertEquals("we didn't read the same size we had put into stream",
     // (int)dataItem.size(),event.getEvent().remaining());
   }
-
-  @Test
-  @Ignore
-  public final void testConcatFile() throws Exception {}
-
-  @Test
-  public final void testReadFullFile() throws Exception {}
-
-  @Test
-  public final void testReadFixedRangesFile() throws Exception {}
-
-  @Test
-  public final void testReadRandomRangesFile() throws Exception {}
-
-  @Test
-  public final void testOverwriteFile() throws Exception {}
-
-  @Test
-  public final void testAppendFile() throws Exception {}
-
-  @Test
-  public final void testDeleteFile() throws Exception {}
 }

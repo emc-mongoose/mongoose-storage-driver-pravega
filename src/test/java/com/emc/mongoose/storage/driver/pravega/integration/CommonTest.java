@@ -107,7 +107,4 @@ public class CommonTest {
             true,
             config.configVal("load").intVal("batch-size"));
   }
-
-  @Test
-  public final void testExample() throws Exception {}
 }

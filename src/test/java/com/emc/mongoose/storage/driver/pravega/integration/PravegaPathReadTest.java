@@ -20,8 +20,8 @@ public class PravegaPathReadTest {
 	@Test
 	public void testPathRead()
 			throws Exception {
-		final String scope = "Scope";
-		final String streamName = "Stream";
+		final String scope = "PathReadTestScope";
+		final String streamName = "PathReadTestStream";
 		final var controllerURI = URI.create("tcp://" + PravegaNode.addr() + ":" + PravegaNode.PORT);
 		final String routingKey = "RoutingKey";
 		final String message1 = "message1";
