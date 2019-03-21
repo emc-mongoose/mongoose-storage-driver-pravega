@@ -20,7 +20,7 @@ stages:
   - deploy
 
 before_script:
-  - apk --update add --no-cache ca-certificates curl openssl binutils xz gnupg
+  - apk --update add --no-cache busybox-extras ca-certificates curl openssl binutils xz gnupg
   - curl -Lks https://github.com/AdoptOpenJDK/openjdk11-binaries/releases/download/jdk-11.0.2%2B9/OpenJDK11U-jdk_x64_linux_hotspot_11.0.2_9.tar.gz -o /tmp/jdk11.tgz
   - tar xvf /tmp/jdk11.tgz -C /opt
   - rm -rf /tmp/jdk11.tgz
@@ -67,7 +67,16 @@ test_unit:
 
 test_integration:
   stage: test
+  variables:
+    # unset because pravega container should use its own jvm
+    JAVA_HOME: ""
+  services:
+    - name: pravega/pravega:0.3.2
+      alias: storage
+      command:
+        - standalone
   script:
+    - telnet storage 9090
     - export JAVA_HOME=/opt/jdk-11.0.2+9
     - ./gradlew integrationTest
   artifacts:
@@ -87,6 +96,11 @@ build_docker_image:
 
 .test_robot:
   stage: test_functional
+  services:
+    - name: pravega/pravega:0.3.2
+      alias: storage
+      command:
+        - standalone
   variables:
     HOST_WORKING_DIR: ${CI_PROJECT_DIR}
     PYTHONPATH: ${PYTHONPATH}:/usr/lib/python2.7/site-packages:src/test/robot/lib
