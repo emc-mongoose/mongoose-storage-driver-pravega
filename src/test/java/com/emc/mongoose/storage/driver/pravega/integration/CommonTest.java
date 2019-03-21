@@ -14,6 +14,7 @@ import com.github.akurilov.confuse.Config;
 import com.github.akurilov.confuse.SchemaProvider;
 import com.github.akurilov.confuse.impl.BasicConfig;
 import java.io.IOException;
+import java.net.Socket;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import lombok.val;
@@ -107,4 +108,15 @@ public class CommonTest {
             true,
             config.configVal("load").intVal("batch-size"));
   }
+
+  @Test
+	public void testPravegaIsListening()
+	throws Exception {
+		try {
+			final var socket = new Socket(PravegaNode.addr(), PravegaNode.PORT);
+			socket.close();
+		} catch(final Throwable thrown) {
+			fail(thrown.toString());
+		}
+	}
 }
