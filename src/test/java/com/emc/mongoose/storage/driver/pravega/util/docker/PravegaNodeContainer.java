@@ -4,6 +4,7 @@ package com.emc.mongoose.storage.driver.pravega.util.docker;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.CreateContainerResponse;
 import com.github.dockerjava.api.exception.NotFoundException;
+import com.github.dockerjava.api.model.Bind;
 import com.github.dockerjava.core.DockerClientBuilder;
 import com.github.dockerjava.core.command.PullImageResultCallback;
 
@@ -36,9 +37,10 @@ public class PravegaNodeContainer
 			.createContainerCmd(IMAGE_NAME)
 			.withCmd("standalone")
 			.withName("pravega_node")
-			.withNetworkMode("host")//--network host
+			.withNetworkMode("host")
 			.withAttachStderr(true)
 			.withAttachStdout(true)
+			.withBinds(Bind.parse("/var/run/docker.sock:/var/run/docker.sock"))
 			.exec();
 		CONTAINER_ID = container.getId();
 		LOG.info("docker start " + CONTAINER_ID + "...");
