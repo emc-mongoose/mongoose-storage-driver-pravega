@@ -76,7 +76,7 @@ test_integration:
       command:
         - standalone
   script:
-    - telnet storage 9090
+    - netstat -n | grep 9090
     - export JAVA_HOME=/opt/jdk-11.0.2+9
     - ./gradlew integrationTest
   artifacts:
