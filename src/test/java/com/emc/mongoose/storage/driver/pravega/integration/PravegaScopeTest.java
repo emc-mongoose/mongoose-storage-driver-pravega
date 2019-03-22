@@ -1,10 +1,13 @@
 package com.emc.mongoose.storage.driver.pravega.integration;
 
-import com.emc.mongoose.storage.driver.pravega.util.PravegaNode;
+import com.emc.mongoose.storage.driver.pravega.util.docker.PravegaNodeContainer;
+
 import io.pravega.client.admin.StreamManager;
 
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.net.URI;
@@ -16,10 +19,27 @@ import static org.junit.Assert.assertTrue;
 public class PravegaScopeTest {
 
 	private StreamManager streamManager;
+	private static PravegaNodeContainer PRAVEGA_NODE_CONTAINER;
+
+	@BeforeClass
+	public static void setUpClass()
+			throws Exception {
+		try {
+			PRAVEGA_NODE_CONTAINER = new PravegaNodeContainer();
+		} catch(final Exception e) {
+			throw new AssertionError(e);
+		}
+	}
+
+	@AfterClass
+	public static void tearDownClass()
+			throws Exception {
+		PRAVEGA_NODE_CONTAINER.close();
+	}
 
 	@Before
 	public void initTest(){
-		streamManager = StreamManager.create(URI.create("tcp://" + PravegaNode.addr() + ":" + PravegaNode.PORT));
+		streamManager = StreamManager.create(URI.create("tcp://127.0.0.1:9090"));
 	}
 
     @After
