@@ -73,7 +73,7 @@ test_integration:
   stage: test
   before_script:
     - docker login -u ${DOCKER_USER} -p ${DOCKER_PASS}
-    - docker run -p 9090:9090 -p 12345:12345 --name=storage pravega/pravega:0.3.2 standalone
+    - docker run -d -p 9090:9090 -p 12345:12345 --name=storage pravega/pravega:0.3.2 standalone
   script:
     - ./gradlew integrationTest
   after_script:
@@ -111,7 +111,7 @@ build_docker_image:
     - export VERSION=$(cat build.gradle | grep version\ = | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
     - docker login -u ${DOCKER_USER} -p ${DOCKER_PASS}
     - docker load < ${IMAGE_FILE_NAME}
-    - docker run -p 9090:9090 -p 12345:12345 --name=storage pravega/pravega:0.3.2 standalone
+    - docker run -d -p 9090:9090 -p 12345:12345 --name=storage pravega/pravega:0.3.2 standalone
     - robot --outputdir build/robotest --suite ${SUITE} --include ${TEST} src/test/robot
   after_script:
     - docker kill storage
