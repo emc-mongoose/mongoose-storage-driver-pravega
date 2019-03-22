@@ -17,8 +17,8 @@ env:
 before_install:
 - openssl aes-256-cbc -K $encrypted_d1a13f1ded05_key -iv $encrypted_d1a13f1ded05_iv
   -in ci/secure/key.asc.enc -out ci/secure/key.asc -d
-- gpg --import ci/travis/key.asc
-- rm -f ci/travis/key.asc
+- gpg --import ci/secure/key.asc
+- rm -f ci/secure/key.asc
 - openssl aes-256-cbc -K $encrypted_d1a13f1ded05_key -iv $encrypted_d1a13f1ded05_iv
   -in ci/secure/ownertrust.txt.enc -out ci/secure/ownertrust.txt -d
 - cat ci/secure/ownertrust.txt | gpg --import-ownertrust --batch
