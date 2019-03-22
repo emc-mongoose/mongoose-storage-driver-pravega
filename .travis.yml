@@ -1,0 +1,69 @@
+language: java
+sudo: true
+addons:
+  ulimit:
+    nofile: 1048576
+jdk:
+- openjdk11
+env:
+  global:
+  - IMAGE_NAME=emcmongoose/mongoose-storage-driver-pravega
+  - IMAGE_FILE_NAME=build/mongoose-storage-driver-pravega.tar
+  - ROBOTEST_CONTAINER_WORKING_DIR=/root/mongoose
+  - SERVICE_HOST=docker
+  - COMMIT=${TRAVIS_COMMIT::8}
+  - secure: Kj3SrVKLnacdCc6Rfi7Ms0Ql46ibf0A37wofQw+YJNGbdqT5G1WFSKJab1RmoUokiqfxxQGxTbGgICY41FOq0sI2yH95R5O7ViXVsLWqELu0RX/l12xe7w/wT+AEeCYqFrYMwipgY5F/paaYL7BE6lDjvhbtet4sr34WI1gwNAXdfVj6/jmzZOc2KOH4JMgvwQsnALAq5mKsUszpQB6dstufn0FKS6lKz6KP7ZEIPzOkR85ayI1VVNfb9md8v/PPryBjvlJ17SNgVhjeNs+IXXhyANL9OPWlM5djdvvwjWypILgCGb6+sUiQV1cbzQrrmAVjE5U2x5UEm1Pz1moTV3KG7pcxgBkY9+ZoMqJSDKYVILUd8vdIubM1hQjIwxBCcS0XHjEeRMa6Vaxx1FkdpKTgTpDxxYEBVxfLsHaYsT0V9d7gO5Vl4PUufArWkjG23s6LyXtwYdZYI3ltVgSnHYsjRaVwmm2U7Z2T0bvoSLezEirrGoJMA0OjMLGsVCuwTgsO/Sl4hxwjzl/F0pi29+YLMXclnaoXzBKRyXwBXMsmdAE1jQONY3fyuJTDudCoCTSxJuXImNOTlV/WLMzHo/QVGsG3rgIsiYYbjn8gha9delBccUGzzlvuOvOxdd1aoF8ATJRgQV4NKXY+H/4F9FuEq9L/4JTarbhGT9BfVTM=
+  - secure: lJS63g+F1vpLeL9AKu9HUh/MvCVnsTQ8p/KTUhS3W1odLadYKY3/1WsicQpClDqzdm9vgOYbUjtTXPxfoQR8p+WhmOzyXK8Ypod3qz89dGxNvCHvfMdgPJ3+6BhZpOH2B26AqWOmRtfdEkxW7UeqeINJ2KppRlL2zdPS2kc1q4qwnqLntuGHheQDKhyyStUDaVnVNbIe+tLUjpxcQjd5y+6rbr3Tw6RczTjiF6w9M/L1ROWFBywalJGcUSsLtZA1tma159R1+83KN9XasJGATlAykg0ZKCdFeSaufwfbcmr5A9Qt8a4r1Y0v+CpRIQ71B6TO1tjwyzw4ksIcSOi5tHB7DdjRRFYX9xCpYHfN2zPbcttI7PRkEwPcLTDcHb7Gsf6x7/k4hC0FFLzQl0UD6NiTJxlZwNz3goOVBFYxNwbJxrjAzcKajpM7jGqiIzOEXBDHj8dmCZirxf3xGng00WVFCNxQDP+CvC9ndIhutvVT230t63QztDgjtdJbMGAS/mULwYe72XV96DCtr0mXnMK403br9tkOP9Hj8UI0EHMU/kJT3rFxbrXSCwQi/eycXVMAD7nthyTSBRttY8i54GLnR68Oz0Nm+5popUQ73JTGXi42E54xG5N9xqiBlKg5JloJ4VdjtZxYitYurmHLy2drHg+rs88DsTTLbI+vUlo=
+before_install:
+- openssl aes-256-cbc -K $encrypted_d1a13f1ded05_key -iv $encrypted_d1a13f1ded05_iv
+  -in ci/secure/key.asc.enc -out ci/secure/key.asc -d
+- gpg --import ci/travis/key.asc
+- rm -f ci/travis/key.asc
+- openssl aes-256-cbc -K $encrypted_d1a13f1ded05_key -iv $encrypted_d1a13f1ded05_iv
+  -in ci/secure/ownertrust.txt.enc -out ci/secure/ownertrust.txt -d
+- cat ci/secure/ownertrust.txt | gpg --import-ownertrust --batch
+- rm -f ci/secure/ownertrust.txt
+- openssl aes-256-cbc -K $encrypted_d1a13f1ded05_key -iv $encrypted_d1a13f1ded05_iv
+  -in ci/secure/secring.gpg.enc -out ci/secure/secring.gpg -d
+- curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+- sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu
+  $(lsb_release -cs) stable"
+- sudo apt-get update
+- sudo apt-get -y install docker-ce
+jobs:
+  include:
+  - stage: Build
+    script: "./gradlew clean jar"
+  - stage: Unit Tests
+    script: "./gradlew test"
+  - stage: Integration Tests
+    script: "./gradlew integrationTest"
+  - stage: Build Docker Image
+    script:
+    - docker login -u $DOCKER_USER -p $DOCKER_PASS
+    - "./gradlew dockerBuildImage"
+    - export VERSION=$(cat build.gradle | grep version\ = | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
+    - docker push ${IMAGE_NAME}:${VERSION}
+  - stage: Functional Tests
+    env:
+    - SUITE=api.storage
+    - TEST=create_events
+    script:
+    - export BASE_VERSION=$(cat build.gradle | grep mongooseBase  | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
+    - export VERSION=$(cat build.gradle | grep version\ = | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
+    - "./gradlew robotest"
+  - env:
+    - SUITE=api.storage
+    - TEST=create_stream
+    script:
+    - export BASE_VERSION=$(cat build.gradle | grep mongooseBase  | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
+    - export VERSION=$(cat build.gradle | grep version\ = | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
+    - "./gradlew robotest"
+  - stage: Deploy to Maven Repo
+    deploy:
+      provider: script
+      script: "./gradlew -Psigning.keyId=${SIGNING_KEY_ID} -Psigning.password=${SIGNING_PASSWORD}
+        -Psigning.secretKeyRingFile=ci/secure/secring.gpg -PossrhUsername=${OSSRH_USERNAME}
+        -PossrhPassword=${OSSRH_PASSWORD} publishToNexus closeAndReleaseRepository"
+      on:
+        condition: "$TRAVIS_TAG = latest"
