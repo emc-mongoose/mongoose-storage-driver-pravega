@@ -9,6 +9,7 @@ env:
   global:
   - IMAGE_NAME=emcmongoose/mongoose-storage-driver-pravega
   - IMAGE_FILE_NAME=build/mongoose-storage-driver-pravega.tar
+  - JAVA_OPTS=-Xmx1024m -XX:MaxPermSize=512m
   - ROBOTEST_CONTAINER_WORKING_DIR=/root/mongoose
   - SERVICE_HOST=docker
   - COMMIT=${TRAVIS_COMMIT::8}
