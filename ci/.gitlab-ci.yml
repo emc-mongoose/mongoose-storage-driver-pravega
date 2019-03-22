@@ -1,7 +1,7 @@
 image: docker:stable
 
 variables:
-  DOCKER_HOST: tcp://localhost:2375
+  DOCKER_HOST: tcp://docker:2375
   DOCKER_DRIVER: overlay2
   IMAGE_NAME: emcmongoose/mongoose-storage-driver-pravega
   IMAGE_FILE_NAME: build/mongoose-storage-driver-pravega.tar
@@ -11,6 +11,10 @@ variables:
 
 services:
   - docker:dind
+  - name: pravega/pravega:0.3.2
+    alias: storage
+    command:
+      - standalone
 
 stages:
   - build
@@ -70,11 +74,6 @@ test_integration:
   variables:
     # unset because pravega container should use its own jvm
     JAVA_HOME: ""
-  services:
-    - name: pravega/pravega:0.3.2
-      alias: storage
-      command:
-        - standalone
   script:
     - export JAVA_HOME=/opt/jdk-11.0.2+9
     - ./gradlew integrationTest
@@ -95,11 +94,6 @@ build_docker_image:
 
 .test_robot:
   stage: test_functional
-  services:
-    - name: pravega/pravega:0.3.2
-      alias: storage
-      command:
-        - standalone
   variables:
     HOST_WORKING_DIR: ${CI_PROJECT_DIR}
     PYTHONPATH: ${PYTHONPATH}:/usr/lib/python2.7/site-packages:src/test/robot/lib
