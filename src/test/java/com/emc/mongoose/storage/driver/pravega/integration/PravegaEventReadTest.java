@@ -19,7 +19,7 @@ import static org.junit.Assert.assertNull;
 
 public class PravegaEventReadTest {
 
-	@Test @Ignore
+	@Test
 	public void testEventRead()
 			throws Exception {
 		/* writing */
