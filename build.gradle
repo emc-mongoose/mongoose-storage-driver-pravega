@@ -85,7 +85,7 @@ dependencies {
 	)
 	testCompile(
 		"junit:junit:[4,)",
-		"com.github.docker-java:docker-java:${depVersion.dockerJava}",
+		"com.github.docker-java:docker-java:[3,)",
 		"org.scala-lang:scala-compiler:${depVersion.scala}",
 		"org.scala-lang:scala-library:${depVersion.scala}",
 		"org.apache.commons:commons-csv:1.1",
