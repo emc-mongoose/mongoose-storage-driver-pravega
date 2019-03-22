@@ -11,10 +11,10 @@ variables:
 
 services:
   - docker:dind
-  - name: pravega/pravega:0.3.2
-    alias: storage
-    command:
-      - standalone
+#  - name: pravega/pravega:0.3.2
+#    alias: storage
+#    command:
+#      - standalone
 
 stages:
   - build
@@ -71,12 +71,14 @@ test_unit:
 
 test_integration:
   stage: test
-  variables:
-    # unset because pravega container should use its own jvm
-    JAVA_HOME: ""
+  before_script:
+    - docker login -u ${DOCKER_USER} -p ${DOCKER_PASS}
+    - docker run -p 9090:9090 -p 12345:12345 --name=storage pravega/pravega:0.3.2 standalone
   script:
-    - export JAVA_HOME=/opt/jdk-11.0.2+9
     - ./gradlew integrationTest
+  after_script:
+    - docker kill storage
+    - docker rm storage
   artifacts:
     paths:
       - build/reports/tests/test/*
@@ -109,8 +111,11 @@ build_docker_image:
     - export VERSION=$(cat build.gradle | grep version\ = | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
     - docker login -u ${DOCKER_USER} -p ${DOCKER_PASS}
     - docker load < ${IMAGE_FILE_NAME}
+    - docker run -p 9090:9090 -p 12345:12345 --name=storage pravega/pravega:0.3.2 standalone
     - robot --outputdir build/robotest --suite ${SUITE} --include ${TEST} src/test/robot
   after_script:
+    - docker kill storage
+    - docker rm storage
     - rebot build/robotest/output.xml
   artifacts:
     paths:
