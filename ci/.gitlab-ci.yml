@@ -73,9 +73,10 @@ test_integration:
   stage: test
   before_script:
     - docker login -u ${DOCKER_USER} -p ${DOCKER_PASS}
+    - unset JAVA_HOME
     - docker run -d -p 9090:9090 -p 12345:12345 --name=storage pravega/pravega:0.3.2 standalone
   script:
-    - ./gradlew integrationTest
+    - JAVA_HOME=/opt/jdk-11.0.2+9 ./gradlew integrationTest
   after_script:
     - docker kill storage
     - docker rm storage
