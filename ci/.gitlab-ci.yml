@@ -71,9 +71,8 @@ test_unit:
 
 test_integration:
   stage: test
-  before_script:
-    - docker login -u ${DOCKER_USER} -p ${DOCKER_PASS}
   script:
+    - docker login -u ${DOCKER_USER} -p ${DOCKER_PASS}
     - ./gradlew integrationTest
   artifacts:
     paths:
