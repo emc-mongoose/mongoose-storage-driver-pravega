@@ -7,6 +7,7 @@ import com.emc.mongoose.base.data.DataInput;
 import com.emc.mongoose.base.env.Extension;
 import com.emc.mongoose.base.storage.Credential;
 import com.emc.mongoose.storage.driver.pravega.PravegaStorageDriver;
+import com.emc.mongoose.storage.driver.pravega.util.PravegaNode;
 import com.emc.mongoose.storage.driver.pravega.util.docker.PravegaNodeContainer;
 import com.github.akurilov.commons.collection.TreeUtil;
 import com.github.akurilov.commons.system.SizeInBytes;
@@ -37,7 +38,6 @@ public class CommonTest {
 	}
 
 	private static final Credential CREDENTIAL = Credential.getInstance("root", "nope");
-	private static PravegaNodeContainer PRAVEGA_NODE_CONTAINER;
 
 	private static Config getConfig() {
 		try {
@@ -66,8 +66,8 @@ public class CommonTest {
 			config.val("storage-net-interestOpQueued", false);
 			config.val("storage-net-linger", 0);
 			config.val("storage-net-timeoutMillis", 0);
-			config.val("storage-net-node-addrs", "localhost");
-			config.val("storage-net-node-port", PravegaNodeContainer.PORT);
+			config.val("storage-net-node-addrs", PravegaNode.addr());
+			config.val("storage-net-node-port", PravegaNode.PORT);
 			config.val("storage-net-node-connAttemptsLimit", 0);
 			config.val("storage-net-uri-schema", "tcp");
 			config.val("storage-auth-uid", CREDENTIAL.getUid());
@@ -101,22 +101,6 @@ public class CommonTest {
 			new PravegaStorageDriver("test-data-pravega-driver", DATA_INPUT, config.configVal("storage"), true,
 				config.configVal("load").intVal("batch-size")
 			);
-	}
-
-	@BeforeClass
-	public static void setUpClass()
-	throws Exception {
-		try {
-			PRAVEGA_NODE_CONTAINER = new PravegaNodeContainer();
-		} catch(final Exception e) {
-			throw new AssertionError(e);
-		}
-	}
-
-	@AfterClass
-	public static void tearDownClass()
-	throws Exception {
-		PRAVEGA_NODE_CONTAINER.close();
 	}
 
 	@Test
