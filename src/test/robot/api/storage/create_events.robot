@@ -11,7 +11,7 @@ ${MONGOOSE_IMAGE_VERSION} =  testing
 ${MONGOOSE_CONTAINER_NAME} =  mongoose-storage-driver-pravega
 
 ${PRAVEGA_IMAGE_NAME} =  pravega/pravega
-${PRAVEGA_IMAGE_VERSION} =  latest
+${PRAVEGA_IMAGE_VERSION} =  0.3.2
 ${PRAVEGA_CONTAINER_NAME} =  pravega_standalone
 ${PRAVEGA_HOST_IP} =  HOST_IP=127.0.0.1
 ${PRAVEGA_CONTROLLER_PORT} =  9090

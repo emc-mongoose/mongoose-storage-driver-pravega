@@ -35,8 +35,11 @@
 5. [Development](#5-development)<br/>
 &nbsp;&nbsp;5.1. [Build](#51-build)<br/>
 &nbsp;&nbsp;5.2. [Test](#52-test)<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;5.2.1 [Automated](#521-automated)<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;5.2.2 [Manual](#522-manual)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;5.2.1. [Automated](#521-automated)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;5.2.1.1. [Unit](#5211-unit)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;5.2.1.2. [Integration](#5212-integration)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;5.2.1.3. [Functional](#5213-functional)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;5.2.2. [Manual](#522-manual)<br/>
 
 # 1. Introduction
 
@@ -263,8 +266,24 @@ TODO
 
 ### 5.2.1. Automated
 
+#### 5.2.1.1. Unit
+
 ```bash
 ./gradlew clean test
+```
+
+#### 5.2.1.2. Integration
+```bash
+docker run -d --name=storage --network=host pravega/pravega:<PRAVEGA_VERSION> standalone
+./gradlew integrationTest
+```
+
+#### 5.2.1.3. Functional
+```bash
+./gradlew jar
+export SUITE=api.storage
+TEST=create_events ./gradlew robotest
+TEST=create_stream ./gradlew robotest
 ```
 
 ### 5.2.1. Manual
@@ -274,9 +293,12 @@ TODO
 ```bash
 cp -f build/libs/mongoose-storage-driver-pravega-*.jar ~/.mongoose/<MONGOOSE_BASE_VERSION>/ext/
 ```
+Note that the Pravega storage driver depends on the 
+[Coop Storage Driver](http://repo.maven.apache.org/maven2/com/github/emc-mongoose/mongoose-storage-driver-coop/) 
+extension so it should be also put into the `ext` directory
 3. Run the Pravega standalone node:
 ```bash
-docker run --network host pravega/pravega standalone
+docker run --network host pravega/pravega:<PRAVEGA_VERSION> standalone
 ```
 4. Run Mongoose's default scenario with some specific command-line arguments:
 ```bash

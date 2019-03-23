@@ -37,7 +37,7 @@ implements StorageDriverFactory<I, O, T> {
 		}
 	};
 
-	private static final String DEFAULTS_FILE_NAME = "defaults-storage-" + DRIVER_NAME + ".yaml";
+	private static final String DEFAULTS_FILE_NAME = "defaults-storage-driver-" + DRIVER_NAME + ".yaml";
 
 	private static final List<String> RES_INSTALL_FILES = Collections.unmodifiableList(
 		Arrays.asList(
