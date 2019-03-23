@@ -67,15 +67,13 @@ test_unit:
 
 test_integration:
   stage: test
-  services:
-    - docker:dind
-    - name: pravega/pravega:0.3.2
-      alias: storage
-      command:
-        - standalone
   script:
     - docker login -u ${DOCKER_USER} -p ${DOCKER_PASS}
+    - docker run -d --name=storage -p 9090:9090 -p 12345:12345 pravega/pravega:0.3.2 standalone
     - ./gradlew integrationTest
+  after_script:
+    - docker stop storage
+    - docker rm storage
   artifacts:
     paths:
       - build/reports/tests/test/*
