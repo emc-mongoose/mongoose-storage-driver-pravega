@@ -69,7 +69,8 @@ test_integration:
   stage: test
   script:
     - docker login -u ${DOCKER_USER} -p ${DOCKER_PASS}
-    - docker run -d --name=storage -p 9090:9090 -p 12345:12345 pravega/pravega:0.3.2 standalone
+    - docker run -d --name=storage --network=host pravega/pravega:0.3.2 standalone
+    - docker ps --no-trunc
     - ./gradlew integrationTest
   after_script:
     - docker stop storage
