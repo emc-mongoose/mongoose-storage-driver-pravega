@@ -5,11 +5,11 @@ public interface PravegaNode {
 	int PORT = 9090;
 
 	static String addr() {
-		/*final boolean ciFlag = null != System.getenv("CI");
+		final boolean ciFlag = null != System.getenv("CI");
 		if(ciFlag) {
-			return "storage";
-		} else {*/
+			return System.getenv("SERVICE_HOST");
+		} else {
 			return "localhost";
-		//}
+		}
 	}
 }
