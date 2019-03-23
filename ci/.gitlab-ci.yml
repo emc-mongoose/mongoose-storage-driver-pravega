@@ -65,22 +65,19 @@ test_unit:
       - build/reports/tests/test/*
     when: on_failure
 
-test_integration:
-  stage: test
-  services:
-    - docker:dind
-    - name: pravega/pravega:0.3.2
-      command:
-        - standalone
-      alias: storage
-  script:
-    - docker login -u ${DOCKER_USER} -p ${DOCKER_PASS}
-    #- docker run -d --name=storage --network=host pravega/pravega:0.3.2 standalone
-    - ./gradlew integrationTest
-  artifacts:
-    paths:
-      - build/reports/tests/test/*
-    when: on_failure
+#test_integration:
+#  stage: test
+#  script:
+#    - docker login -u ${DOCKER_USER} -p ${DOCKER_PASS}
+#    - docker run -d --name=storage --network=host pravega/pravega:0.3.2 standalone
+#    - ./gradlew integrationTest
+#  after_script:
+#    - docker stop storage
+#    - docker rm storage
+#  artifacts:
+#    paths:
+#      - build/reports/tests/test/*
+#    when: on_failure
 
 build_docker_image:
   stage: build_docker_image
@@ -117,17 +114,17 @@ build_docker_image:
       - build/robotest/*.html
     when: on_failure
 
-test_api_storage_create_events:
-  extends: .test_robot
-  variables:
-    SUITE: api.storage
-    TEST: create_events
-
-test_api_storage_create_stream:
-  extends: .test_robot
-  variables:
-    SUITE: api.storage
-    TEST: create_stream
+#test_api_storage_create_events:
+#  extends: .test_robot
+#  variables:
+#    SUITE: api.storage
+#    TEST: create_events
+#
+#test_api_storage_create_stream:
+#  extends: .test_robot
+#  variables:
+#    SUITE: api.storage
+#    TEST: create_stream
 
 release_to_maven_repo:
   stage: deploy
