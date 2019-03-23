@@ -44,7 +44,7 @@ ext {
 		protobuf                 : "3.4.0",
 		scala                    : "2.12.6",
 	]
-	rootPkg = "com.emc.mongoose.storage.driver.hdfs"
+	rootPkg = "com.emc.mongoose.storage.driver.pravega"
 	baseJarFileName = "mongoose"
 	javaHome = System.properties["java.home"]
 	jreOutputDir = "${project.buildDir}${File.separator}jre"
