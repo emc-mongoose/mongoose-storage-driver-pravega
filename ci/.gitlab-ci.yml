@@ -73,15 +73,8 @@ test_integration:
   stage: test
   before_script:
     - docker login -u ${DOCKER_USER} -p ${DOCKER_PASS}
-    - echo $JAVA_HOME
-    - unset JAVA_HOME
-    - docker run -d -p 9090:9090 -p 12345:12345 --name=storage pravega/pravega:0.3.2 standalone
   script:
-    - ls -l /opt
     - ./gradlew integrationTest
-  after_script:
-    - docker kill storage
-    - docker rm storage
   artifacts:
     paths:
       - build/reports/tests/test/*
@@ -114,11 +107,8 @@ build_docker_image:
     - export VERSION=$(cat build.gradle | grep version\ = | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
     - docker login -u ${DOCKER_USER} -p ${DOCKER_PASS}
     - docker load < ${IMAGE_FILE_NAME}
-    - docker run -d -p 9090:9090 -p 12345:12345 --name=storage pravega/pravega:0.3.2 standalone
     - robot --outputdir build/robotest --suite ${SUITE} --include ${TEST} src/test/robot
   after_script:
-    - docker kill storage
-    - docker rm storage
     - rebot build/robotest/output.xml
   artifacts:
     paths:
