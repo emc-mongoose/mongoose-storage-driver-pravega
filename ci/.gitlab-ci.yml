@@ -65,19 +65,21 @@ test_unit:
       - build/reports/tests/test/*
     when: on_failure
 
-#test_integration:
-#  stage: test
-#  script:
-#    - docker login -u ${DOCKER_USER} -p ${DOCKER_PASS}
-#    - docker run -d --name=storage --network=host pravega/pravega:0.3.2 standalone
-#    - ./gradlew integrationTest
-#  after_script:
-#    - docker stop storage
-#    - docker rm storage
-#  artifacts:
-#    paths:
-#      - build/reports/tests/test/*
-#    when: on_failure
+test_integration:
+  stage: test
+  script:
+    - docker login -u ${DOCKER_USER} -p ${DOCKER_PASS}
+    - docker run -d --name=storage --publish=9090:9090 --publish=12345:12345 pravega/pravega:0.3.2 standalone
+    - sleep 10
+    - docker logs storage
+    - ./gradlew integrationTest
+  after_script:
+    - docker stop storage
+    - docker rm storage
+  artifacts:
+    paths:
+      - build/reports/tests/test/*
+    when: on_failure
 
 build_docker_image:
   stage: build_docker_image
