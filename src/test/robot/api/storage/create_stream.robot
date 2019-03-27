@@ -11,7 +11,7 @@ ${MONGOOSE_IMAGE_VERSION} =  testing
 ${MONGOOSE_CONTAINER_NAME} =  mongoose-storage-driver-pravega
 
 ${PRAVEGA_IMAGE_NAME} =  pravega/pravega
-${PRAVEGA_IMAGE_VERSION} =  latest
+${PRAVEGA_IMAGE_VERSION} =  0.3.2
 ${PRAVEGA_CONTAINER_NAME} =  pravega_standalone
 ${PRAVEGA_HOST_IP} =  HOST_IP=127.0.0.1
 ${PRAVEGA_CONTROLLER_PORT} =  9090
@@ -27,7 +27,6 @@ Create Events Test
     Remove Directory  ${LOG_DIR}/${step_id}  recursive=True
     ${args} =  Catenate  SEPARATOR= \\\n\t
     ...  --load-step-id=${step_id}
-    ...  --storage-net-node-port=${PRAVEGA_CONTROLLER_PORT}
     ...  --item-output-path=${stream_name}
     ...  --load-op-limit-count=1
     ...  --storage-driver-limit-concurrency=1
@@ -41,7 +40,7 @@ Execute Mongoose Scenario
     [Arguments]  ${args}
     ${host_working_dir} =  Get Environment Variable  HOST_WORKING_DIR
     Log  ${host_working_dir}
-    ${version} =  Get Environment Variable  MONGOOSE_VERSION
+    ${version} =  Get Environment Variable  BASE_VERSION
     ${cmd} =  Catenate  SEPARATOR= \\\n\t
     ...  docker run
     ...  --name=${MONGOOSE_CONTAINER_NAME}

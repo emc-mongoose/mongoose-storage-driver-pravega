@@ -1,5 +1,6 @@
 package com.emc.mongoose.storage.driver.pravega.integration;
 
+import com.emc.mongoose.storage.driver.pravega.util.PravegaNode;
 import com.emc.mongoose.storage.driver.pravega.util.docker.PravegaNodeContainer;
 import io.pravega.client.ClientFactory;
 import io.pravega.client.admin.ReaderGroupManager;
@@ -17,32 +18,15 @@ import java.util.UUID;
 import static org.junit.Assert.*;
 
 public class PravegaPathReadTest {
-	private static PravegaNodeContainer PRAVEGA_NODE_CONTAINER;
-
-	@BeforeClass
-	public static void setUpClass()
-			throws Exception {
-		try {
-			PRAVEGA_NODE_CONTAINER = new PravegaNodeContainer();
-		} catch (final Exception e) {
-			throw new AssertionError(e);
-		}
-	}
-
-	@AfterClass
-	public static void tearDownClass()
-			throws Exception {
-		PRAVEGA_NODE_CONTAINER.close();
-	}
 
 	//we put three strings into the stream, then we read it and check if we've read them in the
 	//correct order and that there is nothing else in the stream.
 	@Test
 	public void testPathRead()
 			throws Exception {
-		final String scope = "Scope";
-		final String streamName = "Stream";
-		final URI controllerURI = URI.create("tcp://127.0.0.1:9090");
+		final String scope = "PathReadTestScope";
+		final String streamName = "PathReadTestStream";
+		final URI controllerURI = URI.create("tcp://" + PravegaNode.addr() + ":" + PravegaNode.PORT);
 		final String routingKey = "RoutingKey";
 		final String message1 = "message1";
 		final String message2 = "message2";

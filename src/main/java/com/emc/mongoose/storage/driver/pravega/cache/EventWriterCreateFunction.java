@@ -1,6 +1,6 @@
 package com.emc.mongoose.storage.driver.pravega.cache;
 
-import com.emc.mongoose.item.DataItem;
+import com.emc.mongoose.base.item.DataItem;
 
 import io.pravega.client.stream.EventStreamWriter;
 
