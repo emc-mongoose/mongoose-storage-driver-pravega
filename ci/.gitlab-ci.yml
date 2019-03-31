@@ -75,7 +75,7 @@ test_integration:
         - standalone
       alias: pravega
   script:
-    - ping -c 1 pravega
+    - sleep 10 | telnet pravega 9090
     - export JAVA_HOME=/opt/jdk-11.0.2+9
     - ./gradlew integrationTest
   artifacts:
