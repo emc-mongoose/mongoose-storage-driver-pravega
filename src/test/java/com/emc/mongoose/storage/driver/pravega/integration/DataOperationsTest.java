@@ -42,7 +42,7 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
 
   static {
     try {
-      DATA_INPUT = DataInput.instance(null, "7a42d9c483244167", new SizeInBytes("1MB"), 16);
+      DATA_INPUT = DataInput.instance(null, "7a42d9c483244167", new SizeInBytes(1024*1024-8), 16);
     } catch (final IOException e) {
       throw new AssertionError(e);
     }
@@ -143,7 +143,7 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
 
   @Test
   public final void testCreateEvent() throws Exception {
-    final DataItem dataItem = new DataItemImpl(0, MIB, 0);
+    final DataItem dataItem = new DataItemImpl(0, MIB-8, 0);
     dataItem.name("0000");
     dataItem.dataInput(DATA_INPUT);
     String streamName = "default";
@@ -199,7 +199,7 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
 
   @Test
   public final void testReadEvent() throws Exception {
-    final DataItem dataItem = new DataItemImpl(0, MIB, 0);
+    final DataItem dataItem = new DataItemImpl(0, MIB-8, 0);
     dataItem.name("0000");
     dataItem.dataInput(DATA_INPUT);
     String streamName = "default";
@@ -219,7 +219,7 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
     assertEquals(Operation.Status.SUCC, result.status());
     assertEquals(dataItem.size(), createTask.countBytesDone());
 
-    final DataItem dataItem2 = new DataItemImpl(0, MIB, 0);
+    final DataItem dataItem2 = new DataItemImpl(0, MIB-8, 0);
     dataItem2.name("0001");
     final DataOperation<DataItem> createTask2 =
         new DataOperationImpl<>(
