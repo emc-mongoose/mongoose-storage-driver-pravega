@@ -11,6 +11,7 @@ import io.pravega.client.stream.impl.JavaSerializer;
 import lombok.val;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.net.URI;
@@ -21,7 +22,7 @@ import static org.junit.Assert.assertNull;
 
 public class PravegaEventReadTest {
 
-	@Test
+	@Test @Ignore
 	public void testEventRead()
 			throws Exception {
 		/* writing */

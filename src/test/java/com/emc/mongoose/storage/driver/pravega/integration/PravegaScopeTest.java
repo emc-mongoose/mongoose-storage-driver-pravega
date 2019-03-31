@@ -9,6 +9,7 @@ import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.net.URI;
@@ -31,14 +32,14 @@ public class PravegaScopeTest {
 		streamManager.close();
 	}
 
-	@Test
+	@Test @Ignore
 	public void testNewScopeCreation()
 			throws Exception {
 		assertTrue("Can't create a new scope", streamManager.createScope("TestScope"));
 		streamManager.deleteScope("TestScope");
 	}
 
-	@Test
+	@Test @Ignore
 	public void testScopeCreationWithSameName()
 			throws Exception {
 		streamManager.createScope("TestScope");
@@ -46,7 +47,7 @@ public class PravegaScopeTest {
 		streamManager.deleteScope("TestScope");
 	}
 
-	@Test
+	@Test @Ignore
 	public void testScopeDeletion()
 			throws Exception {
 		streamManager.createScope("TestScope");

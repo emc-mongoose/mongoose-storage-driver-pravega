@@ -32,7 +32,7 @@ public class PravegaStreamTest {
 		streamManager.close();
 	}
 
-	@Test
+	@Test @Ignore
 	public void testCreateStream()
 			throws Exception {
 		final String streamNameTmp = new Object() {
@@ -44,7 +44,7 @@ public class PravegaStreamTest {
 		streamManager.deleteStream(scopeName, streamNameTmp);
 	}
 
-	@Test
+	@Test @Ignore
 	public void testSealStream()
 			throws Exception {
 		final String streamNameTmp = new Object() {
@@ -55,7 +55,7 @@ public class PravegaStreamTest {
 		streamManager.deleteStream(scopeName, streamNameTmp);
 	}
 
-	@Test
+	@Test @Ignore
 	public void testDeleteStream()
 			throws Exception {
 		final String streamNameTmp = new Object() {

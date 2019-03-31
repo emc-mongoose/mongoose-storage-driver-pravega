@@ -75,7 +75,6 @@ test_integration:
         - standalone
       alias: pravega
   script:
-    - LANG=C echo exit | telnet pravega 9090
     - export JAVA_HOME=/opt/jdk-11.0.2+9
     - ./gradlew integrationTest
   artifacts:

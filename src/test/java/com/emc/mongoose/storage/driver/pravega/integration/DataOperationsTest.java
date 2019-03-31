@@ -125,7 +125,7 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
         config.configVal("load").intVal("batch-size"));
   }
 
-  @Test
+  @Test @Ignore
   public final void testCreateEvent() throws Exception {
     final DataItem dataItem = new DataItemImpl(0, MIB, 0);
     dataItem.name("0000");
@@ -181,7 +181,7 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
     }
   }
 
-  @Test
+  @Test @Ignore
   public final void testReadEvent() throws Exception {
     final DataItem dataItem = new DataItemImpl(0, MIB, 0);
     dataItem.name("0000");

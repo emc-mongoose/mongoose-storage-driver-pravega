@@ -10,6 +10,7 @@ import io.pravega.client.stream.impl.JavaSerializer;
 
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.net.URI;
@@ -21,7 +22,7 @@ public class PravegaPathReadTest {
 
 	//we put three strings into the stream, then we read it and check if we've read them in the
 	//correct order and that there is nothing else in the stream.
-	@Test
+	@Test @Ignore
 	public void testPathRead()
 			throws Exception {
 		final String scope = "PathReadTestScope";
