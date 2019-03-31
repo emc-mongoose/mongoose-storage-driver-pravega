@@ -70,6 +70,7 @@ test_integration:
   services:
     - name: pravega/pravega:0.3.2
       command:
+        - unset JAVA_HOME
         - standalone
       alias: pravega
   script:
