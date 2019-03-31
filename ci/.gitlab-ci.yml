@@ -69,13 +69,16 @@ test_integration:
   stage: test
   script:
     - docker login -u ${DOCKER_USER} -p ${DOCKER_PASS}
-    - docker run -d --name=storage -p 9090:9090 -p 12345:12345 -v /var/run/docker.sock:/var/run/docker.sock pravega/pravega:0.3.2 standalone
+    - docker run -d --name=zookeeper -p 2181:2181 -p 2888:2888 -p 3888:3888 zookeeper:3.4.13
+    - docker run -d --name=storage -p 9090:9090 -p 12345:12345 pravega/pravega:0.3.2 standalone
     - sleep 10
     - docker logs storage
     - ./gradlew integrationTest
   after_script:
     - docker stop storage
     - docker rm storage
+    - docker stop zookeeper
+    - docker rm zookeeper
   artifacts:
     paths:
       - build/reports/tests/test/*
