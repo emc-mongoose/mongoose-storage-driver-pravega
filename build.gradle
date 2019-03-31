@@ -40,7 +40,7 @@ ext {
 		mongooseStorageDriverCoop: "4.2.6",
 		netty                    : "4.1.16.Final",
 		opencensus               : "0.8.0",
-		pravega                  : "0.3.2",
+		pravega                  : "0.4.0",
 		protobuf                 : "3.4.0",
 		scala                    : "2.12.6",
 	]
