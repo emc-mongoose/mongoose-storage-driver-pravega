@@ -66,15 +66,17 @@ test_unit:
     when: on_failure
 
 test_integration:
+  variables:
+    JAVA_HOME: ""
   stage: test
   services:
     - name: pravega/pravega:0.3.2
-      entrypoint:
-        - unset JAVA_HOME
-        - /opt/pravega/scripts/entrypoint.sh standalone
+      command:
+        - standalone
       alias: pravega
   script:
     - ping -c 1 pravega
+    - export JAVA_HOME=/opt/jdk-11.0.2+9
     - ./gradlew integrationTest
   artifacts:
     paths:
