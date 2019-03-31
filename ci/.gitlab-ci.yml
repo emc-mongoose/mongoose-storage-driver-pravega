@@ -69,9 +69,9 @@ test_integration:
   stage: test
   services:
     - name: pravega/pravega:0.3.2
-      command:
+      entrypoint:
         - unset JAVA_HOME
-        - standalone
+        - /opt/pravega/scripts/entrypoint.sh standalone
       alias: pravega
   script:
     - ping -c 1 pravega
