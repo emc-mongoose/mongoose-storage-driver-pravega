@@ -67,17 +67,14 @@ test_unit:
 
 test_integration:
   stage: test
+  services:
+    - name: pravega/pravega:0.3.2
+      command:
+        - standalone
+      alias: pravega
   script:
-    - docker login -u ${DOCKER_USER} -p ${DOCKER_PASS}
-    - docker run -d --name=storage -p 9090:9090 -p 12345:12345 pravega/pravega:0.3.2 standalone
-    - sleep 10
-    - docker logs storage
+    - ping -c 1 pravega
     - ./gradlew integrationTest
-  after_script:
-    - docker stop storage
-    - docker rm storage
-    - docker stop zookeeper
-    - docker rm zookeeper
   artifacts:
     paths:
       - build/reports/tests/test/*
