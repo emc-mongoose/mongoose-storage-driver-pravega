@@ -22,7 +22,7 @@ import static org.junit.Assert.assertNull;
 
 public class PravegaEventReadTest {
 
-	@Test @Ignore
+	@Test
 	public void testEventRead()
 			throws Exception {
 		/* writing */
@@ -37,15 +37,18 @@ public class PravegaEventReadTest {
 		val streamConfig = StreamConfiguration.builder()
 			.scalingPolicy(ScalingPolicy.fixed(1))
 			.build();
+		System.out.println(0);
 		streamManager.createStream(scopeName, streamName, streamConfig);
-
+		System.out.println(1);
 		try(
 			val clientFactory = ClientFactory.withScope(scopeName, controllerURI);
 			val writer = clientFactory.createEventWriter(
 				streamName, new JavaSerializer<>(), EventWriterConfig.builder().build()
 			)
 		) {
+			System.out.println(2);
 			writer.writeEvent(routingKey, testEvent);
+			System.out.println(3);
 			System.out.format(
 				"Writing message: '%s' with routing-key: '%s' to stream '%s / %s'%n", testEvent, routingKey, scopeName,
 				streamName

@@ -32,14 +32,14 @@ public class PravegaScopeTest {
 		streamManager.close();
 	}
 
-	@Test @Ignore
+	@Test
 	public void testNewScopeCreation()
 			throws Exception {
 		assertTrue("Can't create a new scope", streamManager.createScope("TestScope"));
 		streamManager.deleteScope("TestScope");
 	}
 
-	@Test @Ignore
+	@Test
 	public void testScopeCreationWithSameName()
 			throws Exception {
 		streamManager.createScope("TestScope");
@@ -47,7 +47,7 @@ public class PravegaScopeTest {
 		streamManager.deleteScope("TestScope");
 	}
 
-	@Test @Ignore
+	@Test
 	public void testScopeDeletion()
 			throws Exception {
 		streamManager.createScope("TestScope");
