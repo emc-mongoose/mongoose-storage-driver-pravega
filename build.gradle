@@ -259,7 +259,7 @@ task dockerBuildImage(type: DockerBuildImage) {
 	inputDir = project.projectDir
 	buildArgs = [
 		"BASE_VERSION"       : depVersion.mongooseBase,
-		"STORAGE_DRIVER_COOP_VERSION": depVersion.mongooseStorageDriverHttp,
+		"STORAGE_DRIVER_COOP_VERSION": depVersion.mongooseStorageDriverCoop,
 		"VERSION"            : version,
 	]
 	dockerFile = project.file("ci${File.separator}docker${File.separator}Dockerfile")
