@@ -7,7 +7,7 @@ public interface PravegaNode {
 	static String addr() {
 		final boolean ciFlag = null != System.getenv("CI");
 		if(ciFlag) {
-			return System.getenv("pravega");
+			return "pravega";
 		} else {
 			return "localhost";
 		}
