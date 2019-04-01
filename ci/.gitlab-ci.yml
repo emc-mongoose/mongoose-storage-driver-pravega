@@ -104,6 +104,7 @@ test_integration:
   script:
     - export PRAVEGA_VERSION=$(cat build.gradle | grep pravega\ | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
     - curl https://github.com/pravega/pravega/releases/download/v${PRAVEGA_VERSION}/pravega-${PRAVEGA_VERSION}.tgz -o pravega.tgz
+    - md5sum pravega.tgz
     - tar xvf pravega.tgz
     - cd pravega-${PRAVEGA_VERSION}
     - nohup bin/pravega-standalone 1,2> /tmp/pravega_nohup.out &
