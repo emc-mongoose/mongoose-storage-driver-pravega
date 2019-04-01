@@ -7,7 +7,6 @@ Test Teardown  Stop Containers
 
 *** Variables ***
 ${MONGOOSE_IMAGE_NAME} =  emcmongoose/mongoose-storage-driver-pravega
-${MONGOOSE_IMAGE_VERSION} =  testing
 ${MONGOOSE_CONTAINER_NAME} =  mongoose-storage-driver-pravega
 
 ${PRAVEGA_HOST_IP} =  HOST_IP=127.0.0.1
@@ -43,7 +42,7 @@ Execute Mongoose Scenario
     ...  --name=${MONGOOSE_CONTAINER_NAME}
     ...  --network host
     ...  --volume ${host_working_dir}/${LOG_DIR}:/root/.mongoose/${version}/log
-    ...  ${MONGOOSE_IMAGE_NAME}:${MONGOOSE_IMAGE_VERSION}
+    ...  ${MONGOOSE_IMAGE_NAME}:${image_version}
     ...  ${args}
     ${std_out} =  Run  ${cmd}
     [Return]  ${std_out}
