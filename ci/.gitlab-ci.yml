@@ -156,6 +156,7 @@ build_docker_image:
     - rebot build/robotest/output.xml
   artifacts:
     paths:
+      - /tmp/pravega_nohup.out
       - build/robotest/*.html
     when: on_failure
 
