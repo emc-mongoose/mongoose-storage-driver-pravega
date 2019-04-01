@@ -105,12 +105,11 @@ test_integration:
     JAVA_HOME: ""
   stage: test
   services:
-    - name: pravega/pravega:0.3.2
+    - name: pravega/pravega:0.4.0
       command:
         - standalone
       alias: pravega
   script:
-    - docker ps
     - export JAVA_HOME=/opt/jdk-11.0.2+9
     - ./gradlew integrationTest
   artifacts:
