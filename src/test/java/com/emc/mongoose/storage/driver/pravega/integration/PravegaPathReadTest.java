@@ -22,7 +22,7 @@ public class PravegaPathReadTest {
 
 	//we put three strings into the stream, then we read it and check if we've read them in the
 	//correct order and that there is nothing else in the stream.
-	@Test @Ignore
+	@Test
 	public void testPathRead()
 			throws Exception {
 		final String scope = "PathReadTestScope";
