@@ -50,7 +50,8 @@ Execute Mongoose Scenario
     [Return]  ${std_out}
 
 Remove Mongoose Node
-    Run  docker logs ${MONGOOSE_CONTAINER_NAME}
+    ${std_out} =  Run  docker logs ${MONGOOSE_CONTAINER_NAME}
+    Log  ${std_out}
     Run  docker stop ${MONGOOSE_CONTAINER_NAME}
     Run  docker rm ${MONGOOSE_CONTAINER_NAME}
 
