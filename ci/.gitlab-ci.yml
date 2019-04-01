@@ -101,8 +101,6 @@ test_unit:
     when: on_failure
 
 test_integration:
-  variables:
-    JAVA_HOME: ""
   before_script:
     - export PRAVEGA_VERSION=$(cat build.gradle | grep pravega\ | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
     - curl https://github.com/pravega/pravega/releases/download/v${PRAVEGA_VERSION}/pravega-${PRAVEGA_VERSION}.tgz -o /opt/pravega.tgz
@@ -111,12 +109,12 @@ test_integration:
     - cd pravega-${PRAVEGA_VERSION}
     - nohup bin/pravega-standalone 1,2> /tmp/pravega_nohup.out &
   script:
-    - export JAVA_HOME=/opt/jdk-11.0.2+9
     - ./gradlew integrationTest
   after_script:
-    -
+    - killall java
   artifacts:
     paths:
+      - /tmp/pravega_nohup.out
       - build/reports/tests/test/*
     when: on_failure
 
