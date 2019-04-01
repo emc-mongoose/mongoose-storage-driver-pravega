@@ -55,7 +55,7 @@ before_script:
   #- git config --global user.name "User name"
 
   # install AdoptOpenJDK 11
-  - apk --update add --no-cache ca-certificates curl gzip openssl binutils xz gnupg tar
+  - apk --update add --no-cache ca-certificates curl openssl binutils xz gnupg
   - curl -Lks https://github.com/AdoptOpenJDK/openjdk11-binaries/releases/download/jdk-11.0.2%2B9/OpenJDK11U-jdk_x64_linux_hotspot_11.0.2_9.tar.gz -o /tmp/jdk11.tgz
   - tar xvf /tmp/jdk11.tgz -C /opt
   - rm -rf /tmp/jdk11.tgz
@@ -133,7 +133,7 @@ build_docker_image:
     HOST_WORKING_DIR: ${CI_PROJECT_DIR}
     PYTHONPATH: ${PYTHONPATH}:/usr/lib/python2.7/site-packages:src/test/robot/lib
   before_script:
-    - apk add --no-cache --update python py-pip
+    - apk add --no-cache --update curl python py-pip
     - pip install -U virtualenv
     - pip install -U requests
     - pip install -U robotframework
