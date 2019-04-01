@@ -139,6 +139,12 @@ build_docker_image:
     - pip install -U robotframework
     - pip install -U robotframework-requests
     - pip install -U robotframework-csvlibrary
+    - export PRAVEGA_VERSION=$(cat build.gradle | grep pravega\ | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
+    - curl -L https://github.com/pravega/pravega/releases/download/v${PRAVEGA_VERSION}/pravega-${PRAVEGA_VERSION}.tgz -o pravega.tgz
+    - tar xvf pravega.tgz
+    - cd pravega-${PRAVEGA_VERSION}
+    - nohup bin/pravega-standalone 1,2> /tmp/pravega_nohup.out &
+    - cd ..
   script:
     - export BASE_VERSION=$(cat build.gradle | grep mongooseBase  | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
     - export VERSION=$(cat build.gradle | grep version\ = | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
@@ -146,23 +152,24 @@ build_docker_image:
     - docker load < ${IMAGE_FILE_NAME}
     - robot --outputdir build/robotest --suite ${SUITE} --include ${TEST} src/test/robot
   after_script:
+    - killall java
     - rebot build/robotest/output.xml
   artifacts:
     paths:
       - build/robotest/*.html
     when: on_failure
 
-#test_api_storage_create_events:
-#  extends: .test_robot
-#  variables:
-#    SUITE: api.storage
-#    TEST: create_events
-#
-#test_api_storage_create_stream:
-#  extends: .test_robot
-#  variables:
-#    SUITE: api.storage
-#    TEST: create_stream
+test_api_storage_create_events:
+  extends: .test_robot
+  variables:
+    SUITE: api.storage
+    TEST: create_events
+
+test_api_storage_create_stream:
+  extends: .test_robot
+  variables:
+    SUITE: api.storage
+    TEST: create_stream
 
 release_to_maven_repo:
   stage: deploy
