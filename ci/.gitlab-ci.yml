@@ -60,15 +60,15 @@ build:
     paths:
       - build/libs/mongoose-*.jar
 
-#test_unit:
-#  stage: test
-#  script:
-#    - ./gradlew test
-#  artifacts:
-#    paths:
-#      - build/reports/tests/test/*
-#    when: on_failure
-#
+test_unit:
+  stage: test
+  script:
+    - ./gradlew test
+  artifacts:
+    paths:
+      - build/reports/tests/test/*
+    when: on_failure
+
 test_integration:
   script:
     # Install Pravega
