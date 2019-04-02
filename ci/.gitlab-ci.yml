@@ -72,21 +72,19 @@ build:
 test_integration:
   script:
     # Install Pravega
-#    - curl -L https://github.com/pravega/pravega/releases/download/v${PRAVEGA_VERSION}/pravega-${PRAVEGA_VERSION}.tgz -o /opt/pravega.tgz
-#    - cd /opt
-#    - tar xvf pravega.tgz
-#    - cd ${CI_PROJECT_DIR}
-    - docker run -d --name pravega_standalone -p 9090:9090 -p 12345:12345 pravega/pravega:${PRAVEGA_VERSION} standalone
+    - curl -L https://github.com/pravega/pravega/releases/download/v${PRAVEGA_VERSION}/pravega-${PRAVEGA_VERSION}.tgz -o /opt/pravega.tgz
+    - cd /opt
+    - tar xvf pravega.tgz
+    - cd ${CI_PROJECT_DIR}
     - nohup /opt/pravega-${PRAVEGA_VERSION}/bin/pravega-standalone 1,2> /tmp/pravega_nohup.out &
+    # Run the tests
     - ./gradlew integrationTest
   after_script:
-    - docker stop pravega_standalone
-    - docker rm pravega_standalone
-#    - killall java
+    - killall java
   artifacts:
     paths:
-#      - /tmp/pravega_nohup.out
-      - build/reports/tests/test/*
+      - /tmp/pravega_nohup.out
+      - build/reports/tests/integrationTest/*
     when: on_failure
 
 build_docker_image:
