@@ -55,6 +55,7 @@ before_script:
   - curl -L https://github.com/pravega/pravega/releases/download/v${PRAVEGA_VERSION}/pravega-${PRAVEGA_VERSION}.tgz -o /opt/pravega.tgz
   - cd /opt
   - tar xvf pravega.tgz
+  - cd ${CI_PROJECT_DIR}
 
 build:
   stage: build
