@@ -1,5 +1,6 @@
 package com.emc.mongoose.storage.driver.pravega.integration;
 
+import com.emc.mongoose.storage.driver.pravega.util.PravegaNode;
 import com.emc.mongoose.storage.driver.pravega.util.docker.PravegaNodeContainer;
 
 import io.pravega.client.ClientFactory;
@@ -10,6 +11,7 @@ import io.pravega.client.stream.impl.JavaSerializer;
 import lombok.val;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.net.URI;
@@ -19,23 +21,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
 public class PravegaEventReadTest {
-	private static PravegaNodeContainer PRAVEGA_NODE_CONTAINER;
-
-	@BeforeClass
-	public static void setUpClass()
-			throws Exception {
-		try {
-			PRAVEGA_NODE_CONTAINER = new PravegaNodeContainer();
-		} catch (final Exception e) {
-			throw new AssertionError(e);
-		}
-	}
-
-	@AfterClass
-	public static void tearDownClass()
-			throws Exception {
-		PRAVEGA_NODE_CONTAINER.close();
-	}
 
 	@Test
 	public void testEventRead()
@@ -43,7 +28,7 @@ public class PravegaEventReadTest {
 		/* writing */
 		val scopeName = "Scope";
 		val streamName = "Stream";
-		val controllerURI = URI.create("tcp://127.0.0.1:9090");
+		val controllerURI = URI.create("tcp://" + PravegaNode.addr() + ":" + PravegaNode.PORT);
 		val routingKey = "RoutingKey";
 		val testEvent = "TestEvent";
 		val readerTimeoutMs = 100;
@@ -53,7 +38,6 @@ public class PravegaEventReadTest {
 			.scalingPolicy(ScalingPolicy.fixed(1))
 			.build();
 		streamManager.createStream(scopeName, streamName, streamConfig);
-
 		try(
 			val clientFactory = ClientFactory.withScope(scopeName, controllerURI);
 			val writer = clientFactory.createEventWriter(

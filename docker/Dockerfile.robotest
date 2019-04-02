@@ -2,8 +2,10 @@ FROM docker:dind
 
 RUN apk add --no-cache --update python py-pip \
     && pip install -U virtualenv \
+    && pip install -U requests \
     && pip install -U robotframework \
-    && pip install -U robotframework-csvlibrary
+    && pip install -U robotframework-csvlibrary \
+    && pip install -U robotframework-requests
 
 ENV PYTHONPATH=$PYTHONPATH:/usr/lib/python2.7/site-packages:/root/mongoose-storage-driver-pravega/src/test/robot/lib
 

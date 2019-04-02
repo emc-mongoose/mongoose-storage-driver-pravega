@@ -23,7 +23,7 @@ repositories {
 }
 description = "Mongoose is a high-load storage performance testing tool"
 group = "com.github.emc-mongoose"
-version = "4.2.1"
+version = "4.2.6"
 sourceCompatibility = 11
 targetCompatibility = 11
 ext {
@@ -36,11 +36,11 @@ ext {
 		grpc                     : "1.8.0",
 		guava                    : "20.0",
 		log4j                    : "2.8.2",
-		mongooseBase             : "4.2.1",
-		mongooseStorageDriverCoop: "4.2.1",
+		mongooseBase             : "4.2.6",
+		mongooseStorageDriverCoop: "4.2.6",
 		netty                    : "4.1.16.Final",
 		opencensus               : "0.8.0",
-		pravega                  : "0.3.2",
+		pravega                  : "0.4.0",
 		protobuf                 : "3.4.0",
 		scala                    : "2.12.6",
 	]
@@ -144,7 +144,6 @@ jar {
 	from configurations
 		.provided
 		.copyRecursive()
-		.setTransitive(false)
 		.collect { zipTree(it) }
 }
 javadoc {
@@ -260,7 +259,7 @@ task dockerBuildImage(type: DockerBuildImage) {
 	inputDir = project.projectDir
 	buildArgs = [
 		"BASE_VERSION"       : depVersion.mongooseBase,
-		"BASE_DRIVER_VERSION": depVersion.mongooseStorageDriverCoop,
+		"STORAGE_DRIVER_COOP_VERSION": depVersion.mongooseStorageDriverCoop,
 		"VERSION"            : version,
 	]
 	dockerFile = project.file("ci${File.separator}docker${File.separator}Dockerfile")
@@ -290,9 +289,9 @@ task dockerBuildImageRobotest(type: DockerBuildImage) {
 task dockerCreateContainerRobotest(type: DockerCreateContainer, dependsOn: [dockerBuildImage, dockerBuildImageRobotest]) {
 	attachStderr = true
 	attachStdout = true
-	autoRemove = true
+	//autoRemove = true
 	binds = [
-		"${rootProject.buildDir}": "/root/${project.name}/build",
+		"${rootProject.buildDir}": "/root/mongoose/build",
 		"/var/run/docker.sock"   : "/var/run/docker.sock",
 	]
 	envVars = [
