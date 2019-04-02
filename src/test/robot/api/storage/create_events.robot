@@ -23,10 +23,13 @@ ${LOG_DIR} =  build/log
 Create Events Test
     ${step_id} =  Set Variable  create_events_test
     Remove Directory  ${LOG_DIR}/${step_id}  recursive=True
+    ${svc_host} =  Get Environment Variable  SERVICE_HOST
+    Log  ${svc_host}
     ${args} =  Catenate  SEPARATOR= \\\n\t
     ...  --load-step-id=${step_id}
     ...  --load-op-limit-count=10
     ...  --storage-driver-limit-concurrency=1
+    ...  --storage-net-node-addrs=${svc_host}
     ${std_out} =  Execute Mongoose Scenario  ${args}
     Log  ${std_out}
     Validate Metrics Total Log File  ${step_id}  CREATE  10  0  10485760

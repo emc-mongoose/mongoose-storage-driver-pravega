@@ -20,12 +20,15 @@ ${LOG_DIR} =  build/log
 Create Events Test
     ${step_id} =  Set Variable  create_stream_test
     ${stream_name} =  Set Variable  streamtest
+    ${svc_host} =  Get Environment Variable  SERVICE_HOST
+    Log  ${svc_host}
     Remove Directory  ${LOG_DIR}/${step_id}  recursive=True
     ${args} =  Catenate  SEPARATOR= \\\n\t
     ...  --load-step-id=${step_id}
     ...  --item-output-path=${stream_name}
     ...  --load-op-limit-count=1
     ...  --storage-driver-limit-concurrency=1
+    ...  --storage-net-node-addrs=${svc_host}
     ${std_out} =  Execute Mongoose Scenario  ${args}
     Log  ${std_out}
     Validate Metrics Log File  ${step_id}  ${stream_name}
@@ -39,7 +42,8 @@ Execute Mongoose Scenario
     ${version} =  Get Environment Variable  BASE_VERSION
     ${cmd} =  Catenate  SEPARATOR= \\\n\t
     ...  docker run
-    ...  --name=${MONGOOSE_CONTAINER_NAME}
+    ...  --name ${MONGOOSE_CONTAINER_NAME}
+    ...  --network host
     ...  --volume ${host_working_dir}/${LOG_DIR}:/root/.mongoose/${version}/log
     ...  ${MONGOOSE_IMAGE_NAME}:${image_version}
     ...  ${args}
