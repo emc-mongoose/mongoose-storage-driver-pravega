@@ -39,10 +39,11 @@ Execute Mongoose Scenario
     Log  ${host_working_dir}
     ${version} =  Get Environment Variable  BASE_VERSION
     ${image_version} =  Get Environment Variable  VERSION
+    ${network} =  Get Environment Variable  DOCKER_NETWORK
     ${cmd} =  Catenate  SEPARATOR= \\\n\t
     ...  docker run
     ...  --name ${MONGOOSE_CONTAINER_NAME}
-    ...  --network host
+    ...  --network ${network}
     ...  --volume ${host_working_dir}/${LOG_DIR}:/root/.mongoose/${version}/log
     ...  ${MONGOOSE_IMAGE_NAME}:${image_version}
     ...  ${args}
