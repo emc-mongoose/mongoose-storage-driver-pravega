@@ -110,15 +110,17 @@ build_docker_image:
     - pip install -U robotframework-requests
     - pip install -U robotframework-csvlibrary
     # Run Pravega
-    - nohup /opt/pravega-${PRAVEGA_VERSION}/bin/pravega-standalone 1,2> /tmp/pravega_nohup.out &
+    - docker create
+    - docker run
+    # - nohup /opt/pravega-${PRAVEGA_VERSION}/bin/pravega-standalone 1,2> /tmp/pravega_nohup.out &
     # Load the testing docker image
     - export BASE_VERSION=$(cat build.gradle | grep mongooseBase  | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
     - export VERSION=$(cat build.gradle | grep version\ = | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
     - docker login -u ${DOCKER_USER} -p ${DOCKER_PASS}
     - docker load < ${IMAGE_FILE_NAME}
 
-    - sleep 1 | telnet 9090
-    - sleep 1 | telnet 9100
+    - sleep 1 | telnet 127.0.0.1 9090
+    - sleep 1 | telnet 127.0.0.1 9100
     - cat /tmp/pravega_nohup.out
     # Run the tests
     - robot --outputdir build/robotest --suite ${SUITE} --include ${TEST} src/test/robot
