@@ -40,7 +40,6 @@ Execute Mongoose Scenario
     ${cmd} =  Catenate  SEPARATOR= \\\n\t
     ...  docker run
     ...  --name=${MONGOOSE_CONTAINER_NAME}
-    ...  --network host
     ...  --volume ${host_working_dir}/${LOG_DIR}:/root/.mongoose/${version}/log
     ...  ${MONGOOSE_IMAGE_NAME}:${image_version}
     ...  ${args}
