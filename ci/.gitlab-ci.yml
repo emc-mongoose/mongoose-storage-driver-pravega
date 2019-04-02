@@ -119,6 +119,7 @@ build_docker_image:
 
     - ps alx | grep java
     - netstat -an | grep 9090
+    - cat /tmp/pravega_nohup.out
     # Run the tests
     - robot --outputdir build/robotest --suite ${SUITE} --include ${TEST} src/test/robot
   after_script:
