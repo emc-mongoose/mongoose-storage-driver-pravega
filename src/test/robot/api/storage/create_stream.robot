@@ -40,6 +40,7 @@ Execute Mongoose Scenario
     ${host_working_dir} =  Get Environment Variable  HOST_WORKING_DIR
     Log  ${host_working_dir}
     ${version} =  Get Environment Variable  BASE_VERSION
+    ${image_version} =  Get Environment Variable  VERSION
     ${cmd} =  Catenate  SEPARATOR= \\\n\t
     ...  docker run
     ...  --name ${MONGOOSE_CONTAINER_NAME}
