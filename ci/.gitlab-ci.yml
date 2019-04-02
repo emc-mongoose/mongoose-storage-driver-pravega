@@ -57,14 +57,14 @@ before_script:
   - tar xvf pravega.tgz
   - cd ${CI_PROJECT_DIR}
 
-#build:
-#  stage: build
-#  script:
-#    - ./gradlew clean jar
-#  artifacts:
-#    paths:
-#      - build/libs/mongoose-*.jar
-#
+build:
+  stage: build
+  script:
+    - ./gradlew clean jar
+  artifacts:
+    paths:
+      - build/libs/mongoose-*.jar
+
 #test_unit:
 #  stage: test
 #  script:
