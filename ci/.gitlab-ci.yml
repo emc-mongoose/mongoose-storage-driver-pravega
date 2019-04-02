@@ -76,7 +76,7 @@ test_integration:
 #    - cd /opt
 #    - tar xvf pravega.tgz
 #    - cd ${CI_PROJECT_DIR}
-    - docker run -d --name pravega_standalone --network host pravega/pravega:${PRAVEGA_VERSION} standalone
+    - docker run -d --name pravega_standalone -p 9090:9090 -p 12345:12345 pravega/pravega:${PRAVEGA_VERSION} standalone
     - nohup /opt/pravega-${PRAVEGA_VERSION}/bin/pravega-standalone 1,2> /tmp/pravega_nohup.out &
     - ./gradlew integrationTest
   after_script:
