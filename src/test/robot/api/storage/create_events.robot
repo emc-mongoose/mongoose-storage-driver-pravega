@@ -22,7 +22,7 @@ Create Events Test
     ...  --storage-driver-limit-concurrency=1
     ${std_out} =  Execute Mongoose Scenario  ${args}
     Log  ${std_out}
-    Validate Metrics Total Log File  ${step_id}  CREATE  10  0  10485760
+    Validate Metrics Total Log File  ${step_id}  CREATE  10  0  1024000
 
 *** Keyword ***
 Execute Mongoose Scenario

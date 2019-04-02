@@ -19,7 +19,7 @@ Create Events Test
     Remove Directory  ${LOG_DIR}/${step_id}  recursive=True
     ${args} =  Catenate  SEPARATOR= \\\n\t
     ...  --load-step-id=${step_id}
-    ...  --item-data-size=1
+    ...  --item-data-size=1KB
     ...  --item-output-path=${stream_name}
     ...  --load-op-limit-count=1
     ...  --storage-driver-limit-concurrency=1
