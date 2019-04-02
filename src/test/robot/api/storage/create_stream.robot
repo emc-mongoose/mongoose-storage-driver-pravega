@@ -9,11 +9,6 @@ Test Teardown  Stop Containers
 ${MONGOOSE_IMAGE_NAME} =  emcmongoose/mongoose-storage-driver-pravega
 ${MONGOOSE_CONTAINER_NAME} =  mongoose-storage-driver-pravega
 
-${PRAVEGA_HOST_IP} =  HOST_IP=127.0.0.1
-${PRAVEGA_CONTROLLER_PORT} =  9090
-${PRAVEGA_SEGMENT_STORE_PORT} =  12345
-${PRAVEGA_RUNNING_MODE} =  standalone
-
 ${LOG_DIR} =  build/log
 
 *** Test Cases ***
@@ -24,6 +19,7 @@ Create Events Test
     Remove Directory  ${LOG_DIR}/${step_id}  recursive=True
     ${args} =  Catenate  SEPARATOR= \\\n\t
     ...  --load-step-id=${step_id}
+    ...  --item-data-size=1
     ...  --item-output-path=${stream_name}
     ...  --load-op-limit-count=1
     ...  --storage-driver-limit-concurrency=1

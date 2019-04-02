@@ -120,7 +120,6 @@ build_docker_image:
     - robot --outputdir build/robotest --suite ${SUITE} --include ${TEST} src/test/robot
   after_script:
     - docker stop pravega_standalone
-    - docker logs pravega_standalone
     - docker rm pravega_standalone
     - rebot build/robotest/output.xml
   artifacts:
