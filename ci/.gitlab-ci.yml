@@ -70,6 +70,7 @@ test_unit:
     when: on_failure
 
 test_integration:
+  stage: test
   script:
     # Install Pravega
     - curl -L https://github.com/pravega/pravega/releases/download/v${PRAVEGA_VERSION}/pravega-${PRAVEGA_VERSION}.tgz -o /opt/pravega.tgz
