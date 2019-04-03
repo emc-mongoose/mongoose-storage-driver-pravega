@@ -11,6 +11,7 @@ import io.pravega.client.stream.impl.JavaSerializer;
 import lombok.val;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.net.URI;
@@ -37,7 +38,6 @@ public class PravegaEventReadTest {
 			.scalingPolicy(ScalingPolicy.fixed(1))
 			.build();
 		streamManager.createStream(scopeName, streamName, streamConfig);
-
 		try(
 			val clientFactory = ClientFactory.withScope(scopeName, controllerURI);
 			val writer = clientFactory.createEventWriter(

@@ -1,6 +1,8 @@
 package com.emc.mongoose.storage.driver.pravega.integration;
 
 import static com.emc.mongoose.base.Constants.APP_NAME;
+import static junit.framework.TestCase.assertTrue;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.fail;
 
 import com.emc.mongoose.base.data.DataInput;
@@ -16,6 +18,7 @@ import com.github.akurilov.confuse.SchemaProvider;
 import com.github.akurilov.confuse.impl.BasicConfig;
 
 import java.io.IOException;
+import java.net.Socket;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
@@ -104,7 +107,12 @@ public class CommonTest {
 	}
 
 	@Test
-	public final void testExample()
+	public final void testConnectivity()
 	throws Exception {
+		try(final var socket = new Socket(PravegaNode.addr(), PravegaNode.PORT)) {
+			assertTrue("Not connected to " + PravegaNode.addr() + ":" + PravegaNode.PORT, socket.isConnected());
+			assertFalse("Closed by server: " + PravegaNode.addr() + ":" + PravegaNode.PORT, socket.isClosed());
+			// OK
+		}
 	}
 }

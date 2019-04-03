@@ -10,6 +10,7 @@ import io.pravega.client.stream.impl.JavaSerializer;
 
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.net.URI;
