@@ -29,6 +29,7 @@ Create and read Events Test
     ${args} =  Catenate  SEPARATOR= \\\n\t
     ...  --load-step-id=${step_id}
     ...  --storage-net-node-port=${PRAVEGA_CONTROLLER_PORT}
+    ...  --load-op-recycle
     ...  --run-scenario=${MONGOOSE_CONTAINER_DATA_DIR}/${step_id}.js
     ${std_out} =  Execute Mongoose Scenario  ${args}
     Log  ${std_out}
