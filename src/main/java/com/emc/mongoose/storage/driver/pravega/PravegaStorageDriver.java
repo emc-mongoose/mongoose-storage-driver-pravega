@@ -741,6 +741,13 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
     evtWriterCreateFuncCache.clear();
     closeAllWithTimeout(evtWriterCache.values());
     evtWriterCache.clear();
+    readerGroupManagerCreateFuncCache.clear();
+    closeAllWithTimeout(readerGroupManagerCache.values());
+    readerGroupManagerCache.clear();
+    closeAllWithTimeout(eventStreamReaderCreateFuncCache.keySet());
+    eventStreamReaderCreateFuncCache.clear();
+    closeAllWithTimeout(eventStreamReaderCache.values());
+    eventStreamReaderCache.clear();
   }
 
   void closeAllWithTimeout(final Collection<? extends AutoCloseable> closeables) {
