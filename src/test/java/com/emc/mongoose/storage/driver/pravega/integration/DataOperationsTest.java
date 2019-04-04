@@ -188,7 +188,6 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
       EventRead<ByteBuffer> event = null;
       event = reader.readNextEvent(readTimeoutMillis);
       if (event.getEvent() != null) {
-
         assertEquals(
             "we didn't read the same size we had put into stream",
             (int) dataItem.size(),
@@ -206,7 +205,6 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
     final DataOperation<DataItem> createTask =
         new DataOperationImpl<>(
             0, OpType.CREATE, dataItem, null, streamName, credential, null, 0, null);
-
     String scope = DEFAULT_SCOPE;
     prepare(createTask);
     createTask.status(Operation.Status.ACTIVE);
@@ -228,9 +226,17 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
     prepare(createTask2);
     createTask2.status(Operation.Status.ACTIVE);
     boolean results = submit(createTask2);
+
+    DataOperation<DataItem> result2 = get();
+    while (result2 == null) {
+      result2 = get();
+    }
+
     assertEquals(results, true);
-    // assertEquals("we didn't read the same size we had put into stream",
-    // (int)dataItem.size(),event.getEvent().remaining());
+    assertEquals(
+        "we didn't read the same size we had put into stream",
+        (int) dataItem.size(),
+        (result2.item().size()));
   }
 
   @Test

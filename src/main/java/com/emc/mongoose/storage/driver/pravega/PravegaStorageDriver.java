@@ -36,9 +36,7 @@ import com.emc.mongoose.storage.driver.pravega.cache.ReaderGroupManagerCreateFun
 import com.emc.mongoose.storage.driver.pravega.cache.ScopeCreateFunction;
 import com.emc.mongoose.storage.driver.pravega.cache.ScopeCreateFunctionForStreamConfig;
 import com.emc.mongoose.storage.driver.pravega.cache.StreamCreateFunction;
-
 import com.emc.mongoose.storage.driver.pravega.io.ByteBufferSerializer;
-
 import com.emc.mongoose.storage.driver.pravega.io.DataItemSerializer;
 import com.github.akurilov.confuse.Config;
 import io.pravega.client.ClientConfig;
@@ -48,10 +46,10 @@ import io.pravega.client.stream.*;
 import io.pravega.client.stream.impl.Controller;
 import io.pravega.client.stream.impl.ControllerImpl;
 import io.pravega.client.stream.impl.ControllerImplConfig;
+import java.io.EOFException;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -65,7 +63,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import lombok.Cleanup;
 import lombok.Value;
 import lombok.experimental.var;
 import lombok.val;
@@ -95,6 +92,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
   private final ScheduledExecutorService bgExecutor =
       Executors.newScheduledThreadPool(BACKGROUND_THREAD_COUNT);
 
+  private volatile boolean listWasCalled = false;
   // should be an inner class in order to access the stream create function implementation
   // constructor
   @Value
@@ -214,7 +212,6 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
     }
   }
 
-
   // caches allowing the lazy creation of the necessary things:
   // * endpoints
   private final Map<String, URI> endpointCache = new ConcurrentHashMap<>();
@@ -332,10 +329,14 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
       final int count)
       throws IOException {
 
-    val buff = new ArrayList<I>(count);
-    for (int i = 0; i < count; i++) {
-      buff.add(itemFactory.getItem(path + prefix, 0, 0));
+    if (listWasCalled) {
+      throw new EOFException();
     }
+    // this must be changed to the number of working load generator's threads
+    val buff = new ArrayList<I>(1);
+    buff.add(itemFactory.getItem(path + prefix, 0, 0));
+
+    listWasCalled = true;
     return buff;
   }
 
@@ -417,7 +418,6 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
     thrown.printStackTrace();
     return completeOperation(op, FAIL_UNKNOWN);
   }
-
 
   boolean completeEventReadOperation(
       final DataOperation evtOp, final DataItem evtItem, final Throwable thrown) {
@@ -531,15 +531,13 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
     }
   }
 
-
   void submitEventReadOperation(final Operation Op, final String nodeAddr) {
     val endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
     val scopeName = DEFAULT_SCOPE;
     val streamName =
         (Op instanceof DataOperation)
-            ? extractStreamName(Op.dstPath())
-            : // dataOp
-            extractStreamName(Op.item().name()); // pathOp
+            ? extractStreamName(Op.dstPath()) // dataOp
+            : extractStreamName(Op.item().name()); // pathOp
     scopeStreamsCache.computeIfAbsent(scopeName, ScopeCreateFunction::createStreamCache);
     val readerGroup = UUID.randomUUID().toString().replace("-", "");
     val readerGroupConfig =
@@ -554,12 +552,11 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
     val clientFactoryCreateFunc =
         clientFactoryCreateFuncCache.computeIfAbsent(
             endpointUri, ClientFactoryCreateFunctionImpl::new);
-    @Cleanup
     val clientFactory = clientFactoryCache.computeIfAbsent(scopeName, clientFactoryCreateFunc);
     val readerCreateFunc =
         eventStreamReaderCreateFuncCache.computeIfAbsent(
             clientFactory, ReaderCreateFunctionImpl::new);
-    @Cleanup val evtReader = eventStreamReaderCache.computeIfAbsent(readerGroup, readerCreateFunc);
+    val evtReader = eventStreamReaderCache.computeIfAbsent(readerGroup, readerCreateFunc);
 
     final CompletionStage<Void> readEvtFuture;
     Loggers.MSG.trace("Reading all the events from {} {}", scopeName, streamName);
@@ -575,16 +572,14 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 
   void readEvent(DataOperation dataOp, EventStreamReader<ByteBuffer> evtReader) {
     EventRead<ByteBuffer> event = null;
-    int bytesDone = 0;
+    int bytesDone;
     Exception thrown = null;
     try {
       event = evtReader.readNextEvent(readTimeoutMillis);
-      event.getEvent();
-      Loggers.MSG.trace("Read event {}", event.getEvent());
       bytesDone = event.getEvent().remaining();
       dataOp.item().size(bytesDone);
 
-      completeEventReadOperation(dataOp, dataOp.item(), thrown);
+      completeEventReadOperation(dataOp, dataOp.item(), null);
     } catch (Exception e) { // including ReinitializationRequiredException
       thrown = e;
       completeEventReadOperation(dataOp, dataOp.item(), thrown);
@@ -597,10 +592,9 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
     Exception thrown = null;
     try {
       for (event = evtReader.readNextEvent(readTimeoutMillis); null != event.getEvent(); ) {
-        Loggers.MSG.trace("Read event {}", event.getEvent());
         bytesDone += event.getEvent().remaining();
       }
-      // pathOp.countBytesDone(bytesDone);
+      pathOp.countBytesDone(bytesDone);
       // we need to set the size of the item instead of the countBytesDone
       completeStreamReadOperation(pathOp, bytesDone, thrown);
     } catch (Exception e) { // including ReinitializationRequiredException
@@ -608,7 +602,6 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
       /*pathOp.item() should be instead */
       completeStreamReadOperation(pathOp, bytesDone, thrown);
     }
-
   }
 
   void submitStreamOperation(final PathOperation streamOp, final OpType opType) {
@@ -686,7 +679,6 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 
   boolean completeStreamDeleteOperation(
       final PathOperation streamOp, final boolean result, final Throwable thrown) {
-    // TODO erase code duplication
     val streamName = extractStreamName(streamOp.item().name());
     if (null == thrown) {
       if (result) {
