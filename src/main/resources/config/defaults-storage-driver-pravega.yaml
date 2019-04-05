@@ -1,0 +1,36 @@
+---
+storage:
+  driver:
+    control:
+      timeoutMillis: 10000
+    create:
+      key:
+        enabled: false
+        count: 0
+    read:
+      timeoutMillis: 100
+    scaling:
+      type: fixed
+      rate: 0
+      factor: 0
+      segments: 1
+    namespace:
+      scope: goose
+  net:
+    bindBacklogSize: 0
+    interestOpQueued: false
+    keepAlive: true
+    linger: 0
+    reuseAddr: true
+    rcvBuf: 0
+    sndBuf: 0
+    tcpNoDelay: true
+    timeoutMillis: 0
+    ssl: false
+    uri:
+      schema: tcp
+    node:
+      addrs:
+        - 127.0.0.1
+      port: 9090
+      connAttemptsLimit: 0

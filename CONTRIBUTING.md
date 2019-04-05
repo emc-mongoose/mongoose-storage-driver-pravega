@@ -110,7 +110,7 @@ Tracker link: https://mongoose-issues.atlassian.net/projects/PRAVEGA
 
 # 4. Continuous Integration
 
-https://travis-ci.org/emc-mongoose/mongoose-storage-driver-pravega
+https://gitlab.com/emc-mongoose/mongoose-storage-driver-pravega/pipelines
 
 ## 4.1. Build
 
@@ -118,7 +118,7 @@ https://travis-ci.org/emc-mongoose/mongoose-storage-driver-pravega
 ./gradlew clean jar
 ```
 
-The resulting jar file path is `./build/libs/mongoose-storage-driver-pravega.jar`.
+The resulting jar file path is `./build/libs/mongoose-storage-driver-pravega-<VERSION>.jar`.
 
 ## 4.2. Testing
 
