@@ -1,17 +1,17 @@
 package com.emc.mongoose.storage.driver.pravega;
 
-import static com.emc.mongoose.Constants.APP_NAME;
+import static com.emc.mongoose.base.Constants.APP_NAME;
 import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.DRIVER_NAME;
-import com.emc.mongoose.data.DataInput;
-import com.emc.mongoose.env.ExtensionBase;
-import com.emc.mongoose.exception.OmgShootMyFootException;
-import com.emc.mongoose.item.Item;
-import com.emc.mongoose.item.op.Operation;
-import com.emc.mongoose.storage.driver.StorageDriverFactory;
 
+import com.emc.mongoose.base.config.IllegalConfigurationException;
+import com.emc.mongoose.base.data.DataInput;
+import com.emc.mongoose.base.env.ExtensionBase;
+import com.emc.mongoose.base.item.Item;
+import com.emc.mongoose.base.item.op.Operation;
+import com.emc.mongoose.base.storage.driver.StorageDriverFactory;
 import com.github.akurilov.confuse.Config;
 import com.github.akurilov.confuse.SchemaProvider;
-import com.github.akurilov.confuse.io.json.JsonSchemaProviderBase;
+import com.github.akurilov.confuse.io.yaml.YamlSchemaProviderBase;
 
 import java.io.InputStream;
 import java.util.Arrays;
@@ -24,11 +24,11 @@ public final class PravegaStorageDriverExtension<
 extends ExtensionBase
 implements StorageDriverFactory<I, O, T> {
 
-	private static final SchemaProvider SCHEMA_PROVIDER = new JsonSchemaProviderBase() {
+	private static final SchemaProvider SCHEMA_PROVIDER = new YamlSchemaProviderBase() {
 
 		@Override
 		protected final InputStream schemaInputStream() {
-			return getClass().getResourceAsStream("/config-schema-storage-" + DRIVER_NAME + ".json");
+			return getClass().getResourceAsStream("/config-schema-storage-" + DRIVER_NAME + ".yaml");
 		}
 
 		@Override
@@ -37,7 +37,7 @@ implements StorageDriverFactory<I, O, T> {
 		}
 	};
 
-	private static final String DEFAULTS_FILE_NAME = "defaults-storage-" + DRIVER_NAME + ".json";
+	private static final String DEFAULTS_FILE_NAME = "defaults-storage-driver-" + DRIVER_NAME + ".yaml";
 
 	private static final List<String> RES_INSTALL_FILES = Collections.unmodifiableList(
 		Arrays.asList(
@@ -73,9 +73,7 @@ implements StorageDriverFactory<I, O, T> {
 	public T create(
 		final String stepId, final DataInput dataInput, final Config storageConfig, final boolean verifyFlag,
 		final int batchSize
-	) throws OmgShootMyFootException, InterruptedException {
-		return (T) new PravegaStorageDriver<I, O>(
-			stepId, dataInput, storageConfig, verifyFlag, batchSize
-		);
+	) throws IllegalConfigurationException, InterruptedException {
+		return (T) new PravegaStorageDriver<I, O>(stepId, dataInput, storageConfig, verifyFlag, batchSize);
 	}
 }

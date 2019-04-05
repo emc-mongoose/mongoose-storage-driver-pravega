@@ -1,22 +1,22 @@
 package com.emc.mongoose.storage.driver.pravega.integration;
 
-import static com.emc.mongoose.Constants.APP_NAME;
-import static com.emc.mongoose.Constants.MIB;
+import static com.emc.mongoose.base.Constants.APP_NAME;
+import static com.emc.mongoose.base.Constants.MIB;
 import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.DEFAULT_SCOPE;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
-import com.emc.mongoose.data.DataInput;
-import com.emc.mongoose.env.Extension;
-import com.emc.mongoose.exception.OmgShootMyFootException;
-import com.emc.mongoose.item.DataItem;
-import com.emc.mongoose.item.DataItemImpl;
-import com.emc.mongoose.item.op.OpType;
-import com.emc.mongoose.item.op.Operation;
-import com.emc.mongoose.item.op.data.DataOperation;
-import com.emc.mongoose.item.op.data.DataOperationImpl;
+import com.emc.mongoose.base.data.DataInput;
+import com.emc.mongoose.base.env.Extension;
+import com.emc.mongoose.base.item.DataItem;
+import com.emc.mongoose.base.item.DataItemImpl;
+import com.emc.mongoose.base.item.op.OpType;
+import com.emc.mongoose.base.item.op.Operation;
+import com.emc.mongoose.base.item.op.data.DataOperation;
+import com.emc.mongoose.base.item.op.data.DataOperationImpl;
 import com.emc.mongoose.storage.driver.pravega.PravegaStorageDriver;
 import com.emc.mongoose.storage.driver.pravega.io.ByteBufferSerializer;
+import com.emc.mongoose.storage.driver.pravega.util.PravegaNode;
 import com.emc.mongoose.storage.driver.pravega.util.docker.PravegaNodeContainer;
 import com.github.akurilov.commons.collection.TreeUtil;
 import com.github.akurilov.commons.system.SizeInBytes;
@@ -42,13 +42,11 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
 
   static {
     try {
-      DATA_INPUT = DataInput.instance(null, "7a42d9c483244167", new SizeInBytes("1MB"), 16);
+      DATA_INPUT = DataInput.instance(null, "7a42d9c483244167", new SizeInBytes(1024*1024-8), 16);
     } catch (final IOException e) {
       throw new AssertionError(e);
     }
   }
-
-  private static PravegaNodeContainer PRAVEGA_NODE_CONTAINER;
 
   private static Config getConfig() {
     try {
@@ -86,8 +84,8 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
       config.val("storage-net-interestOpQueued", false);
       config.val("storage-net-linger", 0);
       config.val("storage-net-timeoutMillis", 0);
-      config.val("storage-net-node-addrs", Collections.singletonList("127.0.0.1"));
-      config.val("storage-net-node-port", PravegaNodeContainer.PORT);
+      config.val("storage-net-node-addrs", PravegaNode.addr());
+      config.val("storage-net-node-port", PravegaNode.PORT);
       config.val("storage-net-node-connAttemptsLimit", 0);
 
       config.val("storage-auth-uid", null);
@@ -114,11 +112,11 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
     }
   }
 
-  public DataOperationsTest() throws OmgShootMyFootException {
+  public DataOperationsTest() {
     this(getConfig());
   }
 
-  private DataOperationsTest(final Config config) throws OmgShootMyFootException {
+  private DataOperationsTest(final Config config) {
     super(
         "test-data-pravega-driver",
         DATA_INPUT,
@@ -127,23 +125,9 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
         config.configVal("load").intVal("batch-size"));
   }
 
-  @BeforeClass
-  public static void setUpClass() throws Exception {
-    try {
-      PRAVEGA_NODE_CONTAINER = new PravegaNodeContainer();
-    } catch (final Exception e) {
-      throw new AssertionError(e);
-    }
-  }
-
-  @AfterClass
-  public static void tearDownClass() throws Exception {
-    PRAVEGA_NODE_CONTAINER.close();
-  }
-
   @Test
   public final void testCreateEvent() throws Exception {
-    final DataItem dataItem = new DataItemImpl(0, MIB, 0);
+    final DataItem dataItem = new DataItemImpl(0, MIB-8, 0);
     dataItem.name("0000");
     dataItem.dataInput(DATA_INPUT);
     String streamName = "default";
@@ -198,7 +182,7 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
 
   @Test
   public final void testReadEvent() throws Exception {
-    final DataItem dataItem = new DataItemImpl(0, MIB, 0);
+    final DataItem dataItem = new DataItemImpl(0, MIB-8, 0);
     dataItem.name("0000");
     dataItem.dataInput(DATA_INPUT);
     String streamName = "default";
@@ -217,7 +201,7 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
     assertEquals(Operation.Status.SUCC, result.status());
     assertEquals(dataItem.size(), createTask.countBytesDone());
 
-    final DataItem dataItem2 = new DataItemImpl(0, MIB, 0);
+    final DataItem dataItem2 = new DataItemImpl(0, MIB-8, 0);
     dataItem2.name("0001");
     final DataOperation<DataItem> createTask2 =
         new DataOperationImpl<>(
@@ -238,26 +222,4 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
         (int) dataItem.size(),
         (result2.item().size()));
   }
-
-  @Test
-  @Ignore
-  public final void testConcatFile() throws Exception {}
-
-  @Test
-  public final void testReadFullFile() throws Exception {}
-
-  @Test
-  public final void testReadFixedRangesFile() throws Exception {}
-
-  @Test
-  public final void testReadRandomRangesFile() throws Exception {}
-
-  @Test
-  public final void testOverwriteFile() throws Exception {}
-
-  @Test
-  public final void testAppendFile() throws Exception {}
-
-  @Test
-  public final void testDeleteFile() throws Exception {}
 }

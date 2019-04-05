@@ -1,31 +1,31 @@
 package com.emc.mongoose.storage.driver.pravega;
 
-import static com.emc.mongoose.item.op.OpType.NOOP;
-import static com.emc.mongoose.item.op.Operation.SLASH;
-import static com.emc.mongoose.item.op.Operation.Status.FAIL_UNKNOWN;
-import static com.emc.mongoose.item.op.Operation.Status.INTERRUPTED;
-import static com.emc.mongoose.item.op.Operation.Status.RESP_FAIL_UNKNOWN;
-import static com.emc.mongoose.item.op.Operation.Status.SUCC;
+import static com.emc.mongoose.base.item.op.OpType.NOOP;
+import static com.emc.mongoose.base.item.op.Operation.SLASH;
+import static com.emc.mongoose.base.item.op.Operation.Status.FAIL_UNKNOWN;
+import static com.emc.mongoose.base.item.op.Operation.Status.INTERRUPTED;
+import static com.emc.mongoose.base.item.op.Operation.Status.RESP_FAIL_UNKNOWN;
+import static com.emc.mongoose.base.item.op.Operation.Status.SUCC;
 import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.BACKGROUND_THREAD_COUNT;
 import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.DEFAULT_SCOPE;
 import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.DRIVER_NAME;
 import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.MAX_BACKOFF_MILLIS;
 import static com.emc.mongoose.storage.driver.pravega.io.StreamScaleUtil.scaleToFixedSegmentCount;
+import static com.github.akurilov.commons.lang.Exceptions.throwUnchecked;
 
-import com.emc.mongoose.data.DataInput;
-import com.emc.mongoose.exception.InterruptRunException;
-import com.emc.mongoose.exception.OmgShootMyFootException;
-import com.emc.mongoose.item.DataItem;
-import com.emc.mongoose.item.Item;
-import com.emc.mongoose.item.ItemFactory;
-import com.emc.mongoose.item.op.OpType;
-import com.emc.mongoose.item.op.Operation;
-import com.emc.mongoose.item.op.Operation.Status;
-import com.emc.mongoose.item.op.data.DataOperation;
-import com.emc.mongoose.item.op.path.PathOperation;
-import com.emc.mongoose.logging.LogUtil;
-import com.emc.mongoose.logging.Loggers;
-import com.emc.mongoose.storage.Credential;
+import com.emc.mongoose.base.config.IllegalConfigurationException;
+import com.emc.mongoose.base.data.DataInput;
+import com.emc.mongoose.base.item.DataItem;
+import com.emc.mongoose.base.item.Item;
+import com.emc.mongoose.base.item.ItemFactory;
+import com.emc.mongoose.base.item.op.OpType;
+import com.emc.mongoose.base.item.op.Operation;
+import com.emc.mongoose.base.item.op.Operation.Status;
+import com.emc.mongoose.base.item.op.data.DataOperation;
+import com.emc.mongoose.base.item.op.path.PathOperation;
+import com.emc.mongoose.base.logging.LogUtil;
+import com.emc.mongoose.base.logging.Loggers;
+import com.emc.mongoose.base.storage.Credential;
 import com.emc.mongoose.storage.driver.coop.CoopStorageDriverBase;
 import com.emc.mongoose.storage.driver.pravega.cache.ClientFactoryCreateFunction;
 import com.emc.mongoose.storage.driver.pravega.cache.ClientFactoryCreateFunctionImpl;
@@ -64,7 +64,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import lombok.Value;
-import lombok.experimental.var;
 import lombok.val;
 import org.apache.logging.log4j.Level;
 
@@ -110,7 +109,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
               "Scope \"{}\" was not created, may be already existing before", scopeName);
         }
       } catch (final InterruptedException e) {
-        throw new InterruptRunException(e);
+        throwUnchecked(e);
       } catch (final Throwable cause) {
         LogUtil.exception(
             Level.WARN, cause, "{}: failed to create the scope \"{}\"", stepId, scopeName);
@@ -137,7 +136,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
               "Scope \"{}\" was not created, may be already existing before", scopeName);
         }
       } catch (final InterruptedException e) {
-        throw new InterruptRunException(e);
+        throwUnchecked(e);
       } catch (final Throwable cause) {
         LogUtil.exception(
             Level.WARN, cause, "{}: failed to create the scope \"{}\"", stepId, scopeName);
@@ -174,10 +173,8 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
           scaleToFixedSegmentCount(
               controller, controlApiTimeoutMillis, scopeName, streamName, scalingPolicy);
         }
-      } catch (final InterruptRunException e) {
-        throw e;
       } catch (final InterruptedException e) {
-        throw new InterruptRunException(e);
+        throwUnchecked(e);
       } catch (final Throwable cause) {
         LogUtil.exception(
             Level.WARN, cause, "{}: failed to create the stream \"{}\"", stepId, streamName);
@@ -253,7 +250,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
       final Config storageConfig,
       final boolean verifyFlag,
       final int batchSize)
-      throws OmgShootMyFootException, IllegalArgumentException {
+      throws IllegalConfigurationException, IllegalArgumentException {
     super(stepId, dataInput, storageConfig, verifyFlag, batchSize);
     val driverConfig = storageConfig.configVal("driver");
     this.controlApiTimeoutMillis = driverConfig.intVal("control-timeoutMillis");
@@ -345,17 +342,18 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
   public void adjustIoBuffers(final long avgTransferSize, final OpType opType) {}
 
   @Override
-  protected void prepare(final O operation) {
+  protected boolean prepare(final O operation) {
     super.prepare(operation);
     var endpointAddr = operation.nodeAddr();
     if (endpointAddr == null) {
       endpointAddr = nextEndpointAddr();
       operation.nodeAddr(endpointAddr);
     }
+    return true;
   }
 
   @Override
-  protected final boolean submit(final O op) throws InterruptRunException, IllegalStateException {
+  protected final boolean submit(final O op) throws IllegalStateException {
     if (concurrencyThrottle.tryAcquire()) {
       val opType = op.type();
       if (NOOP.equals(opType)) {
@@ -378,7 +376,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 
   @Override
   protected final int submit(final List<O> ops, final int from, final int to)
-      throws InterruptRunException, IllegalStateException {
+      throws IllegalStateException {
     for (var i = from; i < to; i++) {
       if (!submit(ops.get(i))) {
         return i - from;
@@ -389,7 +387,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 
   @Override
   protected final int submit(final List<O> ops)
-      throws InterruptRunException, IllegalStateException {
+      throws IllegalStateException {
     val opsCount = ops.size();
     for (var i = 0; i < opsCount; i++) {
       if (!submit(ops.get(i))) {
@@ -523,11 +521,11 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
       } else {
         completeFailedOperation((O) evtOp, e);
       }
-    } catch (final InterruptRunException e) {
-      completeOperation((O) evtOp, INTERRUPTED);
-      throw e;
-    } catch (final Throwable cause) {
-      completeFailedOperation((O) evtOp, cause);
+    } catch (final Throwable thrown) {
+    	if(thrown instanceof InterruptedException) {
+    		throwUnchecked(thrown);
+		}
+      completeFailedOperation((O) evtOp, thrown);
     }
   }
 
@@ -660,16 +658,16 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
       createStreamFuture.handle(
           (returned, thrown) -> completeStreamCreateOperation(streamOp, returned, thrown));
     } catch (final NullPointerException e) {
-      if (!isStarted()) {
-        completeOperation((O) streamOp, INTERRUPTED);
-      } else {
-        completeFailedOperation((O) streamOp, e);
-      }
-    } catch (final InterruptRunException e) {
-      completeOperation((O) streamOp, INTERRUPTED);
-      throw e;
-    } catch (final Throwable cause) {
-      completeFailedOperation((O) streamOp, cause);
+		if(! isStarted()) {
+			completeOperation((O) streamOp, INTERRUPTED);
+		} else {
+			completeFailedOperation((O) streamOp, e);
+		}
+	} catch (final Throwable thrown) {
+    	if(thrown instanceof InterruptedException) {
+    		throwUnchecked(thrown);
+		}
+      completeFailedOperation((O) streamOp, thrown);
     }
   }
 
@@ -713,11 +711,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
         completeFailedOperation((O) streamOp, e);
       }
     } catch (final InterruptedException e) {
-      completeOperation((O) streamOp, INTERRUPTED);
-      throw new InterruptRunException(e);
-    } catch (final InterruptRunException e) {
-      completeOperation((O) streamOp, INTERRUPTED);
-      throw e;
+      throwUnchecked(e);
     } catch (final Throwable cause) {
       completeFailedOperation((O) streamOp, cause);
     }
@@ -776,7 +770,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
               closeables.stream().findFirst().get().getClass().getSimpleName());
         }
       } catch (final InterruptedException e) {
-        throw new InterruptRunException(e);
+        throwUnchecked(e);
       } finally {
         closeExecutor.shutdownNow();
       }

@@ -1,4 +1,8 @@
-[Mongoose](https://github.com/emc-mongoose/mongoose)'s storage driver for [Pravega](http://pravega.io) performance testing
+[![Gitter chat](https://badges.gitter.im/emc-mongoose.png)](https://gitter.im/emc-mongoose)
+[![Issue Tracker](https://img.shields.io/badge/Issue-Tracker-red.svg)](https://mongoose-issues.atlassian.net/projects/GOOSE)
+[![CI status](https://travis-ci.org/emc-mongoose/mongoose-storage-driver-pravega.svg?branch=master)](https://travis-ci.org/emc-mongoose/mongoose-storage-driver-pravega/builds)
+[![Maven metadata URL](https://img.shields.io/maven-metadata/v/http/central.maven.org/maven2/com/github/emc-mongoose/mongoose-storage-driver-pravega/maven-metadata.xml.svg)](http://central.maven.org/maven2/com/github/emc-mongoose/mongoose-storage-driver-pravega)
+[![Docker Pulls](https://img.shields.io/docker/pulls/emcmongoose/mongoose-storage-driver-pravega.svg)](https://hub.docker.com/r/emcmongoose/mongoose-storage-driver-pravega/)
 
 # Content
 
@@ -29,8 +33,11 @@
 5. [Development](#5-development)<br/>
 &nbsp;&nbsp;5.1. [Build](#51-build)<br/>
 &nbsp;&nbsp;5.2. [Test](#52-test)<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;5.2.1 [Automated](#521-automated)<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;5.2.2 [Manual](#522-manual)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;5.2.1. [Automated](#521-automated)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;5.2.1.1. [Unit](#5211-unit)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;5.2.1.2. [Integration](#5212-integration)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;5.2.1.3. [Functional](#5213-functional)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;5.2.2. [Manual](#522-manual)<br/>
 
 # 1. Introduction
 
@@ -78,7 +85,6 @@ docker run \
     --network host \
     emcmongoose/mongoose-storage-driver-pravega \
     --storage-net-node-addrs=<NODE_IP_ADDRS> \
-    --storage-net-node-port=<NODE_PORT> \
     ...
 ```
 
@@ -102,7 +108,6 @@ docker run \
     emcmongoose/mongoose-storage-driver-pravega \
     --load-step-node-addrs=<ADDR1,ADDR2,...> \
     --storage-net-node-addrs=<NODE_IP_ADDRS> \
-    --storage-net-node-port=<NODE_PORT> \
     ...
 ```
 
@@ -119,7 +124,7 @@ docker run \
 | storage-driver-scaling-factor     | integer         | 0             | The scaling policy factor. From the Pravega javadoc: *the maximum number of splits of a segment for a scale-up event.*
 | storage-driver-scaling-segments   | integer         | 1             | From the Pravega javadoc: *the minimum number of segments that a stream can have independent of the number of scale down events.*
 | storage-net-node-addrs            | list of strings | 127.0.0.1     | The list of the Pravega storage nodes to use for the load
-| storage-net-node-port             | integer         | 9020          | The default port of the Pravega storage nodes, should be explicitly set to 9090 (the value used by Pravega by default)
+| storage-net-node-port             | integer         | 9090          | The default port of the Pravega storage nodes, should be explicitly set to 9090 (the value used by Pravega by default)
 
 ## 3.4. Specific Cases
 
@@ -259,8 +264,24 @@ TODO
 
 ### 5.2.1. Automated
 
+#### 5.2.1.1. Unit
+
 ```bash
 ./gradlew clean test
+```
+
+#### 5.2.1.2. Integration
+```bash
+docker run -d --name=storage --network=host pravega/pravega:<PRAVEGA_VERSION> standalone
+./gradlew integrationTest
+```
+
+#### 5.2.1.3. Functional
+```bash
+./gradlew jar
+export SUITE=api.storage
+TEST=create_events ./gradlew robotest
+TEST=create_stream ./gradlew robotest
 ```
 
 ### 5.2.1. Manual
@@ -268,15 +289,18 @@ TODO
 1. Build the storage driver
 2. Copy the storage driver's jar file into the mongoose's `ext` directory:
 ```bash
-cp -f build/libs/mongoose-storage-driver-pravega.jar ~/.mongoose/<MONGOOSE_VERSION>/ext/
+cp -f build/libs/mongoose-storage-driver-pravega-*.jar ~/.mongoose/<MONGOOSE_BASE_VERSION>/ext/
 ```
+Note that the Pravega storage driver depends on the 
+[Coop Storage Driver](http://repo.maven.apache.org/maven2/com/github/emc-mongoose/mongoose-storage-driver-coop/) 
+extension so it should be also put into the `ext` directory
 3. Run the Pravega standalone node:
 ```bash
-docker run --network host pravega/pravega standalone
+docker run --network host pravega/pravega:<PRAVEGA_VERSION> standalone
 ```
 4. Run Mongoose's default scenario with some specific command-line arguments:
 ```bash
-java -jar mongoose-<MONGOOSE_VERSION>.jar \
+java -jar mongoose-<MONGOOSE_BASE_VERSION>.jar \
     --storage-driver-type=pravega \
     --storage-net-node-port=9090 \
     --storage-driver-limit-concurrency=10 \
