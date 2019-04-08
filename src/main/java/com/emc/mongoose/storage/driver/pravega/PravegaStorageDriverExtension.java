@@ -74,6 +74,6 @@ implements StorageDriverFactory<I, O, T> {
 		final String stepId, final DataInput dataInput, final Config storageConfig, final boolean verifyFlag,
 		final int batchSize
 	) throws IllegalConfigurationException, InterruptedException {
-		return (T) new PravegaStorageDriver<I, O>(stepId, dataInput, storageConfig, verifyFlag, batchSize);
+		return (T) new PravegaStorageDriver<I, O>(stepId, dataInput, storageConfig, verifyFlag);
 	}
 }

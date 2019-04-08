@@ -17,7 +17,6 @@ import com.emc.mongoose.base.item.op.data.DataOperationImpl;
 import com.emc.mongoose.storage.driver.pravega.PravegaStorageDriver;
 import com.emc.mongoose.storage.driver.pravega.io.ByteBufferSerializer;
 import com.emc.mongoose.storage.driver.pravega.util.PravegaNode;
-import com.emc.mongoose.storage.driver.pravega.util.docker.PravegaNodeContainer;
 import com.github.akurilov.commons.collection.TreeUtil;
 import com.github.akurilov.commons.system.SizeInBytes;
 import com.github.akurilov.confuse.Config;
@@ -32,9 +31,6 @@ import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.stream.Collectors;
 import lombok.val;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 
 public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOperation<DataItem>> {
@@ -170,7 +166,7 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
                 ReaderConfig.builder().build())) {
       System.out.format("Reading all the events from %s/%s%n", scope, streamName);
       EventRead<ByteBuffer> event = null;
-      event = reader.readNextEvent(readTimeoutMillis);
+      event = reader.readNextEvent(opTimeoutMillis);
       if (event.getEvent() != null) {
 
         assertEquals(

@@ -1,4 +1,7 @@
 ---
+load:
+  op:
+    timeoutMillis: int
 storage:
   driver:
     control:

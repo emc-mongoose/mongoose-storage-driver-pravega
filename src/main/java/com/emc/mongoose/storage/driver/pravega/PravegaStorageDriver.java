@@ -1,17 +1,19 @@
 package com.emc.mongoose.storage.driver.pravega;
 
+import static com.emc.mongoose.base.Exceptions.throwUncheckedIfInterrupted;
 import static com.emc.mongoose.base.item.op.OpType.NOOP;
 import static com.emc.mongoose.base.item.op.Operation.SLASH;
+import static com.emc.mongoose.base.item.op.Operation.Status.FAIL_TIMEOUT;
 import static com.emc.mongoose.base.item.op.Operation.Status.FAIL_UNKNOWN;
 import static com.emc.mongoose.base.item.op.Operation.Status.INTERRUPTED;
 import static com.emc.mongoose.base.item.op.Operation.Status.RESP_FAIL_UNKNOWN;
 import static com.emc.mongoose.base.item.op.Operation.Status.SUCC;
 import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.BACKGROUND_THREAD_COUNT;
-import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.DEFAULT_SCOPE;
 import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.DRIVER_NAME;
 import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.MAX_BACKOFF_MILLIS;
 import static com.emc.mongoose.storage.driver.pravega.io.StreamScaleUtil.scaleToFixedSegmentCount;
 import static com.github.akurilov.commons.lang.Exceptions.throwUnchecked;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 import com.emc.mongoose.base.config.IllegalConfigurationException;
 import com.emc.mongoose.base.data.DataInput;
@@ -26,7 +28,6 @@ import com.emc.mongoose.base.item.op.path.PathOperation;
 import com.emc.mongoose.base.logging.LogUtil;
 import com.emc.mongoose.base.logging.Loggers;
 import com.emc.mongoose.base.storage.Credential;
-import com.emc.mongoose.storage.driver.coop.CoopStorageDriverBase;
 import com.emc.mongoose.storage.driver.pravega.cache.ClientFactoryCreateFunction;
 import com.emc.mongoose.storage.driver.pravega.cache.ClientFactoryCreateFunctionImpl;
 import com.emc.mongoose.storage.driver.pravega.cache.EventWriterCreateFunction;
@@ -36,10 +37,9 @@ import com.emc.mongoose.storage.driver.pravega.cache.ReaderGroupManagerCreateFun
 import com.emc.mongoose.storage.driver.pravega.cache.ScopeCreateFunction;
 import com.emc.mongoose.storage.driver.pravega.cache.ScopeCreateFunctionForStreamConfig;
 import com.emc.mongoose.storage.driver.pravega.cache.StreamCreateFunction;
-
 import com.emc.mongoose.storage.driver.pravega.io.ByteBufferSerializer;
-
 import com.emc.mongoose.storage.driver.pravega.io.DataItemSerializer;
+import com.emc.mongoose.storage.driver.preempt.PreemptStorageDriverBase;
 import com.github.akurilov.confuse.Config;
 import io.pravega.client.ClientConfig;
 import io.pravega.client.ClientFactory;
@@ -58,20 +58,21 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.CompletionStage;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
-import lombok.Cleanup;
 import lombok.Value;
 import lombok.val;
 import org.apache.logging.log4j.Level;
 
 public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
-    extends CoopStorageDriverBase<I, O> {
+extends PreemptStorageDriverBase<I, O> {
 
   protected final String uriSchema;
   protected final String scopeName;
@@ -80,7 +81,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
   protected final int controlApiTimeoutMillis;
   protected final boolean createRoutingKeys;
   protected final long createRoutingKeysPeriod;
-  protected final int readTimeoutMillis;
+  protected final int opTimeoutMillis;
   protected final Serializer<DataItem> evtSerializer = new DataItemSerializer(false);
 
   protected final Serializer<ByteBuffer> evtDeserializer = new ByteBufferSerializer();
@@ -94,8 +95,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
   private final ScheduledExecutorService bgExecutor =
       Executors.newScheduledThreadPool(BACKGROUND_THREAD_COUNT);
 
-  // should be an inner class in order to access the stream create function implementation
-  // constructor
+
   @Value
   final class ScopeCreateFunctionImpl implements ScopeCreateFunction {
 
@@ -104,7 +104,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
     @Override
     public final StreamCreateFunction apply(final String scopeName) {
       try {
-        if (controller.createScope(scopeName).get(controlApiTimeoutMillis, TimeUnit.MILLISECONDS)) {
+        if (controller.createScope(scopeName).get(controlApiTimeoutMillis, MILLISECONDS)) {
           Loggers.MSG.trace("Scope \"{}\" was created", scopeName);
         } else {
           Loggers.MSG.info(
@@ -120,7 +120,6 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
     }
   }
 
-  // should be an inner class in order to access the storage driver instance stream config field
   @Value
   final class ScopeCreateFunctionForStreamConfigImpl implements ScopeCreateFunctionForStreamConfig {
 
@@ -131,7 +130,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
       final StreamConfiguration streamConfig =
           StreamConfiguration.builder().scalingPolicy(scalingPolicy).scope(scopeName).build();
       try {
-        if (controller.createScope(scopeName).get(controlApiTimeoutMillis, TimeUnit.MILLISECONDS)) {
+        if (controller.createScope(scopeName).get(controlApiTimeoutMillis, MILLISECONDS)) {
           Loggers.MSG.trace("Scope \"{}\" was created", scopeName);
         } else {
           Loggers.MSG.info(
@@ -147,7 +146,6 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
     }
   }
 
-  // should be an inner class in order to access the storage driver instance stream config field
   @Value
   final class StreamCreateFunctionImpl implements StreamCreateFunction {
 
@@ -165,7 +163,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
       try {
         if (controller
             .createStream(streamConfig)
-            .get(controlApiTimeoutMillis, TimeUnit.MILLISECONDS)) {
+            .get(controlApiTimeoutMillis, MILLISECONDS)) {
           Loggers.MSG.trace(
               "Stream \"{}/{}\" was created using the config: {}",
               scopeName,
@@ -185,8 +183,6 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
     }
   }
 
-  // should be an inner class in order to access the storage driver instance's fields (serializer,
-  // writer config)
   @Value
   final class EventWriterCreateFunctionImpl implements EventWriterCreateFunction {
 
@@ -198,8 +194,6 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
     }
   }
 
-  // should be an inner class in order to access the storage driver instance's fields (serializer,
-  // reader config)
   @Value
   public final class ReaderCreateFunctionImpl implements ReaderCreateFunction {
 
@@ -251,10 +245,9 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
       final String stepId,
       final DataInput dataInput,
       final Config storageConfig,
-      final boolean verifyFlag,
-      final int batchSize)
-      throws IllegalConfigurationException, IllegalArgumentException {
-    super(stepId, dataInput, storageConfig, verifyFlag, batchSize);
+      final boolean verifyFlag
+  ) throws IllegalConfigurationException, IllegalArgumentException {
+    super(stepId, dataInput, storageConfig, verifyFlag);
     val driverConfig = storageConfig.configVal("driver");
     this.controlApiTimeoutMillis = driverConfig.intVal("control-timeoutMillis");
     val scalingConfig = driverConfig.configVal("scaling");
@@ -267,7 +260,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
     val createRoutingKeysConfig = driverConfig.configVal("create-key");
     createRoutingKeys = createRoutingKeysConfig.boolVal("enabled");
     createRoutingKeysPeriod = createRoutingKeysConfig.longVal("count");
-    readTimeoutMillis = driverConfig.intVal("read-timeoutMillis");
+    opTimeoutMillis = driverConfig.intVal("load-op-timeoutMillis");
     endpointAddrs = endpointAddrList.toArray(new String[endpointAddrList.size()]);
     requestAuthTokenFunc = null; // do not use
     requestNewPathFunc = null; // do not use
@@ -326,8 +319,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
       final String prefix,
       final int idRadix,
       final I lastPrevItem,
-      final int count)
-      throws IOException {
+      final int count) {
 
     val buff = new ArrayList<I>(count);
     for (int i = 0; i < count; i++) {
@@ -351,74 +343,265 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
     return true;
   }
 
-  @Override
-  protected final boolean submit(final O op) throws IllegalStateException {
-    if (concurrencyThrottle.tryAcquire()) {
-      val opType = op.type();
-      if (NOOP.equals(opType)) {
-        submitNoop(op);
-      } else {
-        if (op instanceof DataOperation) {
-          submitEventOperation((DataOperation) op, opType);
-        } else if (op instanceof PathOperation) {
-          submitStreamOperation((PathOperation) op, opType);
-        } else {
-          throw new AssertionError(
-              DRIVER_NAME + " storage driver doesn't support the token operations");
-        }
-      }
-      return true;
-    } else {
-      return false;
-    }
-  }
+	@Override
+	protected void execute(final O op) {
+		val opType = op.type();
+		if (NOOP.equals(opType)) {
+			executeNoop(op);
+		} else {
+			if (op instanceof DataOperation) {
+				executeEventOperation((DataOperation) op, opType);
+			} else if (op instanceof PathOperation) {
+				executeStreamOperation((PathOperation) op, opType);
+			} else {
+				throw new AssertionError(
+					DRIVER_NAME + " storage driver doesn't support the token operations");
+			}
+		}
+	}
 
-  @Override
-  protected final int submit(final List<O> ops, final int from, final int to)
-      throws IllegalStateException {
-    for (var i = from; i < to; i++) {
-      if (!submit(ops.get(i))) {
-        return i - from;
-      }
-    }
-    return to - from;
-  }
+	void executeNoop(final O op) {
+		op.startRequest();
+		completeOperation(null, op);
+	}
 
-  @Override
-  protected final int submit(final List<O> ops)
-      throws IllegalStateException {
-    val opsCount = ops.size();
-    for (var i = 0; i < opsCount; i++) {
-      if (!submit(ops.get(i))) {
-        return i;
-      }
-    }
-    return opsCount;
-  }
+	// Event operations ////////////////////////////////////////////////////////////////////////////////////////////////
 
-  void submitNoop(final O op) {
-    op.startRequest();
-    completeOperation(op, SUCC);
-  }
+	void executeEventOperation(final DataOperation evtOp, final OpType opType) {
+		final String nodeAddr = evtOp.nodeAddr();
+		switch (opType) {
+			case CREATE:
+				executeEventCreateOperation(evtOp, nodeAddr);
+				break;
+			case READ:
+				executeEventReadOperation(evtOp, nodeAddr);
+				break;
+			case UPDATE:
+				throw new AssertionError("Not implemented");
+			case DELETE:
+				throw new AssertionError("Not implemented");
+			case LIST:
+				throw new AssertionError("Not implemented");
+			default:
+				throw new AssertionError("Not implemented");
+		}
+	}
 
-  boolean completeOperation(final O op, final Status status) {
-    concurrencyThrottle.release();
-    op.status(status);
-    op.finishRequest();
-    op.startResponse();
-    op.finishResponse();
-    return handleCompleted(op);
-  }
+	void executeEventCreateOperation(final DataOperation evtCreateOp, final String nodeAddr) {
+		try {
+			// prepare
+			val endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
+			val controller = controllerCache.computeIfAbsent(endpointUri, this::createController);
+			val scopeCreateFunc = scopeCreateFuncCache.computeIfAbsent(controller, ScopeCreateFunctionImpl::new);
+			// create the scope if necessary
+			val streamCreateFunc = streamCreateFuncCache.computeIfAbsent(scopeName, scopeCreateFunc);
+			val streamName = extractStreamName(evtCreateOp.dstPath());
+			scopeStreamsCache.computeIfAbsent(scopeName, ScopeCreateFunction::createStreamCache).computeIfAbsent(
+				streamName, streamCreateFunc);
+			// create the client factory create function if necessary
+			val clientFactoryCreateFunc =
+				clientFactoryCreateFuncCache.computeIfAbsent(endpointUri, ClientFactoryCreateFunctionImpl::new);
+			// create the client factory if necessary
+			val clientFactory = clientFactoryCache.computeIfAbsent(scopeName, clientFactoryCreateFunc);
+			// create the event stream writer create function if necessary
+			val evtWriterCreateFunc =
+				evtWriterCreateFuncCache.computeIfAbsent(clientFactory, EventWriterCreateFunctionImpl::new);
+			// create the event stream writer if necessary
+			val evtWriter = evtWriterCache.computeIfAbsent(streamName, evtWriterCreateFunc);
+			val evtItem = evtCreateOp.item();
+			// submit the event writing
+			final CompletableFuture<Void> evtCreateFuture;
+			if(createRoutingKeys) {
+				val routingKey = Long.toString(
+					createRoutingKeysPeriod > 0 ? evtItem.offset() % createRoutingKeysPeriod : evtItem.offset(),
+					Character.MAX_RADIX
+				);
+				evtCreateFuture = evtWriter.writeEvent(routingKey, evtItem);
+			} else {
+				evtCreateFuture = evtWriter.writeEvent(evtItem);
+			}
+			evtCreateOp.startRequest();
+			completeOperation(evtCreateFuture, (O) evtCreateOp);
+		} catch (final NullPointerException e) {
+			if (!isStarted()) { // occurs on manual interruption which is normal so should be handled
+				completeOperation((O) evtCreateOp, INTERRUPTED);
+			} else {
+				failOperation((O) evtCreateOp, e);
+			}
+		} catch (final Throwable thrown) {
+			throwUncheckedIfInterrupted(thrown);
+			failOperation((O) evtCreateOp, thrown);
+		}
+	}
 
-  boolean completeFailedOperation(final O op, final Throwable thrown) {
-    // LogUtil.exception(Level.WARN, thrown, "{}: unexpected load operation failure", stepId);
-    thrown.printStackTrace();
+	void executeEventReadOperation(final DataOperation op, final String nodeAddr) {
+		val endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
+		val streamName = extractStreamName(op.dstPath());
+		scopeStreamsCache.computeIfAbsent(scopeName, ScopeCreateFunction::createStreamCache);
+		val readerGroup = UUID.randomUUID().toString().replace("-", "");
+		val readerGroupConfig =
+			ReaderGroupConfig.builder().stream(Stream.of(scopeName, streamName)).build();
+		val readerGroupManagerCreateFunc =
+			readerGroupManagerCreateFuncCache.computeIfAbsent(endpointUri, ReaderGroupManagerCreateFunctionImpl::new);
+		val readerGroupManager =
+			readerGroupManagerCache.computeIfAbsent(scopeName, readerGroupManagerCreateFunc);
+		readerGroupManager.createReaderGroup(readerGroup, readerGroupConfig);
+		val clientFactoryCreateFunc =
+			clientFactoryCreateFuncCache.computeIfAbsent(endpointUri, ClientFactoryCreateFunctionImpl::new);
+		val clientFactory = clientFactoryCache.computeIfAbsent(scopeName, clientFactoryCreateFunc);
+		val readerCreateFunc =
+			eventStreamReaderCreateFuncCache.computeIfAbsent(clientFactory, ReaderCreateFunctionImpl::new);
+		val evtReader = eventStreamReaderCache.computeIfAbsent(readerGroup, readerCreateFunc);
+		Loggers.MSG.trace("Reading all the events from {} {}", scopeName, streamName);
+		readEvent(op, evtReader);
+		Loggers.MSG.trace("No more events from {} {}", scopeName, streamName);
+	}
+
+	void readEvent(final DataOperation evtOp, EventStreamReader<ByteBuffer> evtReader) {
+		try {
+			val evt = evtReader.readNextEvent(opTimeoutMillis);
+			val payload = evt.getEvent();
+			val bytesDone = payload.remaining();
+			val evtItem = evtOp.item();
+			evtItem.size(bytesDone);
+			completeEventReadOperation(evtOp, evtItem, null);
+		} catch(final Throwable thrown) {
+			throwUncheckedIfInterrupted(thrown);
+			LogUtil.exception(Level.WARN, thrown, "Read event {} failure");
+			evtOp.status(FAIL_UNKNOWN);
+		}
+	}
+
+	// Stream operations ///////////////////////////////////////////////////////////////////////////////////////////////
+
+	void executeStreamOperation(final PathOperation streamOp, final OpType opType) {
+		final String nodeAddr = streamOp.nodeAddr();
+		switch (opType) {
+			case CREATE:
+				executeStreamCreateOperation(streamOp, nodeAddr);
+				break;
+			case READ:
+				executeStreamReadOperation(streamOp, nodeAddr);
+				break;
+			case UPDATE:
+				throw new AssertionError("Not implemented");
+			case DELETE:
+				executeStreamDeleteOperation(streamOp, nodeAddr);
+				break;
+			case LIST:
+				throw new AssertionError("Not implemented");
+			default:
+				throw new AssertionError("Not implemented");
+		}
+	}
+
+	void executeStreamCreateOperation(final PathOperation streamOp, final String nodeAddr) {
+		try {
+			val endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
+			val controller = controllerCache.computeIfAbsent(endpointUri, this::createController);
+			val scopeCreateFuncForStreamConfig = scopeCreateFuncForStreamConfigCache.computeIfAbsent(
+				controller, ScopeCreateFunctionForStreamConfigImpl::new
+			);
+			val streamConfig = scopeStreamConfigsCache.computeIfAbsent(scopeName, scopeCreateFuncForStreamConfig);
+			val streamName = extractStreamName(streamOp.item().name());
+			val createStreamFuture = controller.createStream(combineStreamConfigAndName(streamName, streamConfig));
+			completeOperation(createStreamFuture, (O) streamOp);
+		} catch (final NullPointerException e) {
+			if(! isStarted()) {
+				completeOperation((O) streamOp, INTERRUPTED);
+			} else {
+				failOperation((O) streamOp, e);
+			}
+		} catch (final Throwable thrown) {
+			throwUncheckedIfInterrupted(thrown);
+			failOperation((O) streamOp, thrown);
+		}
+	}
+
+	void executeStreamReadOperation(final PathOperation streamOp, final String nodeAddr) {
+		// TODO: Alex, issue SDP-51
+	}
+
+	void executeStreamDeleteOperation(final PathOperation streamOp, final String nodeAddr) {
+		try {
+			val streamName = extractStreamName(streamOp.item().name());
+			val endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
+			val controller = controllerCache.computeIfAbsent(endpointUri, this::createController);
+			if (!controller
+				.sealStream(scopeName, streamName)
+				.get(controlApiTimeoutMillis, MILLISECONDS)) {
+				Loggers.ERR.debug("Failed to seal the stream {} in the scope {}", streamName, scopeName);
+			}
+			val deleteStreamFuture = controller.deleteStream(scopeName, streamName);
+			completeOperation(deleteStreamFuture, (O) streamOp);
+		} catch (final InterruptedException e) {
+			throwUnchecked(e);
+		} catch (final Throwable cause) {
+			failOperation((O) streamOp, cause);
+		}
+	}
+
+	<T> void completeOperation(final CompletableFuture<T> future, final O op) {
+		try {
+			if(op instanceof DataOperation) {
+				if(null != future) {
+					future.get(opTimeoutMillis, MILLISECONDS);
+				}
+				val evtOp = (DataOperation) op;
+				val evt = evtOp.item();
+				evtOp.countBytesDone(evt.size());
+				op.status(SUCC);
+			} else if(op instanceof PathOperation) {
+				if(null == future) {
+					op.status(SUCC);
+				} else {
+					val successFlag = (boolean) future.get(opTimeoutMillis, MILLISECONDS);
+					if(successFlag) {
+						op.status(SUCC);
+					} else {
+						op.status(RESP_FAIL_UNKNOWN);
+					}
+				}
+			} else {
+				throw new AssertionError("Unexpected operation type: " + op.getClass());
+			}
+		} catch(final InterruptedException e) {
+			op.status(INTERRUPTED);
+			throwUnchecked(e);
+		} catch(final ExecutionException e) {
+			LogUtil.exception(Level.WARN, e.getCause(), "{}: unexpected load operation failure", stepId);
+			op.status(FAIL_UNKNOWN);
+		} catch(final CancellationException e) {
+			op.status(INTERRUPTED);
+		} catch(final TimeoutException e) {
+			op.status(FAIL_TIMEOUT);
+		} catch (final NullPointerException e) {
+			if (!isStarted()) {
+				completeOperation(op, INTERRUPTED);
+			} else {
+				LogUtil.exception(Level.WARN, e, "{}: unexpected load operation failure", stepId);
+				op.status(FAIL_UNKNOWN);
+			}
+		} catch(final Throwable thrown) {
+			LogUtil.exception(Level.WARN, thrown, "{}: unexpected load operation failure", stepId);
+			op.status(FAIL_UNKNOWN);
+		}
+	}
+
+	boolean completeOperation(final O op, final Status status) {
+		op.status(status);
+		op.finishRequest();
+		op.startResponse();
+		op.finishResponse();
+		return true;
+	}
+
+  boolean failOperation(final O op, final Throwable thrown) {
     return completeOperation(op, FAIL_UNKNOWN);
   }
 
 
-  boolean completeEventReadOperation(
-      final DataOperation evtOp, final DataItem evtItem, final Throwable thrown) {
+  boolean completeEventReadOperation(final DataOperation evtOp, final DataItem evtItem, final Throwable thrown) {
     if (null == thrown) {
       try {
         evtOp.countBytesDone(evtItem.size());
@@ -426,302 +609,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
       }
       return completeOperation((O) evtOp, SUCC);
     } else {
-      return completeFailedOperation((O) evtOp, thrown);
-    }
-  }
-
-  boolean completeStreamReadOperation(
-      final PathOperation evtOp, final int bytesDone, final Throwable thrown) {
-    if (null == thrown) {
-      evtOp.countBytesDone(bytesDone);
-      return completeOperation((O) evtOp, SUCC);
-    } else {
-      return completeFailedOperation((O) evtOp, thrown);
-    }
-  }
-
-  boolean completeEventCreateOperation(
-      final DataOperation evtOp, final DataItem evtItem, final Throwable thrown) {
-    if (null == thrown) {
-      try {
-        evtOp.countBytesDone(evtItem.size());
-      } catch (final IOException ignored) {
-      }
-      return completeOperation((O) evtOp, SUCC);
-    } else {
-      return completeFailedOperation((O) evtOp, thrown);
-    }
-  }
-
-  void submitEventOperation(final DataOperation evtOp, final OpType opType) {
-    final String nodeAddr = evtOp.nodeAddr();
-    switch (opType) {
-      case CREATE:
-        submitEventCreateOperation(evtOp, nodeAddr);
-        break;
-      case READ:
-        submitEventReadOperation(evtOp, nodeAddr);
-        break;
-      case UPDATE:
-        throw new AssertionError("Not implemented");
-      case DELETE:
-        throw new AssertionError("Not implemented");
-      case LIST:
-        throw new AssertionError("Not implemented");
-      default:
-        throw new AssertionError("Not implemented");
-    }
-  }
-
-  void submitEventCreateOperation(final DataOperation evtOp, final String nodeAddr) {
-    try {
-      // prepare
-      val endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
-      val controller = controllerCache.computeIfAbsent(endpointUri, this::createController);
-      val scopeCreateFunc =
-          scopeCreateFuncCache.computeIfAbsent(controller, ScopeCreateFunctionImpl::new);
-      // create the scope if necessary
-      val streamCreateFunc = streamCreateFuncCache.computeIfAbsent(scopeName, scopeCreateFunc);
-      val streamName = extractStreamName(evtOp.dstPath());
-      scopeStreamsCache
-          .computeIfAbsent(scopeName, ScopeCreateFunction::createStreamCache)
-          .computeIfAbsent(streamName, streamCreateFunc);
-      // create the client factory create function if necessary
-      val clientFactoryCreateFunc =
-          clientFactoryCreateFuncCache.computeIfAbsent(
-              endpointUri, ClientFactoryCreateFunctionImpl::new);
-      // create the client factory if necessary
-      val clientFactory = clientFactoryCache.computeIfAbsent(scopeName, clientFactoryCreateFunc);
-      // create the event stream writer create function if necessary
-      val evtWriterCreateFunc =
-          evtWriterCreateFuncCache.computeIfAbsent(
-              clientFactory, EventWriterCreateFunctionImpl::new);
-      // create the event stream writer if necessary
-      val evtWriter = evtWriterCache.computeIfAbsent(streamName, evtWriterCreateFunc);
-      val evtItem = evtOp.item();
-      // submit the event writing
-      final CompletionStage<Void> writeEvtFuture;
-      if (createRoutingKeys) {
-        val routingKey =
-            Long.toString(
-                createRoutingKeysPeriod > 0
-                    ? evtItem.offset() % createRoutingKeysPeriod
-                    : evtItem.offset(),
-                Character.MAX_RADIX);
-        writeEvtFuture = evtWriter.writeEvent(routingKey, evtItem);
-      } else {
-        writeEvtFuture = evtWriter.writeEvent(evtItem);
-      }
-      evtOp.startRequest();
-      writeEvtFuture.handle(
-          (returned, thrown) -> completeEventCreateOperation(evtOp, evtItem, thrown));
-    } catch (final NullPointerException e) {
-      if (!isStarted()) { // occurs on manual interruption which is normal so should be handled
-        completeOperation((O) evtOp, INTERRUPTED);
-      } else {
-        completeFailedOperation((O) evtOp, e);
-      }
-    } catch (final Throwable thrown) {
-    	if(thrown instanceof InterruptedException) {
-    		throwUnchecked(thrown);
-		}
-      completeFailedOperation((O) evtOp, thrown);
-    }
-  }
-
-
-  void submitEventReadOperation(final Operation Op, final String nodeAddr) {
-    val endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
-    val scopeName = DEFAULT_SCOPE;
-    val streamName =
-        (Op instanceof DataOperation)
-            ? extractStreamName(Op.dstPath())
-            : // dataOp
-            extractStreamName(Op.item().name()); // pathOp
-    scopeStreamsCache.computeIfAbsent(scopeName, ScopeCreateFunction::createStreamCache);
-    val readerGroup = UUID.randomUUID().toString().replace("-", "");
-    val readerGroupConfig =
-        ReaderGroupConfig.builder().stream(Stream.of(scopeName, streamName)).build();
-    val readerGroupManagerCreateFunc =
-        readerGroupManagerCreateFuncCache.computeIfAbsent(
-            endpointUri, ReaderGroupManagerCreateFunctionImpl::new);
-    val readerGroupManager =
-        readerGroupManagerCache.computeIfAbsent(scopeName, readerGroupManagerCreateFunc);
-
-    readerGroupManager.createReaderGroup(readerGroup, readerGroupConfig);
-    val clientFactoryCreateFunc =
-        clientFactoryCreateFuncCache.computeIfAbsent(
-            endpointUri, ClientFactoryCreateFunctionImpl::new);
-    @Cleanup
-    val clientFactory = clientFactoryCache.computeIfAbsent(scopeName, clientFactoryCreateFunc);
-    val readerCreateFunc =
-        eventStreamReaderCreateFuncCache.computeIfAbsent(
-            clientFactory, ReaderCreateFunctionImpl::new);
-    @Cleanup val evtReader = eventStreamReaderCache.computeIfAbsent(readerGroup, readerCreateFunc);
-
-    final CompletionStage<Void> readEvtFuture;
-    Loggers.MSG.trace("Reading all the events from {} {}", scopeName, streamName);
-    /*readEvtFuture = ? */
-    if (Op instanceof DataOperation) {
-      readEvent((DataOperation) Op, evtReader); // dataOp
-    } else {
-      readStream((PathOperation) Op, evtReader); // pathOp
-    }
-    // readEvtFuture.handle((returned, thrown) ->completeEventReadOperation(Op, bytesDone, thrown);
-    Loggers.MSG.trace("No more events from {} {}", scopeName, streamName);
-  }
-
-  void readEvent(DataOperation dataOp, EventStreamReader<ByteBuffer> evtReader) {
-    EventRead<ByteBuffer> event = null;
-    int bytesDone = 0;
-    Exception thrown = null;
-    try {
-      event = evtReader.readNextEvent(readTimeoutMillis);
-      event.getEvent();
-      Loggers.MSG.trace("Read event {}", event.getEvent());
-      bytesDone = event.getEvent().remaining();
-      dataOp.item().size(bytesDone);
-
-      completeEventReadOperation(dataOp, dataOp.item(), thrown);
-    } catch (Exception e) { // including ReinitializationRequiredException
-      thrown = e;
-      completeEventReadOperation(dataOp, dataOp.item(), thrown);
-    }
-  }
-
-  void readStream(PathOperation pathOp, EventStreamReader<ByteBuffer> evtReader) {
-    EventRead<ByteBuffer> event = null;
-    int bytesDone = 0;
-    Exception thrown = null;
-    try {
-      for (event = evtReader.readNextEvent(readTimeoutMillis); null != event.getEvent(); ) {
-        Loggers.MSG.trace("Read event {}", event.getEvent());
-        bytesDone += event.getEvent().remaining();
-      }
-      // pathOp.countBytesDone(bytesDone);
-      // we need to set the size of the item instead of the countBytesDone
-      completeStreamReadOperation(pathOp, bytesDone, thrown);
-    } catch (Exception e) { // including ReinitializationRequiredException
-      //	thrown = e;
-      /*pathOp.item() should be instead */
-      completeStreamReadOperation(pathOp, bytesDone, thrown);
-    }
-
-  }
-
-  void submitStreamOperation(final PathOperation streamOp, final OpType opType) {
-    final String nodeAddr = streamOp.nodeAddr();
-    switch (opType) {
-      case CREATE:
-        submitStreamCreateOperation(streamOp, nodeAddr);
-        break;
-      case READ:
-        submitStreamReadOperation(streamOp, nodeAddr);
-        break;
-      case UPDATE:
-        throw new AssertionError("Not implemented");
-      case DELETE:
-        submitStreamDeleteOperation(streamOp, nodeAddr);
-        break;
-      case LIST:
-        throw new AssertionError("Not implemented");
-      default:
-        throw new AssertionError("Not implemented");
-    }
-  }
-
-  boolean completeStreamCreateOperation(
-      final PathOperation streamOp, final boolean result, final Throwable thrown) {
-    // TODO erase code duplication
-    val streamName = extractStreamName(streamOp.item().name());
-    if (null == thrown) {
-      if (result) {
-        return completeOperation((O) streamOp, SUCC);
-      } else {
-        // Should I give stream and scope name to this method?
-        Loggers.ERR.debug("The stream {} already exists in the scope {}", streamName, scopeName);
-        return completeOperation((O) streamOp, RESP_FAIL_UNKNOWN);
-      }
-    } else {
-      return completeFailedOperation((O) streamOp, thrown);
-    }
-  }
-
-  void submitStreamCreateOperation(final PathOperation streamOp, final String nodeAddr) {
-    try {
-      val endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
-      val controller = controllerCache.computeIfAbsent(endpointUri, this::createController);
-      val scopeCreateFuncForStreamConfig =
-          scopeCreateFuncForStreamConfigCache.computeIfAbsent(
-              controller, ScopeCreateFunctionForStreamConfigImpl::new);
-      val streamConfig =
-          scopeStreamConfigsCache.computeIfAbsent(scopeName, scopeCreateFuncForStreamConfig);
-      val streamName = extractStreamName(streamOp.item().name());
-      /*We need to use StreamConfiguration.builder() because scopeCreateFuncForStreamConfig returns
-      StreamConfig without streamName field. So this looks like implementation of StreamManager.createStream()
-       */
-      val createStreamFuture =
-          controller.createStream(combineStreamConfigAndName(streamName, streamConfig));
-      createStreamFuture.handle(
-          (returned, thrown) -> completeStreamCreateOperation(streamOp, returned, thrown));
-    } catch (final NullPointerException e) {
-		if(! isStarted()) {
-			completeOperation((O) streamOp, INTERRUPTED);
-		} else {
-			completeFailedOperation((O) streamOp, e);
-		}
-	} catch (final Throwable thrown) {
-    	if(thrown instanceof InterruptedException) {
-    		throwUnchecked(thrown);
-		}
-      completeFailedOperation((O) streamOp, thrown);
-    }
-  }
-
-  void submitStreamReadOperation(final PathOperation streamOp, final String nodeAddr) {
-    // TODO: Alex, issue SDP-51
-  }
-
-  boolean completeStreamDeleteOperation(
-      final PathOperation streamOp, final boolean result, final Throwable thrown) {
-    // TODO erase code duplication
-    val streamName = extractStreamName(streamOp.item().name());
-    if (null == thrown) {
-      if (result) {
-        return completeOperation((O) streamOp, SUCC);
-      } else {
-        // Should I give stream and scope name to this method?
-        Loggers.ERR.debug("Failed to delete the stream {} in the scope {}", streamName, scopeName);
-        return completeOperation((O) streamOp, RESP_FAIL_UNKNOWN);
-      }
-    } else {
-      return completeFailedOperation((O) streamOp, thrown);
-    }
-  }
-
-  void submitStreamDeleteOperation(final PathOperation streamOp, final String nodeAddr) {
-    try {
-      val streamName = extractStreamName(streamOp.item().name());
-      val endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
-      val controller = controllerCache.computeIfAbsent(endpointUri, this::createController);
-      if (!controller
-          .sealStream(scopeName, streamName)
-          .get(controlApiTimeoutMillis, TimeUnit.MILLISECONDS)) {
-        Loggers.ERR.debug("Failed to seal the stream {} in the scope {}", streamName, scopeName);
-      }
-      val deleteStreamFuture = controller.deleteStream(scopeName, streamName);
-      deleteStreamFuture.handle(
-          (returned, thrown) -> completeStreamDeleteOperation(streamOp, returned, thrown));
-    } catch (final NullPointerException e) {
-      if (!isStarted()) {
-        completeOperation((O) streamOp, INTERRUPTED);
-      } else {
-        completeFailedOperation((O) streamOp, e);
-      }
-    } catch (final InterruptedException e) {
-      throwUnchecked(e);
-    } catch (final Throwable cause) {
-      completeFailedOperation((O) streamOp, cause);
+      return failOperation((O) evtOp, thrown);
     }
   }
 
@@ -764,7 +652,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
                     }
                   }));
       try {
-        if (!closeExecutor.awaitTermination(controlApiTimeoutMillis, TimeUnit.MILLISECONDS)) {
+        if (!closeExecutor.awaitTermination(controlApiTimeoutMillis, MILLISECONDS)) {
           Loggers.ERR.warn(
               "{}: storage driver timeout while closing one of \"{}\"",
               stepId,
@@ -778,8 +666,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
     }
   }
 
-  static StreamConfiguration combineStreamConfigAndName(
-      final String streamName, final StreamConfiguration config) {
+  static StreamConfiguration combineStreamConfigAndName(final String streamName, final StreamConfiguration config) {
     return StreamConfiguration.builder()
         .scalingPolicy(config.getScalingPolicy())
         .streamName(streamName)
