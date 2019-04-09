@@ -1,22 +1,21 @@
 ---
-load:
-  op:
-    timeoutMillis: 0
 storage:
   driver:
     control:
       timeoutMillis: 10000
-    create:
+    event:
       key:
         enabled: false
         count: 0
+      timeoutMillis: 100
     scaling:
       type: fixed
       rate: 0
       factor: 0
       segments: 1
-    namespace:
-      scope: goose
+    stream:
+      size: 1MB
+  namespace: goose
   net:
     bindBacklogSize: 0
     interestOpQueued: false

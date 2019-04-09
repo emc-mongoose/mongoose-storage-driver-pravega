@@ -1,24 +1,20 @@
 ---
-load:
-  op:
-    timeoutMillis: int
 storage:
   driver:
     control:
       timeoutMillis: int
-    create:
+    event:
       key:
         enabled: boolean
         count: long
-    read:
       timeoutMillis: int
     scaling:
       type: string
       rate: int
       factor: int
       segments: int
-    namespace:
-      scope: string
+    stream:
+      size: any
   net:
     bindBacklogSize: int
     interestOpQueued: boolean

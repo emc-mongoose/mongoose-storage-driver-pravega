@@ -115,10 +115,10 @@ docker run \
 
 | Name                              | Type            | Default Value | Description                                      |
 |:----------------------------------|:----------------|:--------------|:-------------------------------------------------|
-| load-op-timeoutMillis | integer         | 100           | The event read timeout in milliseconds
 | storage-driver-control-timeoutMillis | integer      | 30000         | The timeout for any Pravega Controller API call
-| storage-driver-create-key-enabled | boolean         | false         | Specifies if Mongoose should generate its own routing key during the events creation
-| storage-driver-create-key-count   | integer         | 0             | Specifies a max count of unique routing keys to use during the events creation (may be considered as a routing key period). 0 value means to use unique routing key for each new event
+| storage-driver-event-key-enabled | boolean         | false         | Specifies if Mongoose should generate its own routing key during the events creation
+| storage-driver-event-key-count   | integer         | 0             | Specifies a max count of unique routing keys to use during the events creation (may be considered as a routing key period). 0 value means to use unique routing key for each new event
+| storage-driver-event-timeoutMillis | integer         | 100           | The event read timeout in milliseconds
 | storage-driver-scaling-type       | one of: "fixed", "event_rate", "byte_rate" | fixed | The scaling policy type to use. [See the Pravega documentation](http://pravega.io/docs/latest/terminology/) for details
 | storage-driver-scaling-rate       | integer         | 0             | The scaling policy target rate. May be meausred in events per second either kilobytes per second depending on the scaling policy type
 | storage-driver-scaling-factor     | integer         | 0             | The scaling policy factor. From the Pravega javadoc: *the maximum number of splits of a segment for a scale-up event.*
@@ -216,28 +216,11 @@ Mongoose should perform the load operations on the *streams* when the configurat
 
 ### 4.2.1. Create
 
-**Notes**:
-> * Just creates empty streams
-> * Works synchronously
-
-Steps:
-1. Get the endpoint URI from the cache.
-2. Check if the corresponding `StreamManager` exists using the cache, create a new one if it doesn't.
-3. Check if the destination scope exists using the cache, create a new one if it doesn't.
-4. Create the corresponding stream using the `StreamManager` instance, scope name, etc.
-5. Invoke the load operation completion handler.
+Creates the [byte streams](https://github.com/pravega/pravega/wiki/PDP-30-ByteStream-API).
 
 ### 4.2.2. Read
 
-Read the whole streams (all the corresponding events)
-
-Steps:
-1. Get the endpoint URI from the cache.
-2. Check if the corresponding `StreamManager` exists using the cache, create a new one if it doesn't.
-3. Check if the corresponding `ClientFactory` exists using the cache, create a new one if it doesn't.
-4. Check if the corresponding `EventStreamReader<ByteBuffer>` exists using the cache, create a new one if it doesn't.
-5. Read all events in the stream in the loop, discard the returned byte buffers content.
-6. Invoke the load operation completion handler.
+Reads the [byte streams](https://github.com/pravega/pravega/wiki/PDP-30-ByteStream-API).
 
 ### 4.2.3. Update
 
