@@ -29,7 +29,7 @@ import com.emc.mongoose.base.logging.LogUtil;
 import com.emc.mongoose.base.logging.Loggers;
 import com.emc.mongoose.base.storage.Credential;
 import com.emc.mongoose.storage.driver.pravega.cache.ClientFactoryCreateFunction;
-import com.emc.mongoose.storage.driver.pravega.cache.ClientFactoryCreateFunctionImpl;
+import com.emc.mongoose.storage.driver.pravega.cache.CustomThreadCountClientFactory;
 import com.emc.mongoose.storage.driver.pravega.cache.EventWriterCreateFunction;
 import com.emc.mongoose.storage.driver.pravega.cache.ReaderCreateFunction;
 import com.emc.mongoose.storage.driver.pravega.cache.ReaderGroupManagerCreateFunction;
@@ -78,6 +78,7 @@ extends PreemptStorageDriverBase<I, O> {
   protected final String scopeName;
   protected final String[] endpointAddrs;
   protected final int nodePort;
+  protected final int concurrencyLimit;
   protected final int controlApiTimeoutMillis;
   protected final boolean createRoutingKeys;
   protected final long createRoutingKeysPeriod;
@@ -95,6 +96,17 @@ extends PreemptStorageDriverBase<I, O> {
   private final ScheduledExecutorService bgExecutor =
       Executors.newScheduledThreadPool(BACKGROUND_THREAD_COUNT);
 
+	@Value
+	final class ClientFactoryCreateFunctionImpl
+		implements ClientFactoryCreateFunction {
+
+		URI endpointUri;
+
+		@Override
+		public final CustomThreadCountClientFactory apply(final String scopeName) {
+			return CustomThreadCountClientFactory.withScope(scopeName, endpointUri, concurrencyLimit);
+		}
+	}
 
   @Value
   final class ScopeCreateFunctionImpl implements ScopeCreateFunction {
@@ -249,6 +261,7 @@ extends PreemptStorageDriverBase<I, O> {
   ) throws IllegalConfigurationException, IllegalArgumentException {
     super(stepId, dataInput, storageConfig, verifyFlag);
     val driverConfig = storageConfig.configVal("driver");
+    this.concurrencyLimit = driverConfig.intVal("limit-concurrency");
     this.controlApiTimeoutMillis = driverConfig.intVal("control-timeoutMillis");
     val scalingConfig = driverConfig.configVal("scaling");
     this.scalingPolicy = PravegaScalingConfig.scalingPolicy(scalingConfig);

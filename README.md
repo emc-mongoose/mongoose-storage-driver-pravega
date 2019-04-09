@@ -42,7 +42,7 @@
 # 1. Introduction
 
 The storage driver extends the Mongoose's Abstract Coop Storage Driver and uses the following libraries:
-* `pravega-client` version 0.3.2
+* `pravega-client` version 0.4.0
 
 # 2. Features
 
@@ -166,6 +166,10 @@ Mongoose and Pravega are using quite different concepts. So it's necessary to de
 | [Event](http://pravega.io/docs/latest/pravega-concepts/#events) | *Data Item* |
 | Stream Segment | N/A |
 
+**Note**:
+> The unlimited concurrency case (`storage-driver-limit-concurrency=0`) is not effective for this storage driver 
+> implementation.
+
 ## 4.1. Event Operations
 
 Mongoose should perform the load operations on the *events* when the configuration option `item-type` is set to `data`.
@@ -250,7 +254,7 @@ the deletion too.
 
 ## 4.2. Open Issues
 
-TODO
+* https://github.com/pravega/pravega/issues/3587
 
 # 5. Development
 
