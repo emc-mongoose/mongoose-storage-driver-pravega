@@ -14,7 +14,7 @@ storage:
       factor: int
       segments: int
     stream:
-      size: any
+      data: string
   net:
     bindBacklogSize: int
     interestOpQueued: boolean

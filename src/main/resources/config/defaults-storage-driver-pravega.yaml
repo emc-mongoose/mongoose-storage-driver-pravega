@@ -14,7 +14,7 @@ storage:
       factor: 0
       segments: 1
     stream:
-      size: 1MB
+      data: events
   namespace: goose
   net:
     bindBacklogSize: 0

@@ -20,16 +20,17 @@
 &nbsp;&nbsp;&nbsp;&nbsp;3.4.1. [Manual Scaling](#341-manual-scaling)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;3.4.2. [Multiple Destination Streams](#342-multiple-destination-streams)<br/>
 4. [Design](#4-design)<br/>
-&nbsp;&nbsp;4.1. [Event Operations](#41-event-operations)<br/>
+&nbsp;&nbsp;4.1. [Event Stream Operations](#41-event-stream-operations)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;4.1.1. [Create](#411-create)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;4.1.2. [Read](#412-read)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;4.1.3. [Update](#413-update)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;4.1.4. [Delete](#414-delete)<br/>
-&nbsp;&nbsp;4.2. [Stream Operations](#42-stream-operations)<br/>
+&nbsp;&nbsp;4.2. [Byte Stream Operations](#42-byte-stream-operations)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;4.2.1. [Create](#421-create)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;4.2.2. [Read](#422-read)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;4.2.3. [Update](#423-update)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;4.2.4. [Delete](#424-delete)<br/>
+&nbsp;&nbsp;4.3. [Open Issues](#43-open-issues)<br/>
 5. [Development](#5-development)<br/>
 &nbsp;&nbsp;5.1. [Build](#51-build)<br/>
 &nbsp;&nbsp;5.2. [Test](#52-test)<br/>
@@ -123,6 +124,7 @@ docker run \
 | storage-driver-scaling-rate       | integer         | 0             | The scaling policy target rate. May be meausred in events per second either kilobytes per second depending on the scaling policy type
 | storage-driver-scaling-factor     | integer         | 0             | The scaling policy factor. From the Pravega javadoc: *the maximum number of splits of a segment for a scale-up event.*
 | storage-driver-scaling-segments   | integer         | 1             | From the Pravega javadoc: *the minimum number of segments that a stream can have independent of the number of scale down events.*
+| storage-driver-stream-data        | enum            | "events"      | Work on events or byte streams (if `bytes` is set)
 | storage-net-node-addrs            | list of strings | 127.0.0.1     | The list of the Pravega storage nodes to use for the load
 | storage-net-node-port             | integer         | 9090          | The default port of the Pravega storage nodes, should be explicitly set to 9090 (the value used by Pravega by default)
 
@@ -166,7 +168,7 @@ Mongoose and Pravega are using quite different concepts. So it's necessary to de
 | [Event](http://pravega.io/docs/latest/pravega-concepts/#events) | *Data Item* |
 | Stream Segment | N/A |
 
-## 4.1. Event Operations
+## 4.1. Event Stream Operations
 
 Mongoose should perform the load operations on the *events* when the configuration option `item-type` is set to `data`.
 
@@ -210,9 +212,10 @@ to write the events.
 
 Not supported.
 
-## 4.2. Stream Operations
+## 4.2. Byte Stream Operations
 
-Mongoose should perform the load operations on the *streams* when the configuration option `item-type` is set to `path`.
+Mongoose should perform the load operations on the *streams* when the configuration option `storage-driver-stream-data` 
+is set to `bytes`. This means that the whole streams are being accounted as *items*.
 
 ### 4.2.1. Create
 
@@ -231,7 +234,7 @@ Not supported
 Before the deletion, the stream must be sealed because of Pravega concepts. So the sealing of the stream is done during
 the deletion too.
 
-## 4.2. Open Issues
+## 4.3. Open Issues
 
 * https://github.com/pravega/pravega/issues/3587
 
