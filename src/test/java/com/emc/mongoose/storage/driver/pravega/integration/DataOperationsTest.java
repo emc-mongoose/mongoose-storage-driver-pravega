@@ -2,7 +2,6 @@ package com.emc.mongoose.storage.driver.pravega.integration;
 
 import static com.emc.mongoose.base.Constants.APP_NAME;
 import static com.emc.mongoose.base.Constants.MIB;
-import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.DEFAULT_SCOPE;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
@@ -17,7 +16,6 @@ import com.emc.mongoose.base.item.op.data.DataOperationImpl;
 import com.emc.mongoose.storage.driver.pravega.PravegaStorageDriver;
 import com.emc.mongoose.storage.driver.pravega.io.ByteBufferSerializer;
 import com.emc.mongoose.storage.driver.pravega.util.PravegaNode;
-import com.emc.mongoose.storage.driver.pravega.util.docker.PravegaNodeContainer;
 import com.github.akurilov.commons.collection.TreeUtil;
 import com.github.akurilov.commons.system.SizeInBytes;
 import com.github.akurilov.confuse.Config;
@@ -32,9 +30,6 @@ import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.stream.Collectors;
 import lombok.val;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 
 public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOperation<DataItem>> {
@@ -135,7 +130,7 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
         new DataOperationImpl<>(
             0, OpType.CREATE, dataItem, null, streamName, credential, null, 0, null);
 
-    String scope = DEFAULT_SCOPE;
+    String scope = "goose";
     prepare(createTask);
     createTask.status(Operation.Status.ACTIVE);
     submit(createTask);
@@ -170,7 +165,7 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
                 ReaderConfig.builder().build())) {
       System.out.format("Reading all the events from %s/%s%n", scope, streamName);
       EventRead<ByteBuffer> event = null;
-      event = reader.readNextEvent(readTimeoutMillis);
+      event = reader.readNextEvent(opTimeoutMillis);
       if (event.getEvent() != null) {
         assertEquals(
             "we didn't read the same size we had put into stream",
@@ -189,7 +184,8 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
     final DataOperation<DataItem> createTask =
         new DataOperationImpl<>(
             0, OpType.CREATE, dataItem, null, streamName, credential, null, 0, null);
-    String scope = DEFAULT_SCOPE;
+
+    String scope = "goose";
     prepare(createTask);
     createTask.status(Operation.Status.ACTIVE);
     submit(createTask);
