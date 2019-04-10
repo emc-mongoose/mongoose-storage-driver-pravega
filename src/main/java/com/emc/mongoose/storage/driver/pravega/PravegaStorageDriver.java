@@ -317,7 +317,8 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
       final String prefix,
       final int idRadix,
       final I lastPrevItem,
-      final int count) {
+      final int count) 
+      throws EOFException {
 
     if (listWasCalled) {
       throw new EOFException();
