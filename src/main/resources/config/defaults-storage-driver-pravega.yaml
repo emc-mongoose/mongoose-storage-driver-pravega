@@ -1,4 +1,7 @@
 ---
+load:
+  op:
+    timeoutMillis: 0
 storage:
   driver:
     control:
@@ -7,8 +10,6 @@ storage:
       key:
         enabled: false
         count: 0
-    read:
-      timeoutMillis: 100
     scaling:
       type: fixed
       rate: 0

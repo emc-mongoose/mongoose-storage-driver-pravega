@@ -1,5 +1,6 @@
 package com.emc.mongoose.storage.driver.pravega;
 
+import static com.emc.mongoose.base.Exceptions.throwUncheckedIfInterrupted;
 import static com.emc.mongoose.base.item.op.OpType.NOOP;
 import static com.emc.mongoose.base.item.op.Operation.SLASH;
 import static com.emc.mongoose.base.item.op.Operation.Status.FAIL_UNKNOWN;
@@ -7,11 +8,11 @@ import static com.emc.mongoose.base.item.op.Operation.Status.INTERRUPTED;
 import static com.emc.mongoose.base.item.op.Operation.Status.RESP_FAIL_UNKNOWN;
 import static com.emc.mongoose.base.item.op.Operation.Status.SUCC;
 import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.BACKGROUND_THREAD_COUNT;
-import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.DEFAULT_SCOPE;
 import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.DRIVER_NAME;
 import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.MAX_BACKOFF_MILLIS;
 import static com.emc.mongoose.storage.driver.pravega.io.StreamScaleUtil.scaleToFixedSegmentCount;
 import static com.github.akurilov.commons.lang.Exceptions.throwUnchecked;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 import com.emc.mongoose.base.config.IllegalConfigurationException;
 import com.emc.mongoose.base.data.DataInput;
@@ -80,7 +81,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
   protected final int controlApiTimeoutMillis;
   protected final boolean createRoutingKeys;
   protected final long createRoutingKeysPeriod;
-  protected final int readTimeoutMillis;
+  protected final int opTimeoutMillis;
   protected final Serializer<DataItem> evtSerializer = new DataItemSerializer(false);
 
   protected final Serializer<ByteBuffer> evtDeserializer = new ByteBufferSerializer();
@@ -94,8 +95,6 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
   private final ScheduledExecutorService bgExecutor =
       Executors.newScheduledThreadPool(BACKGROUND_THREAD_COUNT);
 
-  // should be an inner class in order to access the stream create function implementation
-  // constructor
   @Value
   final class ScopeCreateFunctionImpl implements ScopeCreateFunction {
 
@@ -104,7 +103,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
     @Override
     public final StreamCreateFunction apply(final String scopeName) {
       try {
-        if (controller.createScope(scopeName).get(controlApiTimeoutMillis, TimeUnit.MILLISECONDS)) {
+        if (controller.createScope(scopeName).get(controlApiTimeoutMillis, MILLISECONDS)) {
           Loggers.MSG.trace("Scope \"{}\" was created", scopeName);
         } else {
           Loggers.MSG.info(
@@ -120,7 +119,6 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
     }
   }
 
-  // should be an inner class in order to access the storage driver instance stream config field
   @Value
   final class ScopeCreateFunctionForStreamConfigImpl implements ScopeCreateFunctionForStreamConfig {
 
@@ -131,7 +129,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
       final StreamConfiguration streamConfig =
           StreamConfiguration.builder().scalingPolicy(scalingPolicy).scope(scopeName).build();
       try {
-        if (controller.createScope(scopeName).get(controlApiTimeoutMillis, TimeUnit.MILLISECONDS)) {
+        if (controller.createScope(scopeName).get(controlApiTimeoutMillis, MILLISECONDS)) {
           Loggers.MSG.trace("Scope \"{}\" was created", scopeName);
         } else {
           Loggers.MSG.info(
@@ -147,7 +145,6 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
     }
   }
 
-  // should be an inner class in order to access the storage driver instance stream config field
   @Value
   final class StreamCreateFunctionImpl implements StreamCreateFunction {
 
@@ -165,7 +162,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
       try {
         if (controller
             .createStream(streamConfig)
-            .get(controlApiTimeoutMillis, TimeUnit.MILLISECONDS)) {
+            .get(controlApiTimeoutMillis, MILLISECONDS)) {
           Loggers.MSG.trace(
               "Stream \"{}/{}\" was created using the config: {}",
               scopeName,
@@ -185,8 +182,6 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
     }
   }
 
-  // should be an inner class in order to access the storage driver instance's fields (serializer,
-  // writer config)
   @Value
   final class EventWriterCreateFunctionImpl implements EventWriterCreateFunction {
 
@@ -198,8 +193,6 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
     }
   }
 
-  // should be an inner class in order to access the storage driver instance's fields (serializer,
-  // reader config)
   @Value
   public final class ReaderCreateFunctionImpl implements ReaderCreateFunction {
 
@@ -267,7 +260,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
     val createRoutingKeysConfig = driverConfig.configVal("create-key");
     createRoutingKeys = createRoutingKeysConfig.boolVal("enabled");
     createRoutingKeysPeriod = createRoutingKeysConfig.longVal("count");
-    readTimeoutMillis = driverConfig.intVal("read-timeoutMillis");
+    opTimeoutMillis = driverConfig.intVal("load-op-timeoutMillis");
     endpointAddrs = endpointAddrList.toArray(new String[endpointAddrList.size()]);
     requestAuthTokenFunc = null; // do not use
     requestNewPathFunc = null; // do not use
@@ -326,8 +319,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
       final String prefix,
       final int idRadix,
       final I lastPrevItem,
-      final int count)
-      throws IOException {
+      final int count) {
 
     val buff = new ArrayList<I>(count);
     for (int i = 0; i < count; i++) {
@@ -532,7 +524,6 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
 
   void submitEventReadOperation(final Operation Op, final String nodeAddr) {
     val endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
-    val scopeName = DEFAULT_SCOPE;
     val streamName =
         (Op instanceof DataOperation)
             ? extractStreamName(Op.dstPath())
@@ -571,30 +562,27 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
     Loggers.MSG.trace("No more events from {} {}", scopeName, streamName);
   }
 
-  void readEvent(DataOperation dataOp, EventStreamReader<ByteBuffer> evtReader) {
-    EventRead<ByteBuffer> event = null;
-    int bytesDone = 0;
-    Exception thrown = null;
-    try {
-      event = evtReader.readNextEvent(readTimeoutMillis);
-      event.getEvent();
-      Loggers.MSG.trace("Read event {}", event.getEvent());
-      bytesDone = event.getEvent().remaining();
-      dataOp.item().size(bytesDone);
-
-      completeEventReadOperation(dataOp, dataOp.item(), thrown);
-    } catch (Exception e) { // including ReinitializationRequiredException
-      thrown = e;
-      completeEventReadOperation(dataOp, dataOp.item(), thrown);
-    }
-  }
+	void readEvent(final DataOperation evtOp, EventStreamReader<ByteBuffer> evtReader) {
+		try {
+			val evt = evtReader.readNextEvent(opTimeoutMillis);
+			val payload = evt.getEvent();
+			val bytesDone = payload.remaining();
+			val evtItem = evtOp.item();
+			evtItem.size(bytesDone);
+			completeEventReadOperation(evtOp, evtItem, null);
+		} catch(final Throwable thrown) {
+			throwUncheckedIfInterrupted(thrown);
+			LogUtil.exception(Level.WARN, thrown, "Read event {} failure");
+			evtOp.status(FAIL_UNKNOWN);
+		}
+	}
 
   void readStream(PathOperation pathOp, EventStreamReader<ByteBuffer> evtReader) {
     EventRead<ByteBuffer> event = null;
     int bytesDone = 0;
     Exception thrown = null;
     try {
-      for (event = evtReader.readNextEvent(readTimeoutMillis); null != event.getEvent(); ) {
+      for (event = evtReader.readNextEvent(opTimeoutMillis); null != event.getEvent(); ) {
         Loggers.MSG.trace("Read event {}", event.getEvent());
         bytesDone += event.getEvent().remaining();
       }
@@ -764,7 +752,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
                     }
                   }));
       try {
-        if (!closeExecutor.awaitTermination(controlApiTimeoutMillis, TimeUnit.MILLISECONDS)) {
+        if (!closeExecutor.awaitTermination(controlApiTimeoutMillis, MILLISECONDS)) {
           Loggers.ERR.warn(
               "{}: storage driver timeout while closing one of \"{}\"",
               stepId,
