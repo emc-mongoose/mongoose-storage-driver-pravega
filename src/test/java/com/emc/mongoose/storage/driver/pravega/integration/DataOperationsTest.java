@@ -122,7 +122,7 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
 
   @Test
   public final void testCreateEvent() throws Exception {
-    final DataItem dataItem = new DataItemImpl(0, MIB-8, 0);
+    val dataItem = new DataItemImpl(0, MIB-8, 0);
     dataItem.name("0000");
     dataItem.dataInput(DATA_INPUT);
     String streamName = "default";
