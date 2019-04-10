@@ -581,7 +581,7 @@ public class PravegaStorageDriver<I extends Item, O extends Operation<I>>
     int bytesDone = 0;
     Exception thrown = null;
     try {
-      for (event = evtReader.readNextEvent(readTimeoutMillis); null != event.getEvent(); ) {
+      for (event = evtReader.readNextEvent(opTimeoutMillis); null != event.getEvent(); ) {
         bytesDone += event.getEvent().remaining();
       }
       pathOp.countBytesDone(bytesDone);
