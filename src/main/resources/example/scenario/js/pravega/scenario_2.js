@@ -24,7 +24,7 @@ function writeEventsLoadStepConfig(c) {
 		},
 		"storage" : {
 			"driver" : {
-				"create" : {
+				"event" : {
 					"key" : {
 						"count" : 0 // -> use new routing key for each new event
 					}

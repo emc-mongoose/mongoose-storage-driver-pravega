@@ -255,7 +255,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		this.createRoutingKeys = createRoutingKeysConfig.boolVal("enabled");
 		this.createRoutingKeysPeriod = createRoutingKeysConfig.longVal("count");
 		this.readTimeoutMillis = eventConfig.intVal("timeoutMillis");
-		this.streamDataType = StreamDataType.valueOf(driverConfig.stringVal("stream-data"));
+		this.streamDataType = StreamDataType.valueOf(driverConfig.stringVal("stream-data").toUpperCase());
 		this.endpointAddrs = endpointAddrList.toArray(new String[endpointAddrList.size()]);
 		this.requestAuthTokenFunc = null; // do not use
 		this.requestNewPathFunc = null; // do not use
