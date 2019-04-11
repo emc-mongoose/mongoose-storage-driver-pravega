@@ -15,6 +15,7 @@ storage:
       segments: int
     stream:
       data: string
+  namespace: string
   net:
     bindBacklogSize: int
     interestOpQueued: boolean
