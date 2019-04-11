@@ -247,6 +247,9 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		val netConfig = storageConfig.configVal("net");
 		this.uriSchema = netConfig.stringVal("uri-schema");
 		this.scopeName = storageConfig.stringVal("namespace");
+		if(scopeName == null || scopeName.isEmpty()) {
+			Loggers.ERR.warn("Scope name not set, use the \"storage-namespace\" configuration option");
+		}
 		val nodeConfig = netConfig.configVal("node");
 		this.nodePort = nodeConfig.intVal("port");
 		val endpointAddrList = nodeConfig.listVal("addrs");
