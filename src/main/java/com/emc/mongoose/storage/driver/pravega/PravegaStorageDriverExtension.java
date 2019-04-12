@@ -6,20 +6,18 @@ import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.DRIVER_NA
 import com.emc.mongoose.base.config.IllegalConfigurationException;
 import com.emc.mongoose.base.data.DataInput;
 import com.emc.mongoose.base.env.ExtensionBase;
-import com.emc.mongoose.base.item.Item;
-import com.emc.mongoose.base.item.op.Operation;
+import com.emc.mongoose.base.item.DataItem;
+import com.emc.mongoose.base.item.op.data.DataOperation;
 import com.emc.mongoose.base.storage.driver.StorageDriverFactory;
 import com.github.akurilov.confuse.Config;
 import com.github.akurilov.confuse.SchemaProvider;
 import com.github.akurilov.confuse.io.yaml.YamlSchemaProviderBase;
 
 import java.io.InputStream;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 
 public final class PravegaStorageDriverExtension<
-	I extends Item, O extends Operation<I>, T extends PravegaStorageDriver<I, O>
+	I extends DataItem, O extends DataOperation<I>, T extends PravegaStorageDriver<I, O>
 >
 extends ExtensionBase
 implements StorageDriverFactory<I, O, T> {
@@ -39,14 +37,10 @@ implements StorageDriverFactory<I, O, T> {
 
 	private static final String DEFAULTS_FILE_NAME = "defaults-storage-driver-" + DRIVER_NAME + ".yaml";
 
-	private static final List<String> RES_INSTALL_FILES = Collections.unmodifiableList(
-		Arrays.asList(
-			"config/" + DEFAULTS_FILE_NAME,
-			"example/scenario/js/pravega/manual_scaling.js",
-			"example/scenario/js/pravega/scenario_1.js",
-			"example/scenario/js/pravega/scenario_2.js",
-			"example/scenario/js/pravega/scenario_3.js"
-		)
+	private static final List<String> RES_INSTALL_FILES = List.of(
+		"config/" + DEFAULTS_FILE_NAME, "example/scenario/js/pravega/manual_scaling.js",
+		"example/scenario/js/pravega/scenario_1.js", "example/scenario/js/pravega/scenario_2.js",
+		"example/scenario/js/pravega/scenario_3.js"
 	);
 
 	@Override

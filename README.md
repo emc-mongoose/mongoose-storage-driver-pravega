@@ -20,16 +20,17 @@
 &nbsp;&nbsp;&nbsp;&nbsp;3.4.1. [Manual Scaling](#341-manual-scaling)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;3.4.2. [Multiple Destination Streams](#342-multiple-destination-streams)<br/>
 4. [Design](#4-design)<br/>
-&nbsp;&nbsp;4.1. [Event Operations](#41-event-operations)<br/>
+&nbsp;&nbsp;4.1. [Event Stream Operations](#41-event-stream-operations)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;4.1.1. [Create](#411-create)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;4.1.2. [Read](#412-read)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;4.1.3. [Update](#413-update)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;4.1.4. [Delete](#414-delete)<br/>
-&nbsp;&nbsp;4.2. [Stream Operations](#42-stream-operations)<br/>
+&nbsp;&nbsp;4.2. [Byte Stream Operations](#42-byte-stream-operations)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;4.2.1. [Create](#421-create)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;4.2.2. [Read](#422-read)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;4.2.3. [Update](#423-update)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;4.2.4. [Delete](#424-delete)<br/>
+&nbsp;&nbsp;4.3. [Open Issues](#43-open-issues)<br/>
 5. [Development](#5-development)<br/>
 &nbsp;&nbsp;5.1. [Build](#51-build)<br/>
 &nbsp;&nbsp;5.2. [Test](#52-test)<br/>
@@ -115,14 +116,15 @@ docker run \
 
 | Name                              | Type            | Default Value | Description                                      |
 |:----------------------------------|:----------------|:--------------|:-------------------------------------------------|
-| load-op-timeoutMillis | integer         | 100           | The event read timeout in milliseconds
 | storage-driver-control-timeoutMillis | integer      | 30000         | The timeout for any Pravega Controller API call
-| storage-driver-create-key-enabled | boolean         | false         | Specifies if Mongoose should generate its own routing key during the events creation
-| storage-driver-create-key-count   | integer         | 0             | Specifies a max count of unique routing keys to use during the events creation (may be considered as a routing key period). 0 value means to use unique routing key for each new event
+| storage-driver-event-key-enabled | boolean         | false         | Specifies if Mongoose should generate its own routing key during the events creation
+| storage-driver-event-key-count   | integer         | 0             | Specifies a max count of unique routing keys to use during the events creation (may be considered as a routing key period). 0 value means to use unique routing key for each new event
+| storage-driver-event-timeoutMillis | integer         | 100           | The event read timeout in milliseconds
 | storage-driver-scaling-type       | one of: "fixed", "event_rate", "byte_rate" | fixed | The scaling policy type to use. [See the Pravega documentation](http://pravega.io/docs/latest/terminology/) for details
 | storage-driver-scaling-rate       | integer         | 0             | The scaling policy target rate. May be meausred in events per second either kilobytes per second depending on the scaling policy type
 | storage-driver-scaling-factor     | integer         | 0             | The scaling policy factor. From the Pravega javadoc: *the maximum number of splits of a segment for a scale-up event.*
 | storage-driver-scaling-segments   | integer         | 1             | From the Pravega javadoc: *the minimum number of segments that a stream can have independent of the number of scale down events.*
+| storage-driver-stream-data        | enum            | "events"      | Work on events or byte streams (if `bytes` is set)
 | storage-net-node-addrs            | list of strings | 127.0.0.1     | The list of the Pravega storage nodes to use for the load
 | storage-net-node-port             | integer         | 9090          | The default port of the Pravega storage nodes, should be explicitly set to 9090 (the value used by Pravega by default)
 
@@ -166,7 +168,7 @@ Mongoose and Pravega are using quite different concepts. So it's necessary to de
 | [Event](http://pravega.io/docs/latest/pravega-concepts/#events) | *Data Item* |
 | Stream Segment | N/A |
 
-## 4.1. Event Operations
+## 4.1. Event Stream Operations
 
 Mongoose should perform the load operations on the *events* when the configuration option `item-type` is set to `data`.
 
@@ -210,34 +212,18 @@ to write the events.
 
 Not supported.
 
-## 4.2. Stream Operations
+## 4.2. Byte Stream Operations
 
-Mongoose should perform the load operations on the *streams* when the configuration option `item-type` is set to `path`.
+Mongoose should perform the load operations on the *streams* when the configuration option `storage-driver-stream-data` 
+is set to `bytes`. This means that the whole streams are being accounted as *items*.
 
 ### 4.2.1. Create
 
-**Notes**:
-> * Just creates empty streams
-> * Works synchronously
-
-Steps:
-1. Get the endpoint URI from the cache.
-2. Check if the corresponding `StreamManager` exists using the cache, create a new one if it doesn't.
-3. Check if the destination scope exists using the cache, create a new one if it doesn't.
-4. Create the corresponding stream using the `StreamManager` instance, scope name, etc.
-5. Invoke the load operation completion handler.
+Creates the [byte streams](https://github.com/pravega/pravega/wiki/PDP-30-ByteStream-API).
 
 ### 4.2.2. Read
 
-Read the whole streams (all the corresponding events)
-
-Steps:
-1. Get the endpoint URI from the cache.
-2. Check if the corresponding `StreamManager` exists using the cache, create a new one if it doesn't.
-3. Check if the corresponding `ClientFactory` exists using the cache, create a new one if it doesn't.
-4. Check if the corresponding `EventStreamReader<ByteBuffer>` exists using the cache, create a new one if it doesn't.
-5. Read all events in the stream in the loop, discard the returned byte buffers content.
-6. Invoke the load operation completion handler.
+Reads the [byte streams](https://github.com/pravega/pravega/wiki/PDP-30-ByteStream-API).
 
 ### 4.2.3. Update
 
@@ -248,7 +234,7 @@ Not supported
 Before the deletion, the stream must be sealed because of Pravega concepts. So the sealing of the stream is done during
 the deletion too.
 
-## 4.2. Open Issues
+## 4.3. Open Issues
 
 * https://github.com/pravega/pravega/issues/3587
 

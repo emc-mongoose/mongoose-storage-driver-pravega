@@ -77,18 +77,19 @@ public class CommonTest {
 			config.val("storage-auth-token", null);
 			config.val("storage-auth-secret", CREDENTIAL.getSecret());
 			config.val("storage-driver-control-timeoutMillis", 10_000);
-			config.val("storage-driver-create-key-enabled", true);
-			config.val("storage-driver-create-key-count", 0);
-			config.val("storage-driver-read-timeoutMillis", 100);
+			config.val("storage-driver-event-key-enabled", true);
+			config.val("storage-driver-event-key-count", 0);
+			config.val("storage-driver-event-timeoutMillis", 100);
 			config.val("storage-driver-scaling-type", "fixed");
 			config.val("storage-driver-scaling-rate", 0);
 			config.val("storage-driver-scaling-factor", 0);
 			config.val("storage-driver-scaling-segments", 1);
+			config.val("storage-driver-stream-data", "events");
 			config.val("storage-driver-threads", 0);
 			config.val("storage-driver-limit-queue-input", 1_000_000);
 			config.val("storage-driver-limit-queue-output", 1_000_000);
 			config.val("storage-driver-limit-concurrency", 1);
-			config.val("storage-driver-namespace-scope", "goose");
+			config.val("storage-namespace", "goose");
 			return config;
 		} catch(final Throwable cause) {
 			throw new RuntimeException(cause);
