@@ -37,7 +37,7 @@ ext {
 		guava                    : "20.0",
 		log4j                    : "2.8.2",
 		mongooseBase             : "4.2.8",
-		mongooseStorageDriverCoop: "4.2.16",
+		mongooseStorageDriverCoop: "4.2.17",
 		opencensus               : "0.8.0",
 		pravega                  : "0.4.0",
 		protobuf                 : "3.4.0",
