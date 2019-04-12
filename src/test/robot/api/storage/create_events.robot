@@ -19,7 +19,7 @@ Create Events Test
     ...  --item-data-size=1000KB
     ...  --load-step-id=${step_id}
     ...  --load-op-limit-count=10
-    ...  --storage-driver-limit-concurrency=1
+    ...  --storage-namespace=goose
     ${std_out} =  Execute Mongoose Scenario  ${args}
     Log  ${std_out}
     Validate Metrics Total Log File  ${step_id}  CREATE  10  0  10240000

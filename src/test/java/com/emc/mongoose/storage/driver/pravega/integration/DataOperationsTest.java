@@ -37,7 +37,8 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
 
   static {
     try {
-      DATA_INPUT = DataInput.instance(null, "7a42d9c483244167", new SizeInBytes(1024*1024-8), 16);
+      DATA_INPUT =
+          DataInput.instance(null, "7a42d9c483244167", new SizeInBytes(1024 * 1024 - 8), 16);
     } catch (final IOException e) {
       throw new AssertionError(e);
     }
@@ -88,18 +89,19 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
       config.val("storage-auth-secret", null);
 
       config.val("storage-driver-control-timeoutMillis", 10_000);
-      config.val("storage-driver-create-key-enabled", true);
-      config.val("storage-driver-create-key-count", 0);
-      config.val("storage-driver-read-timeoutMillis", 100);
+      config.val("storage-driver-event-key-enabled", true);
+      config.val("storage-driver-event-key-count", 0);
+      config.val("storage-driver-event-timeoutMillis", 100);
       config.val("storage-driver-scaling-type", "fixed");
       config.val("storage-driver-scaling-rate", 0);
       config.val("storage-driver-scaling-factor", 0);
       config.val("storage-driver-scaling-segments", 1);
+      config.val("storage-driver-stream-data", "events");
       config.val("storage-driver-threads", 0);
       config.val("storage-driver-limit-queue-input", 1_000_000);
       config.val("storage-driver-limit-queue-output", 1_000_000);
       config.val("storage-driver-limit-concurrency", 0);
-      config.val("storage-driver-namespace-scope", "goose");
+      config.val("storage-namespace", "goose");
 
       return config;
     } catch (final Throwable cause) {
@@ -122,7 +124,7 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
 
   @Test
   public final void testCreateEvent() throws Exception {
-    final DataItem dataItem = new DataItemImpl(0, MIB-8, 0);
+    val dataItem = new DataItemImpl(0, MIB - 8, 0);
     dataItem.name("0000");
     dataItem.dataInput(DATA_INPUT);
     String streamName = "default";
@@ -165,7 +167,7 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
                 ReaderConfig.builder().build())) {
       System.out.format("Reading all the events from %s/%s%n", scope, streamName);
       EventRead<ByteBuffer> event = null;
-      event = reader.readNextEvent(opTimeoutMillis);
+      event = reader.readNextEvent(readTimeoutMillis);
       if (event.getEvent() != null) {
         assertEquals(
             "we didn't read the same size we had put into stream",
@@ -177,7 +179,7 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
 
   @Test
   public final void testReadEvent() throws Exception {
-    final DataItem dataItem = new DataItemImpl(0, MIB-8, 0);
+    final DataItem dataItem = new DataItemImpl(0, MIB - 8, 0);
     dataItem.name("0000");
     dataItem.dataInput(DATA_INPUT);
     String streamName = "default";
@@ -197,7 +199,7 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
     assertEquals(Operation.Status.SUCC, result.status());
     assertEquals(dataItem.size(), createTask.countBytesDone());
 
-    final DataItem dataItem2 = new DataItemImpl(0, MIB-8, 0);
+    final DataItem dataItem2 = new DataItemImpl(0, MIB - 8, 0);
     dataItem2.name("0001");
     final DataOperation<DataItem> createTask2 =
         new DataOperationImpl<>(
