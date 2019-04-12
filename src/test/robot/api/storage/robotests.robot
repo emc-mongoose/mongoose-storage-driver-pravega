@@ -1,5 +1,5 @@
 *** Settings ***
-Force Tags  create_events
+Force Tags  robotests
 Library  OperatingSystem
 Library  CSVLibrary
 Test Setup  Start Containers
@@ -8,21 +8,43 @@ Test Teardown  Stop Containers
 *** Variables ***
 ${MONGOOSE_IMAGE_NAME} =  emcmongoose/mongoose-storage-driver-pravega
 ${MONGOOSE_CONTAINER_NAME} =  mongoose-storage-driver-pravega
+${MONGOOSE_CONTAINER_DATA_DIR} =  /data
 
 ${LOG_DIR} =  build/log
+${DATA_DIR} =  src/test/robot/api/storage/data
 
 *** Test Cases ***
+Create and read Events Test
+    ${step_id} =  Set Variable  create_and_read_events_test
+    Remove Directory  ${LOG_DIR}/${step_id}  recursive=True
+    ${args} =  Catenate  SEPARATOR= \\\n\t
+    ...  --load-step-id=${step_id}
+    ...  --load-op-recycle
+    ...  --run-scenario=${MONGOOSE_CONTAINER_DATA_DIR}/${step_id}.js
+    ${std_out} =  Execute Mongoose Scenario  ${args}
+    Log  ${std_out}
+    Validate Metrics Total Log File  ${step_id}  READ  1000  0  1024000000
+
 Create Events Test
     ${step_id} =  Set Variable  create_events_test
     Remove Directory  ${LOG_DIR}/${step_id}  recursive=True
     ${args} =  Catenate  SEPARATOR= \\\n\t
-    ...  --item-data-size=1000KB
     ...  --load-step-id=${step_id}
-    ...  --load-op-limit-count=10
-    ...  --storage-namespace=goose
+    ...  --run-scenario=${MONGOOSE_CONTAINER_DATA_DIR}/${step_id}.js
     ${std_out} =  Execute Mongoose Scenario  ${args}
     Log  ${std_out}
     Validate Metrics Total Log File  ${step_id}  CREATE  10  0  10240000
+
+Create Stream Test
+    ${step_id} =  Set Variable  create_stream_test
+    ${stream_name} =  Set Variable  streamtest
+    Remove Directory  ${LOG_DIR}/${step_id}  recursive=True
+    ${args} =  Catenate  SEPARATOR= \\\n\t
+    ...  --load-step-id=${step_id}
+    ...  --run-scenario=${MONGOOSE_CONTAINER_DATA_DIR}/${step_id}.js
+    ${std_out} =  Execute Mongoose Scenario  ${args}
+    Log  ${std_out}
+    Validate Metrics Log File  ${step_id}  ${stream_name}
 
 *** Keyword ***
 Execute Mongoose Scenario
@@ -36,6 +58,7 @@ Execute Mongoose Scenario
     ...  docker run
     ...  --name ${MONGOOSE_CONTAINER_NAME}
     ...  --network host
+    ...  --volume ${host_working_dir}/${DATA_DIR}:${MONGOOSE_CONTAINER_DATA_DIR}
     ...  --volume ${host_working_dir}/${LOG_DIR}:/root/.mongoose/${version}/log
     ...  ${MONGOOSE_IMAGE_NAME}:${image_version}
     ...  ${args}
@@ -61,3 +84,10 @@ Validate Metrics Total Log File
     Should Be Equal As Strings  &{metricsTotal[0]}[CountSucc]  ${count_succ}
     Should Be Equal As Strings  &{metricsTotal[0]}[CountFail]  ${count_fail}
     Should Be Equal As Strings  &{metricsTotal[0]}[Size]  ${transfer_size}
+
+Validate Metrics Log File
+    [Arguments]  ${step_id}  ${stream_name}
+    ${result} =  Grep File  ${LOG_DIR}/${step_id}/3rdparty.log  Stream created successfully: ${stream_name}
+    Run Keyword If  "${result}"!="${EMPTY}"
+    ...  Log  passed
+    ...  ELSE  Fail  Stream ${stream_name} not created

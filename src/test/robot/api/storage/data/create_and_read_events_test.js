@@ -4,15 +4,21 @@ PreconditionLoad
 			"type" : "data",
 			"output" : {
 				"path" : "test"
-			}
-	},
+			},
+            "data" : {
+                "size" : "1000KB"
+            }
+		},
 	    "load" : {
         	"op" : {
             	"limit" : {
-                	"count" : 5
+                	"count" : 1000
             	}
-        }
-    }
+        	}
+    	},
+        "storage" : {
+            "namespace" : "goose"
+		}
 	})
 	.run();
 
@@ -22,15 +28,21 @@ ReadLoad
 	        "type" : "data",
 	        "input" : {
 	            "path" : "test"
-	        }
+	        },
+            "data" : {
+                "size" : "1000KB"
+            }
 	    },   
 	    "load" : {
 	        "op" : {
 	            "type" : "read",
 	            "limit" : {
-	                "count" : 5
+	                "count" : 1000
 	            }
 	        }
-	    }
+	    },
+        "storage" : {
+            "namespace" : "goose"
+        }
 	})
 	.run();
