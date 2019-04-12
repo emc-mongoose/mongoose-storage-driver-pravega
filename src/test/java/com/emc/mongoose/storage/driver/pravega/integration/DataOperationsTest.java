@@ -37,7 +37,8 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
 
   static {
     try {
-      DATA_INPUT = DataInput.instance(null, "7a42d9c483244167", new SizeInBytes(1024*1024-8), 16);
+      DATA_INPUT =
+          DataInput.instance(null, "7a42d9c483244167", new SizeInBytes(1024 * 1024 - 8), 16);
     } catch (final IOException e) {
       throw new AssertionError(e);
     }
@@ -123,7 +124,7 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
 
   @Test
   public final void testCreateEvent() throws Exception {
-    val dataItem = new DataItemImpl(0, MIB-8, 0);
+    val dataItem = new DataItemImpl(0, MIB - 8, 0);
     dataItem.name("0000");
     dataItem.dataInput(DATA_INPUT);
     String streamName = "default";
@@ -168,7 +169,6 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
       EventRead<ByteBuffer> event = null;
       event = reader.readNextEvent(readTimeoutMillis);
       if (event.getEvent() != null) {
-
         assertEquals(
             "we didn't read the same size we had put into stream",
             (int) dataItem.size(),
@@ -179,7 +179,7 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
 
   @Test
   public final void testReadEvent() throws Exception {
-    final DataItem dataItem = new DataItemImpl(0, MIB-8, 0);
+    final DataItem dataItem = new DataItemImpl(0, MIB - 8, 0);
     dataItem.name("0000");
     dataItem.dataInput(DATA_INPUT);
     String streamName = "default";
@@ -199,7 +199,7 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
     assertEquals(Operation.Status.SUCC, result.status());
     assertEquals(dataItem.size(), createTask.countBytesDone());
 
-    final DataItem dataItem2 = new DataItemImpl(0, MIB-8, 0);
+    final DataItem dataItem2 = new DataItemImpl(0, MIB - 8, 0);
     dataItem2.name("0001");
     final DataOperation<DataItem> createTask2 =
         new DataOperationImpl<>(
@@ -208,8 +208,16 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
     prepare(createTask2);
     createTask2.status(Operation.Status.ACTIVE);
     boolean results = submit(createTask2);
+
+    DataOperation<DataItem> result2 = get();
+    while (result2 == null) {
+      result2 = get();
+    }
+
     assertEquals(results, true);
-    // assertEquals("we didn't read the same size we had put into stream",
-    // (int)dataItem.size(),event.getEvent().remaining());
+    assertEquals(
+        "we didn't read the same size we had put into stream",
+        (int) dataItem.size(),
+        (result2.item().size()));
   }
 }
