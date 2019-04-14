@@ -129,17 +129,11 @@ build_docker_image:
       - build/robotest/*.html
     when: on_failure
 
-test_api_storage_create_events:
+test_api_storage_robotests:
   extends: .test_robot
   variables:
     SUITE: api.storage
-    TEST: create_events
-
-test_api_storage_create_stream:
-  extends: .test_robot
-  variables:
-    SUITE: api.storage
-    TEST: create_stream
+    TEST: robotests
 
 release_to_maven_repo:
   stage: deploy
