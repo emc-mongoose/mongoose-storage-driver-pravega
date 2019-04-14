@@ -65,11 +65,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -234,7 +230,10 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
   // * reader group managers
   private final Map<URI, ReaderGroupManagerCreateFunction> readerGroupManagerCreateFuncCache =
       new ConcurrentHashMap<>();
+  // * String here - a name of manager
   private final Map<String, ReaderGroupManager> readerGroupManagerCache = new ConcurrentHashMap<>();
+  // * readerGroups and associated readerGroupManagers. String here - a name of readerGroup
+  private final Map<String, ReaderGroupManager> readerGroupCache = new ConcurrentHashMap();
   // * event stream reader
   private final Map<ClientFactory, ReaderCreateFunction> eventStreamReaderCreateFuncCache =
       new ConcurrentHashMap<>();
@@ -524,7 +523,11 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
       val endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
       val streamName = extractStreamName(evtOp.dstPath());
       scopeStreamsCache.computeIfAbsent(scopeName, ScopeCreateFunction::createStreamCache);
-      val readerGroup = UUID.randomUUID().toString().replace("-", "");
+      val readerGroupPart = (evtOp instanceof DataOperation) ? "DataOp" : "PathOp";
+      val readerGroup = scopeName + streamName + readerGroupPart;
+      // val readerGroup = UUID.randomUUID().toString().replace("-", "");
+      Stream s = Stream.of(scopeName, streamName);
+
       val readerGroupConfig =
           ReaderGroupConfig.builder().stream(Stream.of(scopeName, streamName)).build();
       val readerGroupManagerCreateFunc =
@@ -533,6 +536,8 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
       val readerGroupManager =
           readerGroupManagerCache.computeIfAbsent(scopeName, readerGroupManagerCreateFunc);
       readerGroupManager.createReaderGroup(readerGroup, readerGroupConfig);
+
+      readerGroupCache.putIfAbsent(readerGroup, readerGroupManager);
       val clientFactoryCreateFunc =
           clientFactoryCreateFuncCache.computeIfAbsent(
               endpointUri, ClientFactoryCreateFunctionImpl::new);
@@ -705,6 +710,10 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
   @Override
   protected void doClose() throws IOException {
     super.doClose();
+    for (String readerGroup : readerGroupCache.keySet()) {
+      ReaderGroupManager manager = readerGroupCache.get(readerGroup);
+      manager.deleteReaderGroup(readerGroup);
+    }
     bgExecutor.shutdownNow();
     // clear all caches
     endpointCache.clear();
@@ -721,8 +730,10 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
     closeAllWithTimeout(evtWriterCache.values());
     evtWriterCache.clear();
     readerGroupManagerCreateFuncCache.clear();
+
     closeAllWithTimeout(readerGroupManagerCache.values());
     readerGroupManagerCache.clear();
+    readerGroupCache.clear();
     closeAllWithTimeout(eventStreamReaderCreateFuncCache.keySet());
     eventStreamReaderCreateFuncCache.clear();
     closeAllWithTimeout(eventStreamReaderCache.values());
