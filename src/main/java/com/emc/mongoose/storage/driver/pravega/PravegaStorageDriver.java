@@ -7,7 +7,6 @@ import static com.emc.mongoose.base.item.op.Operation.Status.FAIL_IO;
 import static com.emc.mongoose.base.item.op.Operation.Status.FAIL_UNKNOWN;
 import static com.emc.mongoose.base.item.op.Operation.Status.INTERRUPTED;
 import static com.emc.mongoose.base.item.op.Operation.Status.SUCC;
-import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.BACKGROUND_THREAD_COUNT;
 import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.DRIVER_NAME;
 import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.MAX_BACKOFF_MILLIS;
 import static com.emc.mongoose.storage.driver.pravega.io.StreamScaleUtil.scaleToFixedSegmentCount;
@@ -47,6 +46,8 @@ import io.pravega.client.admin.ReaderGroupManager;
 import io.pravega.client.byteStream.ByteStreamClient;
 import io.pravega.client.byteStream.ByteStreamReader;
 import io.pravega.client.byteStream.ByteStreamWriter;
+import io.pravega.client.netty.impl.ConnectionFactory;
+import io.pravega.client.netty.impl.ConnectionFactoryImpl;
 import io.pravega.client.stream.EventStreamReader;
 import io.pravega.client.stream.EventStreamWriter;
 import io.pravega.client.stream.EventWriterConfig;
@@ -74,9 +75,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import io.pravega.client.stream.impl.Credentials;
+import io.pravega.common.concurrent.ExecutorServiceHelpers;
 import lombok.Value;
 import lombok.val;
 import org.apache.logging.log4j.Level;
@@ -100,7 +102,8 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	protected final StreamDataType streamDataType;
 	// round-robin counter to select the endpoint node for each load operation in order to distribute them uniformly
 	private final AtomicInteger rrc = new AtomicInteger(0);
-	private final ScheduledExecutorService bgExecutor = Executors.newScheduledThreadPool(BACKGROUND_THREAD_COUNT);
+	private final ScheduledExecutorService executor = ExecutorServiceHelpers
+		.newScheduledThreadPool(ioWorkerCount, "worker");
 
 	@Value final class ScopeCreateFunctionImpl
 		implements ScopeCreateFunction {
@@ -201,15 +204,19 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	// caches allowing the lazy creation of the necessary things:
 	// * endpoints
 	private final Map<String, URI> endpointCache = new ConcurrentHashMap<>();
-	// * stream managers
-	private final Map<URI, Controller> controllerCache = new ConcurrentHashMap<>();
+	// * client configs
+	private final Map<URI, ClientConfig> clientConfigCache = new ConcurrentHashMap<>();
+	// * controllers
+	private final Map<ClientConfig, Controller> controllerCache = new ConcurrentHashMap<>();
+	// * connection factories
+	private final Map<ClientFactory, ConnectionFactory> connFactoryCache = new ConcurrentHashMap<>();
 	// * scopes
 	private final Map<Controller, ScopeCreateFunction> scopeCreateFuncCache = new ConcurrentHashMap<>();
 	private final Map<String, StreamCreateFunction> streamCreateFuncCache = new ConcurrentHashMap<>();
 	// * streams
 	private final Map<String, Map<String, StreamConfiguration>> scopeStreamsCache = new ConcurrentHashMap<>();
 	// * client factories
-	private final Map<URI, ClientFactoryCreateFunction> clientFactoryCreateFuncCache = new ConcurrentHashMap<>();
+	private final Map<Controller, ClientFactoryCreateFunction> clientFactoryCreateFuncCache = new ConcurrentHashMap<>();
 	private final Map<String, ClientFactory> clientFactoryCache = new ConcurrentHashMap<>();
 	// * event writers
 	private final Map<ClientFactory, EventWriterCreateFunction> evtWriterCreateFuncCache = new ConcurrentHashMap<>();
@@ -287,12 +294,20 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		}
 	}
 
-	@SuppressWarnings("UnstableApiUsage")
-	Controller createController(final URI endpointUri) {
-		val clientConfig = ClientConfig.builder().controllerURI(endpointUri).build();
-		val controllerConfig =
-			ControllerImplConfig.builder().clientConfig(clientConfig).maxBackoffMillis(MAX_BACKOFF_MILLIS).build();
-		return new ControllerImpl(controllerConfig, bgExecutor);
+	ClientConfig createClientConfig(final URI endpointUri) {
+		return ClientConfig.builder()
+			.controllerURI(endpointUri)
+			.build();
+	}
+
+	Controller createController(final ClientConfig clientConfig) {
+		val controllerConfig = ControllerImplConfig
+			.builder().clientConfig(clientConfig).maxBackoffMillis(MAX_BACKOFF_MILLIS).build();
+		return new ControllerImpl(controllerConfig, executor);
+	}
+
+	ConnectionFactory createConnectionFactory(final ClientConfig clientConfig) {
+		return new ConnectionFactoryImpl(clientConfig, executor);
 	}
 
 	/**
@@ -430,7 +445,8 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		try {
 			// prepare
 			val endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
-			val controller = controllerCache.computeIfAbsent(endpointUri, this::createController);
+			val clientConfig = clientConfigCache.computeIfAbsent(endpointUri, this::createClientConfig);
+			val controller = controllerCache.computeIfAbsent(clientConfig, this::createController);
 			val scopeCreateFunc = scopeCreateFuncCache.computeIfAbsent(controller, ScopeCreateFunctionImpl::new);
 			// create the scope if necessary
 			val streamCreateFunc = streamCreateFuncCache.computeIfAbsent(scopeName, scopeCreateFunc);
@@ -439,7 +455,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				streamName, streamCreateFunc);
 			// create the client factory create function if necessary
 			val clientFactoryCreateFunc =
-				clientFactoryCreateFuncCache.computeIfAbsent(endpointUri, ClientFactoryCreateFunctionImpl::new);
+				clientFactoryCreateFuncCache.computeIfAbsent(controller, ClientFactoryCreateFunctionImpl::new);
 			// create the client factory if necessary
 			val clientFactory = clientFactoryCache.computeIfAbsent(scopeName, clientFactoryCreateFunc);
 			// create the event stream writer create function if necessary
@@ -488,6 +504,8 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	void submitEventReadOperation(final O evtOp, final String nodeAddr) {
 		try {
 			val endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
+			val clientConfig = clientConfigCache.computeIfAbsent(endpointUri, this::createClientConfig);
+			val controller = controllerCache.computeIfAbsent(clientConfig, this::createController);
 			val streamName = extractStreamName(evtOp.dstPath());
 			scopeStreamsCache.computeIfAbsent(scopeName, ScopeCreateFunction::createStreamCache);
 			val readerGroup = UUID.randomUUID().toString().replace("-", "");
@@ -498,7 +516,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 			val readerGroupManager = readerGroupManagerCache.computeIfAbsent(scopeName, readerGroupManagerCreateFunc);
 			readerGroupManager.createReaderGroup(readerGroup, readerGroupConfig);
 			val clientFactoryCreateFunc =
-				clientFactoryCreateFuncCache.computeIfAbsent(endpointUri, ClientFactoryCreateFunctionImpl::new);
+				clientFactoryCreateFuncCache.computeIfAbsent(controller, ClientFactoryCreateFunctionImpl::new);
 			val clientFactory = clientFactoryCache.computeIfAbsent(scopeName, clientFactoryCreateFunc);
 			val readerCreateFunc =
 				eventStreamReaderCreateFuncCache.computeIfAbsent(clientFactory, ReaderCreateFunctionImpl::new);
@@ -520,7 +538,8 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	void submitStreamCreateOperation(final O streamOp, final String nodeAddr) {
 		try {
 			val endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
-			val controller = controllerCache.computeIfAbsent(endpointUri, this::createController);
+			val clientConfig = clientConfigCache.computeIfAbsent(endpointUri, this::createClientConfig);
+			val controller = controllerCache.computeIfAbsent(clientConfig, this::createController);
 			val scopeCreateFuncForStreamConfig = scopeCreateFuncForStreamConfigCache.computeIfAbsent(
 				controller, ScopeCreateFunctionForStreamConfigImpl::new
 			);
@@ -535,7 +554,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 							Level.DEBUG, thrown, "Failed to create the stream {} in the scope {}", streamName, scopeName
 						);
 					}
-					handleStreamCreate(endpointUri, streamName, streamOp);
+					handleStreamCreate(controller, streamName, streamOp);
 					return result;
 				}
 			);
@@ -559,7 +578,8 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		try {
 			val streamName = extractStreamName(streamOp.item().name());
 			val endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
-			val controller = controllerCache.computeIfAbsent(endpointUri, this::createController);
+			val clientConfig = clientConfigCache.computeIfAbsent(endpointUri, this::createClientConfig);
+			val controller = controllerCache.computeIfAbsent(clientConfig, this::createController);
 			val sealFuture = controller.sealStream(scopeName, streamName);
 			sealFuture.handle(
 				(result, thrown) -> {
@@ -615,11 +635,11 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	}
 
 	/**
-	 @param endpointUri selected storage node URI
+	 @param controller pravega controller
 	 @param streamName stream name
 	 @param streamOp stream operation instance
 	 */
-	void handleStreamCreate(final URI endpointUri, final String streamName, final O streamOp) {
+	void handleStreamCreate(final Controller controller, final String streamName, final O streamOp) {
 		var countBytesDone = 0L;
 		val streamItem = streamOp.item();
 		try {
@@ -627,7 +647,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 			if(streamSize > 0) {
 				// create the client factory create function if necessary
 				val clientFactoryCreateFunc = clientFactoryCreateFuncCache.computeIfAbsent(
-					endpointUri, ClientFactoryCreateFunctionImpl::new
+					controller, ClientFactoryCreateFunctionImpl::new
 				);
 				// create the client factory if necessary
 				val clientFactory = clientFactoryCache.computeIfAbsent(scopeName, clientFactoryCreateFunc);
@@ -663,7 +683,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	protected void doClose()
 	throws IOException {
 		super.doClose();
-		bgExecutor.shutdownNow();
+		executor.shutdownNow();
 		// clear all caches
 		endpointCache.clear();
 		closeAllWithTimeout(controllerCache.values());
