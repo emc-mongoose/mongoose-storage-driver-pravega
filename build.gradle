@@ -16,6 +16,7 @@ plugins {
 	id "com.diffplug.gradle.spotless" version "3.18.0"
 	id "io.codearte.nexus-staging" version "0.20.0"
 	id "de.marcphilipp.nexus-publish" version "0.2.0"
+	id "org.ajoberstar.grgit" version "3.1.1"
 }
 repositories {
 	jcenter()
@@ -39,7 +40,6 @@ ext {
 		mongooseBase             : "4.2.8",
 		mongooseStorageDriverCoop: "4.2.17",
 		opencensus               : "0.8.0",
-		pravega                  : "0.4.0",
 		protobuf                 : "3.4.0",
 		scala                    : "2.12.6",
 	]
@@ -48,10 +48,28 @@ ext {
 	javaHome = System.properties["java.home"]
 	jreOutputDir = "${project.buildDir}${File.separator}jre"
 	modulesDepsFilePath = "${project.buildDir}${File.separator}modules.deps"
+	pravegaSrcDir = "${project.buildDir}${File.separator}pravega"
+	pravegaClientJarDir = "${pravegaSrcDir}${File.separator}client${File.separator}build${File.separator}libs"
 }
 wrapper {
 	gradleVersion = "4.10.3"
 }
+task clonePravegaRepo {
+	doLast {
+		def destDir = file(pravegaSrcDir)
+		if(!destDir.exists()) {
+			grgit.clone {
+				uri = "https://github.com/pravega/pravega.git"
+				dir = pravegaSrcDir
+			}
+		}
+	}
+}
+task buildPravegaClientJar(type: Exec, dependsOn: clonePravegaRepo) {
+	workingDir pravegaSrcDir
+	commandLine "./gradlew", ":client:jar"
+}
+compileJava.dependsOn += buildPravegaClientJar
 configurations {
 	provided
 	testCompile {
@@ -80,7 +98,7 @@ dependencies {
 		"org.apache.logging.log4j:log4j-api:${depVersion.log4j}",
 	)
 	provided(
-		"io.pravega:pravega-client:${depVersion.pravega}",
+		fileTree(dir: pravegaClientJarDir, include: "*.jar")
 	)
 	testCompile(
 		"junit:junit:[4,)",
