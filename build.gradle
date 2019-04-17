@@ -30,6 +30,7 @@ targetCompatibility = 11
 ext {
 	depVersion = [
 		commonsJava              : "2.3.5",
+		commonsLang3             : "3.7",
 		confuse                  : "1.2.1",
 		confuseIoYaml            : "1.0.0",
 		disruptor                : "3.4.2",
@@ -123,6 +124,7 @@ dependencies {
 		"io.netty:netty-transport-native-kqueue:${depVersion.netty}:osx-x86_64",
 		"io.netty:netty-transport-native-unix-common:${depVersion.netty}",
 		"io.netty:netty-tcnative-boringssl-static:${depVersion.nettyTcNative}",
+		"org.apache.commons:commons-lang3:${depVersion:commonsLang3}",
 	)
 	testCompile(
 		"junit:junit:[4,)",
