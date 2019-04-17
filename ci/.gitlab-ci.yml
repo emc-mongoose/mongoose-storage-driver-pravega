@@ -20,9 +20,6 @@ stages:
   - deploy
 
 before_script:
-
-  - export PRAVEGA_VERSION=$(cat build.gradle | grep pravega\ | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
-
   # install AdoptOpenJDK 11
   - apk add --update --no-cache ca-certificates curl openssl binutils xz gnupg busybox-extras
   - curl -Lks https://github.com/AdoptOpenJDK/openjdk11-binaries/releases/download/jdk-11.0.2%2B9/OpenJDK11U-jdk_x64_linux_hotspot_11.0.2_9.tar.gz -o /tmp/jdk11.tgz
@@ -73,11 +70,14 @@ test_integration:
   stage: test
   script:
     # Install Pravega
-    - curl -L https://github.com/pravega/pravega/releases/download/v${PRAVEGA_VERSION}/pravega-${PRAVEGA_VERSION}.tgz -o /opt/pravega.tgz
-    - cd /opt
-    - tar xvf pravega.tgz
+    - git clone https://github.com/pravega/pravega.git
+    - cd pravega
+    - ./gradlew distribution install
+    - export PRAVEGA_VERSION=$(./gradlew properties --no-daemon --console=plain -q | grep "^version:" | awk '{printf $2}')
+    - tar xvf build/distributions/pravega-${PRAVEGA_VERSION}.tgz
+    - cd pravega-${PRAVEGA_VERSION}
+    - nohup bin/pravega-standalone 1,2> /tmp/pravega_nohup.out &
     - cd ${CI_PROJECT_DIR}
-    - nohup /opt/pravega-${PRAVEGA_VERSION}/bin/pravega-standalone 1,2> /tmp/pravega_nohup.out &
     # Run the tests
     - ./gradlew integrationTest
   after_script:

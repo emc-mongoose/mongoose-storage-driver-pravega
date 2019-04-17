@@ -38,12 +38,11 @@ public interface StreamScaleUtil {
 		} else {
 			val streamConfig = StreamConfiguration
 				.builder()
-				.scope(scopeName)
-				.streamName(streamName)
 				.scalingPolicy(scalingPolicy)
 				.build();
 			try {
-				if(controller.updateStream(streamConfig).get(timeoutMillis, TimeUnit.MILLISECONDS)) {
+				val updateStreamFuture = controller.updateStream(scopeName, streamName, streamConfig);
+				if(updateStreamFuture.get(timeoutMillis, TimeUnit.MILLISECONDS)) {
 					Loggers.MSG.info(
 						"Stream \"{}/{}\" has been updated w/ the config {}", scopeName, streamName, streamConfig
 					);

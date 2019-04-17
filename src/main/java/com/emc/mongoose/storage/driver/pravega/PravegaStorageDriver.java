@@ -7,7 +7,6 @@ import static com.emc.mongoose.base.item.op.Operation.Status.FAIL_IO;
 import static com.emc.mongoose.base.item.op.Operation.Status.FAIL_UNKNOWN;
 import static com.emc.mongoose.base.item.op.Operation.Status.INTERRUPTED;
 import static com.emc.mongoose.base.item.op.Operation.Status.SUCC;
-import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.BACKGROUND_THREAD_COUNT;
 import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.DRIVER_NAME;
 import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.MAX_BACKOFF_MILLIS;
 import static com.emc.mongoose.storage.driver.pravega.io.StreamScaleUtil.scaleToFixedSegmentCount;
@@ -21,6 +20,7 @@ import com.emc.mongoose.base.item.ItemFactory;
 import com.emc.mongoose.base.item.op.OpType;
 import com.emc.mongoose.base.item.op.Operation.Status;
 import com.emc.mongoose.base.item.op.data.DataOperation;
+import com.emc.mongoose.base.logging.LogContextThreadFactory;
 import com.emc.mongoose.base.logging.LogUtil;
 import com.emc.mongoose.base.logging.Loggers;
 import com.emc.mongoose.base.storage.Credential;
@@ -100,8 +100,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
   // round-robin counter to select the endpoint node for each load operation in order to distribute
   // them uniformly
   private final AtomicInteger rrc = new AtomicInteger(0);
-  private final ScheduledExecutorService bgExecutor =
-      Executors.newScheduledThreadPool(BACKGROUND_THREAD_COUNT);
+  private final ScheduledExecutorService bgExecutor;
 
   private volatile boolean listWasCalled = false;
 
@@ -165,11 +164,10 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
       final StreamConfiguration streamConfig =
           StreamConfiguration.builder()
               .scalingPolicy(scalingPolicy)
-              .streamName(streamName)
-              .scope(scopeName)
               .build();
       try {
-        if (controller.createStream(streamConfig).get(controlApiTimeoutMillis, MILLISECONDS)) {
+      	val createStreamFuture = controller.createStream(scopeName, streamName, streamConfig);
+        if (createStreamFuture.get(controlApiTimeoutMillis, MILLISECONDS)) {
           Loggers.MSG.trace(
               "Stream \"{}/{}\" was created using the config: {}",
               scopeName,
@@ -288,6 +286,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
     this.endpointAddrs = endpointAddrList.toArray(new String[endpointAddrList.size()]);
     this.requestAuthTokenFunc = null; // do not use
     this.requestNewPathFunc = null; // do not use
+    this.bgExecutor = Executors.newScheduledThreadPool(ioWorkerCount, new LogContextThreadFactory(toString(), true));
   }
 
   String nextEndpointAddr() {
@@ -525,8 +524,9 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
       val streamName = extractStreamName(evtOp.dstPath());
       scopeStreamsCache.computeIfAbsent(scopeName, ScopeCreateFunction::createStreamCache);
       val readerGroup = UUID.randomUUID().toString().replace("-", "");
-      val readerGroupConfig =
-          ReaderGroupConfig.builder().stream(Stream.of(scopeName, streamName)).build();
+      val readerGroupConfigBuilder = ReaderGroupConfig.builder();
+      val stream = Stream.of(scopeName, streamName);
+      val readerGroupConfig = readerGroupConfigBuilder.stream(stream).build();
       val readerGroupManagerCreateFunc =
           readerGroupManagerCreateFuncCache.computeIfAbsent(
               endpointUri, ReaderGroupManagerCreateFunctionImpl::new);
@@ -565,8 +565,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
       val streamConfig =
           scopeStreamConfigsCache.computeIfAbsent(scopeName, scopeCreateFuncForStreamConfig);
       val streamName = extractStreamName(streamOp.item().name());
-      val specificStreamConfig = combineStreamConfigAndName(streamName, streamConfig);
-      val createStreamFuture = controller.createStream(specificStreamConfig);
+      val createStreamFuture = controller.createStream(streamName, scopeName, streamConfig);
       createStreamFuture.handle(
           (result, thrown) -> {
             if (null == thrown) {
@@ -766,8 +765,6 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
       final String streamName, final StreamConfiguration config) {
     return StreamConfiguration.builder()
         .scalingPolicy(config.getScalingPolicy())
-        .streamName(streamName)
-        .scope(config.getScope())
         .build();
   }
 
