@@ -48,6 +48,15 @@ before_script:
   - mv /tmp/libz/usr/lib/libz.so* /usr/glibc-compat/lib
   - apk del binutils
   - rm -rf /tmp/${GLIBC_VER}.apk /tmp/gcc /tmp/gcc-libs.tar.xz /tmp/libz /tmp/libz.tar.xz /var/cache/apk/*
+  # Clone, build and install Pravega
+  - cd /opt
+  - git clone https://github.com/pravega/pravega.git
+  - cd /opt/pravega
+  - ./gradlew distribution install
+  - export PRAVEGA_VERSION=$(./gradlew properties --no-daemon --console=plain -q | grep "^version:" | awk '{printf $2}')
+  - cd /opt
+  - tar xvf build/distributions/pravega-${PRAVEGA_VERSION}.tgz
+  - cd ${CI_PROJECT_DIR}
 
 build:
   stage: build
@@ -69,16 +78,8 @@ test_unit:
 test_integration:
   stage: test
   script:
-    # Install Pravega
-    - git clone https://github.com/pravega/pravega.git
-    - cd pravega
-    - ./gradlew distribution install
-    - export PRAVEGA_VERSION=$(./gradlew properties --no-daemon --console=plain -q | grep "^version:" | awk '{printf $2}')
-    - tar xvf build/distributions/pravega-${PRAVEGA_VERSION}.tgz
     # Run Pravega
-    - cd pravega-${PRAVEGA_VERSION}
-    - nohup bin/pravega-standalone 1,2> /tmp/pravega_nohup.out &
-    - cd ${CI_PROJECT_DIR}
+    - nohup /opt/pravega-${PRAVEGA_VERSION}/bin/pravega-standalone 1,2> /tmp/pravega_nohup.out &
     # Run the tests
     - ./gradlew integrationTest
   after_script:
@@ -117,16 +118,8 @@ build_docker_image:
     - export VERSION=$(cat build.gradle | grep version\ = | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
     - docker login -u ${DOCKER_USER} -p ${DOCKER_PASS}
     - docker load < ${IMAGE_FILE_NAME}
-    # Install Pravega
-    - git clone https://github.com/pravega/pravega.git
-    - cd pravega
-    - ./gradlew distribution install
-    - export PRAVEGA_VERSION=$(./gradlew properties --no-daemon --console=plain -q | grep "^version:" | awk '{printf $2}')
-    - tar xvf build/distributions/pravega-${PRAVEGA_VERSION}.tgz
     # Run Pravega
-    - cd pravega-${PRAVEGA_VERSION}
-    - nohup bin/pravega-standalone 1,2> /tmp/pravega_nohup.out &
-    - cd ${CI_PROJECT_DIR}
+    - nohup /opt/pravega-${PRAVEGA_VERSION}/bin/pravega-standalone 1,2> /tmp/pravega_nohup.out &
     # Run the tests
     - robot --outputdir build/robotest --suite ${SUITE} --include ${TEST} src/test/robot
   after_script:
