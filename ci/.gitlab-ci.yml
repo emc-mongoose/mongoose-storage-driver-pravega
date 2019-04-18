@@ -55,7 +55,7 @@ before_script:
   - ./gradlew distribution install
   - export PRAVEGA_VERSION=$(./gradlew properties --no-daemon --console=plain -q | grep "^version:" | awk '{printf $2}')
   - cd /opt
-  - tar xvf build/distributions/pravega-${PRAVEGA_VERSION}.tgz
+  - tar xvf pravega/build/distributions/pravega-${PRAVEGA_VERSION}.tgz
   - cd ${CI_PROJECT_DIR}
 
 build:
