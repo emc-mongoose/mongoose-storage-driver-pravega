@@ -16,13 +16,12 @@ Create Events Test
     ${step_id} =  Set Variable  create_events_test
     Remove Directory  ${LOG_DIR}/${step_id}  recursive=True
     ${args} =  Catenate  SEPARATOR= \\\n\t
-    ...  --item-data-size=1000KB
     ...  --load-step-id=${step_id}
     ...  --load-op-limit-count=10
     ...  --storage-namespace=goose
     ${std_out} =  Execute Mongoose Scenario  ${args}
     Log  ${std_out}
-    Validate Metrics Total Log File  ${step_id}  CREATE  10  0  10240000
+    Validate Metrics Total Log File  ${step_id}  CREATE  10  0  1048576
 
 *** Keyword ***
 Execute Mongoose Scenario

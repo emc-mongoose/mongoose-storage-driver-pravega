@@ -119,7 +119,7 @@ build_docker_image:
     - docker login -u ${DOCKER_USER} -p ${DOCKER_PASS}
     - docker load < ${IMAGE_FILE_NAME}
     # Run Pravega
-    - nohup /opt/pravega-${PRAVEGA_VERSION}/bin/pravega-standalone 1,2> /tmp/pravega_nohup.out &
+    - /opt/pravega-${PRAVEGA_VERSION}/bin/pravega-standalone &
     # Run the tests
     - robot --outputdir build/robotest --suite ${SUITE} --include ${TEST} src/test/robot
   after_script:
@@ -127,7 +127,6 @@ build_docker_image:
     - rebot build/robotest/output.xml
   artifacts:
     paths:
-      - /tmp/pravega_nohup.out
       - build/robotest/*.html
     when: on_failure
 

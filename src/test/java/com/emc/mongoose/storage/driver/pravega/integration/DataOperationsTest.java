@@ -124,7 +124,7 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
 
   @Test
   public final void testCreateEvent() throws Exception {
-    val dataItem = new DataItemImpl(0, MIB - 8, 0);
+    val dataItem = new DataItemImpl(0, MIB, 0);
     dataItem.name("0000");
     dataItem.dataInput(DATA_INPUT);
     String streamName = "default";
@@ -179,7 +179,7 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
 
   @Test
   public final void testReadEvent() throws Exception {
-    final DataItem dataItem = new DataItemImpl(0, MIB - 8, 0);
+    final DataItem dataItem = new DataItemImpl(0, MIB, 0);
     dataItem.name("0000");
     dataItem.dataInput(DATA_INPUT);
     String streamName = "default";
@@ -199,7 +199,7 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
     assertEquals(Operation.Status.SUCC, result.status());
     assertEquals(dataItem.size(), createTask.countBytesDone());
 
-    final DataItem dataItem2 = new DataItemImpl(0, MIB - 8, 0);
+    final DataItem dataItem2 = new DataItemImpl(0, MIB, 0);
     dataItem2.name("0001");
     final DataOperation<DataItem> createTask2 =
         new DataOperationImpl<>(
