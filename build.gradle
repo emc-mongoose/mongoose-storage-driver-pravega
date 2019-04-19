@@ -67,10 +67,12 @@ task clonePravegaRepo {
 	doLast {
 		def destDir = file(pravegaSrcDir)
 		if(!destDir.exists()) {
-			Grgit.clone {
+			def gitRepo = Grgit.clone {
 				uri = "https://github.com/pravega/pravega.git"
-				refToCheckout = pravegaCommit
 				dir = pravegaSrcDir
+			}
+			gitRepo.reset {
+				commit = pravegaCommit
 			}
 		}
 	}
@@ -79,7 +81,7 @@ task buildPravegaJars(type: Exec, dependsOn: clonePravegaRepo) {
 	workingDir pravegaSrcDir
 	commandLine "./gradlew", ":client:jar"
 }
-compileJava.dependsOn += buildPravegaJars
+init.dependsOn += buildPravegaJars
 configurations {
 	provided
 	testCompile {
