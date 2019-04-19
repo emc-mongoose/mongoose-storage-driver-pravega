@@ -61,7 +61,8 @@ before_script:
 build:
   stage: build
   script:
-    - ./gradlew clean jar
+    - ./gradlew clean buildPravegaJars
+    - ./gradlew jar
   artifacts:
     paths:
       - build/libs/mongoose-*.jar
