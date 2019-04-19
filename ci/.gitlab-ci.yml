@@ -79,7 +79,7 @@ test_integration:
   stage: test
   script:
     # Run Pravega
-    - nohup /opt/pravega-${PRAVEGA_VERSION}/bin/pravega-standalone 1,2> /tmp/pravega_nohup.out &
+    - /opt/pravega-${PRAVEGA_VERSION}/bin/pravega-standalone 1,2> /dev/null &
     # Run the tests
     - ./gradlew integrationTest
   after_script:
@@ -106,6 +106,9 @@ build_docker_image:
     HOST_WORKING_DIR: ${CI_PROJECT_DIR}
     PYTHONPATH: ${PYTHONPATH}:/usr/lib/python2.7/site-packages:src/test/robot/lib
   script:
+    # Run Pravega
+    - /opt/pravega-${PRAVEGA_VERSION}/bin/pravega-standalone 1,2> /dev/null &
+    - sleep 15
     # Install robotframework and keyword libs
     - apk add --no-cache --update python py-pip
     - pip install -U virtualenv
@@ -118,8 +121,6 @@ build_docker_image:
     - export VERSION=$(cat build.gradle | grep version\ = | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
     - docker login -u ${DOCKER_USER} -p ${DOCKER_PASS}
     - docker load < ${IMAGE_FILE_NAME}
-    # Run Pravega
-    - /opt/pravega-${PRAVEGA_VERSION}/bin/pravega-standalone &
     # Run the tests
     - robot --outputdir build/robotest --suite ${SUITE} --include ${TEST} src/test/robot
   after_script:
