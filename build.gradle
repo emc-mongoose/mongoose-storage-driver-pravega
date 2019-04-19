@@ -38,8 +38,8 @@ ext {
 		grpc                     : "1.17.1",
 		guava                    : "27.0.1-jre",
 		log4j                    : "2.8.2",
-		mongooseBase             : "4.2.8",
-		mongooseStorageDriverCoop: "4.2.17",
+		mongooseBase             : "4.2.9",
+		mongooseStorageDriverCoop: "4.2.18",
 		netty                    : "4.1.16.Final",
 		nettyTcNative            : "2.0.17.Final",
 		protobuf                 : "3.5.1",
@@ -50,8 +50,9 @@ ext {
 	javaHome = System.properties["java.home"]
 	jreOutputDir = "${project.buildDir}${File.separator}jre"
 	modulesDepsFilePath = "${project.buildDir}${File.separator}modules.deps"
-	pravegaSrcDir = "${project.buildDir}${File.separator}pravega"
 	buildLibsPath = "build${File.separator}libs"
+	pravegaSrcDir = "${project.buildDir}${File.separator}pravega"
+	pravegaCommit = "3fd167ecd36603251d92d9da09adeebc5293981d"
 	pravegaClientJarDir = "${pravegaSrcDir}${File.separator}client${File.separator}${buildLibsPath}"
 	pravegaCommonJarDir = "${pravegaSrcDir}${File.separator}common${File.separator}${buildLibsPath}"
 	pravegaSharedAuthpluginJarDir = "${pravegaSrcDir}${File.separator}shared${File.separator}authplugin${File.separator}${buildLibsPath}"
@@ -68,6 +69,7 @@ task clonePravegaRepo {
 		if(!destDir.exists()) {
 			Grgit.clone {
 				uri = "https://github.com/pravega/pravega.git"
+				refToCheckout = pravegaCommit
 				dir = pravegaSrcDir
 			}
 		}
