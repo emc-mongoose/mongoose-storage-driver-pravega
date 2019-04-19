@@ -52,7 +52,7 @@ ext {
 	modulesDepsFilePath = "${project.buildDir}${File.separator}modules.deps"
 	buildLibsPath = "build${File.separator}libs"
 	pravegaSrcDir = "${project.buildDir}${File.separator}pravega"
-	pravegaCommit = "3fd167ecd36603251d92d9da09adeebc5293981d"
+	pravegaCommit = "ce3ba81"
 	pravegaClientJarDir = "${pravegaSrcDir}${File.separator}client${File.separator}${buildLibsPath}"
 	pravegaCommonJarDir = "${pravegaSrcDir}${File.separator}common${File.separator}${buildLibsPath}"
 	pravegaSharedAuthpluginJarDir = "${pravegaSrcDir}${File.separator}shared${File.separator}authplugin${File.separator}${buildLibsPath}"
@@ -73,6 +73,7 @@ task clonePravegaRepo {
 			}
 			gitRepo.reset {
 				commit = pravegaCommit
+				mode = "hard"
 			}
 		}
 	}
