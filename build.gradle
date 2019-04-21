@@ -4,6 +4,9 @@ buildscript {
 		maven {
 			url "https://plugins.gradle.org/m2/"
 		}
+		maven {
+			url "http://dl.bintray.com/vermeulen-mp/gradle-plugins"
+		}
 	}
 }
 plugins {
@@ -17,6 +20,7 @@ plugins {
 	id "io.codearte.nexus-staging" version "0.20.0"
 	id "de.marcphilipp.nexus-publish" version "0.2.0"
 	id "org.ajoberstar.grgit" version "3.1.1"
+	id "com.wiredforcode.spawn" version "0.8.0"
 }
 repositories {
 	jcenter()
@@ -78,11 +82,40 @@ task clonePravegaRepo {
 		}
 	}
 }
-task buildPravegaJars(type: Exec, dependsOn: clonePravegaRepo) {
+task pravegaClientJars(type: Exec, dependsOn: clonePravegaRepo) {
 	workingDir pravegaSrcDir
 	commandLine "./gradlew", ":client:jar"
 }
-init.dependsOn += buildPravegaJars
+compileJava.dependsOn += pravegaClientJars
+task pravegaDistInstall(type: Exec, dependsOn: clonePravegaRepo) {
+	workingDir pravegaSrcDir
+	commandLine "./gradlew", "distribution", "install"
+}
+def getPravegaVersion() {
+	def pravegaVersion = new ByteArrayOutputStream()
+	exec {
+		workingDir pravegaSrcDir
+		commandLine "sh", "-c", "./gradlew properties --no-daemon --console=plain -q | grep \"^version:\" | awk '{printf \$2}'"
+		standardOutput = pravegaVersion
+	}
+	return pravegaVersion
+}
+task pravegaExtract(dependsOn: pravegaDistInstall) {
+	doLast {
+		def pravegaVersion = getPravegaVersion()
+		project.ext.set("pravegaVersion", pravegaVersion)
+		println "Extracting Pravega v${pravegaVersion}..."
+		copy {
+			from tarTree("${pravegaSrcDir}${File.separator}build${File.separator}distributions${File.separator}pravega-${pravegaVersion}.tgz")
+			into project.buildDir
+		}
+	}
+}
+task startServer(type: SpawnProcessTask, dependsOn: pravegaExtract) {
+	command "${project.buildDir}${File.separator}pravega-${pravegaVersion}${File.separator}bin${File.separator}pravega-standalone"
+	ready "Controller event processors startUp complete"
+}
+task stopServer(type: KillProcessTask)
 configurations {
 	provided
 	testCompile {

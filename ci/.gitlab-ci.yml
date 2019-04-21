@@ -48,20 +48,11 @@ before_script:
   - mv /tmp/libz/usr/lib/libz.so* /usr/glibc-compat/lib
   - apk del binutils
   - rm -rf /tmp/${GLIBC_VER}.apk /tmp/gcc /tmp/gcc-libs.tar.xz /tmp/libz /tmp/libz.tar.xz /var/cache/apk/*
-  # Clone, build and install Pravega
-  - cd /opt
-  - git clone https://github.com/pravega/pravega.git
-  - cd /opt/pravega
-  - ./gradlew distribution install
-  - export PRAVEGA_VERSION=$(./gradlew properties --no-daemon --console=plain -q | grep "^version:" | awk '{printf $2}')
-  - cd /opt
-  - tar xvf pravega/build/distributions/pravega-${PRAVEGA_VERSION}.tgz
-  - cd ${CI_PROJECT_DIR}
 
 build:
   stage: build
   script:
-    - ./gradlew clean buildPravegaJars
+    - ./gradlew clean pravegaClientJars
     - ./gradlew jar
   artifacts:
     paths:
@@ -70,7 +61,7 @@ build:
 test_unit:
   stage: test
   script:
-    - ./gradlew clean buildPravegaJars
+    - ./gradlew clean pravegaClientJars
     - ./gradlew test
   artifacts:
     paths:
@@ -80,13 +71,10 @@ test_unit:
 test_integration:
   stage: test
   script:
-    # Run Pravega
-    - /opt/pravega-${PRAVEGA_VERSION}/bin/pravega-standalone 1,2> /dev/null &
-    # Run the tests
-    - ./gradlew clean buildPravegaJars
+    - ./gradlew startServer
     - ./gradlew integrationTest
   after_script:
-    - killall java
+    - ./gradlew stopServer
   artifacts:
     paths:
       - /tmp/pravega_nohup.out
@@ -109,9 +97,6 @@ build_docker_image:
     HOST_WORKING_DIR: ${CI_PROJECT_DIR}
     PYTHONPATH: ${PYTHONPATH}:/usr/lib/python2.7/site-packages:src/test/robot/lib
   script:
-    # Run Pravega
-    - /opt/pravega-${PRAVEGA_VERSION}/bin/pravega-standalone 1,2> /dev/null &
-    - sleep 15
     # Install robotframework and keyword libs
     - apk add --no-cache --update python py-pip
     - pip install -U virtualenv
@@ -124,10 +109,12 @@ build_docker_image:
     - export VERSION=$(cat build.gradle | grep version\ = | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
     - docker login -u ${DOCKER_USER} -p ${DOCKER_PASS}
     - docker load < ${IMAGE_FILE_NAME}
+    # Run Pravega
+    - ./gradlew startServer
     # Run the tests
     - robot --outputdir build/robotest --suite ${SUITE} --include ${TEST} src/test/robot
   after_script:
-    - killall java
+    - ./gradlew stopServer
     - rebot build/robotest/output.xml
   artifacts:
     paths:
