@@ -71,10 +71,10 @@ test_unit:
 test_integration:
   stage: test
   script:
-    - ./gradlew startServer
+    - ./gradlew pravegaStart
     - ./gradlew integrationTest
   after_script:
-    - ./gradlew stopServer
+    - ./gradlew pravegaStop
   artifacts:
     paths:
       - /tmp/pravega_nohup.out
@@ -110,11 +110,11 @@ build_docker_image:
     - docker login -u ${DOCKER_USER} -p ${DOCKER_PASS}
     - docker load < ${IMAGE_FILE_NAME}
     # Run Pravega
-    - ./gradlew startServer
+    - ./gradlew pravegaStart
     # Run the tests
     - robot --outputdir build/robotest --suite ${SUITE} --include ${TEST} src/test/robot
   after_script:
-    - ./gradlew stopServer
+    - ./gradlew pravegaStop
     - rebot build/robotest/output.xml
   artifacts:
     paths:
