@@ -70,6 +70,7 @@ build:
 test_unit:
   stage: test
   script:
+    - ./gradlew clean buildPravegaJars
     - ./gradlew test
   artifacts:
     paths:
@@ -82,6 +83,7 @@ test_integration:
     # Run Pravega
     - /opt/pravega-${PRAVEGA_VERSION}/bin/pravega-standalone 1,2> /dev/null &
     # Run the tests
+    - ./gradlew clean buildPravegaJars
     - ./gradlew integrationTest
   after_script:
     - killall java
