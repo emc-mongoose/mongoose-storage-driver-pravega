@@ -91,19 +91,9 @@ task pravegaDistInstall(type: Exec, dependsOn: clonePravegaRepo) {
 	workingDir pravegaSrcDir
 	commandLine "./gradlew", "distribution", "install"
 }
-def getPravegaVersion() {
-	def pravegaVersion = new ByteArrayOutputStream()
-	exec {
-		workingDir pravegaSrcDir
-		commandLine "bash", "-c", "./gradlew properties --no-daemon --console=plain -q | grep \"^version:\" | awk '{printf \$2}'"
-		standardOutput = pravegaVersion
-	}
-	return pravegaVersion
-}
 task pravegaExtract(dependsOn: pravegaDistInstall) {
 	doLast {
-		def pravegaVersion = getPravegaVersion()
-		project.ext.set("pravegaVersion", pravegaVersion)
+		def pravegaVersion = "0.5.0-2223.ce3ba81-SNAPSHOT"
 		println "Extracting Pravega v${pravegaVersion}..."
 		copy {
 			from tarTree("${pravegaSrcDir}${File.separator}build${File.separator}distributions${File.separator}pravega-${pravegaVersion}.tgz")
@@ -112,6 +102,7 @@ task pravegaExtract(dependsOn: pravegaDistInstall) {
 	}
 }
 task pravegaStart(type: SpawnProcessTask, dependsOn: pravegaExtract) {
+	def pravegaVersion = "0.5.0-2223.ce3ba81-SNAPSHOT"
 	command "${project.buildDir}${File.separator}pravega-${pravegaVersion}${File.separator}bin${File.separator}pravega-standalone"
 	ready "Controller event processors startUp complete"
 	pidLockFileName ".pravega.pid.lock"
