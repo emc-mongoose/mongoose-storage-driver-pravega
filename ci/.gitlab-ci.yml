@@ -72,14 +72,14 @@ test_integration:
   stage: test
   script:
     - ./gradlew pravegaExtract
-    - nohup build/pravega_/bin/pravega-standalone 1,2 > /tmp/pravega_nohup.out &
+    - nohup build/pravega_/bin/pravega-standalone 1,2 > build/pravega_nohup.out &
     - sleep 15
     - ./gradlew integrationTest
   after_script:
     - killall java
   artifacts:
     paths:
-      - /tmp/pravega_nohup.out
+      - build/pravega_nohup.out
       - build/reports/tests/integrationTest/*
     when: on_failure
 
@@ -114,6 +114,8 @@ build_docker_image:
     # Run Pravega
     - nohup build/pravega_/bin/pravega-standalone 1,2 > build/pravega_nohup.out &
     - sleep 15
+    - ps alx | grep java
+    - cat build/pravega_nodup.out
     # Run the tests
     - robot --outputdir build/robotest --suite ${SUITE} --include ${TEST} src/test/robot
   after_script:
