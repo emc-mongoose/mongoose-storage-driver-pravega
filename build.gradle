@@ -57,7 +57,7 @@ ext {
 	buildLibsPath = "build${File.separator}libs"
 	pravegaSrcDir = "${project.buildDir}${File.separator}pravega"
 	pravegaCommit = "ce3ba81"
-	pravegaDstDir = "${project.buildDir}${File.separator}pravega-${pravegaCommit}"
+	pravegaDstDir = "${project.buildDir}${File.separator}pravega_"
 	pravegaClientJarDir = "${pravegaSrcDir}${File.separator}client${File.separator}${buildLibsPath}"
 	pravegaCommonJarDir = "${pravegaSrcDir}${File.separator}common${File.separator}${buildLibsPath}"
 	pravegaSharedAuthpluginJarDir = "${pravegaSrcDir}${File.separator}shared${File.separator}authplugin${File.separator}${buildLibsPath}"
@@ -117,7 +117,8 @@ task pravegaExtract(dependsOn: [pravegaVersion, pravegaDistInstall]) {
 			into project.buildDir
 		}
 		def pravegaDir = new File("${project.buildDir}${File.separator}pravega-${pravegaVersion.ext.result}")
-		pravegaDir.renameTo("${pravegaDstDir}")
+		pravegaDir.renameTo(pravegaDstDir)
+		pravegaDir.deleteDir()
 	}
 }
 task pravegaStart(type: SpawnProcessTask, dependsOn: pravegaExtract) {

@@ -71,10 +71,12 @@ test_unit:
 test_integration:
   stage: test
   script:
-    - ./gradlew pravegaStart
+    - ./gradlew pravegaExtract
+    - nohup build/pravega_/bin/pravega-standalone 1,2 > /tmp/pravega_nohup.out &
+    - sleep 15
     - ./gradlew integrationTest
   after_script:
-    - ./gradlew pravegaStop
+    - killall java
   artifacts:
     paths:
       - /tmp/pravega_nohup.out
