@@ -70,6 +70,15 @@ import org.ajoberstar.grgit.Grgit
 task clonePravegaRepo {
 	doLast {
 		def destDir = file(pravegaSrcDir)
+		if(destDir.exists()) {
+			if(destDir.isDirectory()) {
+				if(0 < destDir.list().length) {
+					return
+				}
+			} else {
+				throw new GradleException("${pravegaSrcDir} is not a directory")
+			}
+		}
 		if(!destDir.exists()) {
 			def gitRepo = Grgit.clone {
 				uri = "https://github.com/pravega/pravega.git"
@@ -82,6 +91,11 @@ task clonePravegaRepo {
 		}
 	}
 }
+task pravegaVersion(type: Exec, dependsOn: clonePravegaRepo) {
+	workingDir pravegaSrcDir
+	commandLine "sh", "-c", "./gradlew properties --no-daemon --console=plain -q | grep \"^version:\" | awk '{printf \$2}'"
+	standardOutput = new ByteArrayOutputStream()
+}
 task pravegaClientJars(type: Exec, dependsOn: clonePravegaRepo) {
 	workingDir pravegaSrcDir
 	commandLine "./gradlew", ":client:jar"
@@ -91,9 +105,9 @@ task pravegaDistInstall(type: Exec, dependsOn: clonePravegaRepo) {
 	workingDir pravegaSrcDir
 	commandLine "./gradlew", "distribution", "install"
 }
-task pravegaExtract(dependsOn: pravegaDistInstall) {
+task pravegaExtract(dependsOn: [pravegaVersion, pravegaDistInstall]) {
 	doLast {
-		def pravegaVersion = "0.5.0-2223.ce3ba81-SNAPSHOT"
+		def pravegaVersion = pravegaVersion.standardOutput.toString()
 		println "Extracting Pravega v${pravegaVersion}..."
 		copy {
 			from tarTree("${pravegaSrcDir}${File.separator}build${File.separator}distributions${File.separator}pravega-${pravegaVersion}.tgz")
@@ -102,7 +116,7 @@ task pravegaExtract(dependsOn: pravegaDistInstall) {
 	}
 }
 task pravegaStart(type: SpawnProcessTask, dependsOn: pravegaExtract) {
-	def pravegaVersion = "0.5.0-2223.ce3ba81-SNAPSHOT"
+	def pravegaVersion = pravegaVersion.standardOutput.toString()
 	command "${project.buildDir}${File.separator}pravega-${pravegaVersion}${File.separator}bin${File.separator}pravega-standalone"
 	ready "Controller event processors startUp complete"
 	pidLockFileName ".pravega.pid.lock"
@@ -202,11 +216,15 @@ jar {
 	excludes = [
 		"**/*.css",
 		"**/*.html",
+		"**/*.png",
+		"*.js",
+		"*.zip",
 		"META-INF/*.DSA",
 		"META-INF/*.LIST",
 		"META-INF/*.RSA",
 		"META-INF/*.SF",
-		"OSGI-INF/*",
+		"OSGI-INF/**",
+		"jquery/**",
 		"module-info.class",
 	]
 	manifest {
