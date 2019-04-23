@@ -217,6 +217,7 @@ jar {
 		"**/*.css",
 		"**/*.html",
 		"**/*.png",
+		"**/*.proto",
 		"*.js",
 		"*.zip",
 		"META-INF/*.DSA",
