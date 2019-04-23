@@ -112,14 +112,16 @@ build_docker_image:
     - docker login -u ${DOCKER_USER} -p ${DOCKER_PASS}
     - docker load < ${IMAGE_FILE_NAME}
     # Run Pravega
-    - ./gradlew pravegaStart
+    - nohup build/pravega_/bin/pravega-standalone 1,2 > build/pravega_nohup.out &
+    - sleep 15
     # Run the tests
     - robot --outputdir build/robotest --suite ${SUITE} --include ${TEST} src/test/robot
   after_script:
-    - ./gradlew pravegaStop
+    - killall java
     - rebot build/robotest/output.xml
   artifacts:
     paths:
+      - build/pravega_nohup.out
       - build/robotest/*.html
     when: on_failure
 
