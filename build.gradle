@@ -57,6 +57,7 @@ ext {
 	buildLibsPath = "build${File.separator}libs"
 	pravegaSrcDir = "${project.buildDir}${File.separator}pravega"
 	pravegaCommit = "ce3ba81"
+	pravegaDstDir = "${project.buildDir}${File.separator}pravega-${pravegaCommit}"
 	pravegaClientJarDir = "${pravegaSrcDir}${File.separator}client${File.separator}${buildLibsPath}"
 	pravegaCommonJarDir = "${pravegaSrcDir}${File.separator}common${File.separator}${buildLibsPath}"
 	pravegaSharedAuthpluginJarDir = "${pravegaSrcDir}${File.separator}shared${File.separator}authplugin${File.separator}${buildLibsPath}"
@@ -91,11 +92,6 @@ task clonePravegaRepo {
 		}
 	}
 }
-task pravegaVersion(type: Exec, dependsOn: clonePravegaRepo) {
-	workingDir pravegaSrcDir
-	commandLine "sh", "-c", "./gradlew properties --no-daemon --console=plain -q | grep \"^version:\" | awk '{printf \$2}'"
-	standardOutput = new ByteArrayOutputStream()
-}
 task pravegaClientJars(type: Exec, dependsOn: clonePravegaRepo) {
 	workingDir pravegaSrcDir
 	commandLine "./gradlew", ":client:jar"
@@ -105,19 +101,27 @@ task pravegaDistInstall(type: Exec, dependsOn: clonePravegaRepo) {
 	workingDir pravegaSrcDir
 	commandLine "./gradlew", "distribution", "install"
 }
+task pravegaVersion(type: Exec, dependsOn: clonePravegaRepo) {
+	workingDir pravegaSrcDir
+	commandLine "sh", "-c", "./gradlew properties --no-daemon --console=plain -q | grep \"^version:\" | awk '{printf \$2}'"
+	standardOutput = new ByteArrayOutputStream()
+	doLast {
+		pravegaVersion.ext.result = standardOutput.toString()
+		println "Pravega version: ${pravegaVersion.ext.result}"
+	}
+}
 task pravegaExtract(dependsOn: [pravegaVersion, pravegaDistInstall]) {
 	doLast {
-		def pravegaVersion = pravegaVersion.standardOutput.toString()
-		println "Extracting Pravega v${pravegaVersion}..."
 		copy {
-			from tarTree("${pravegaSrcDir}${File.separator}build${File.separator}distributions${File.separator}pravega-${pravegaVersion}.tgz")
+			from tarTree("${pravegaSrcDir}${File.separator}build${File.separator}distributions${File.separator}pravega-${pravegaVersion.ext.result}.tgz")
 			into project.buildDir
 		}
+		def pravegaDir = new File("${project.buildDir}${File.separator}pravega-${pravegaVersion.ext.result}")
+		pravegaDir.renameTo("${pravegaDstDir}")
 	}
 }
 task pravegaStart(type: SpawnProcessTask, dependsOn: pravegaExtract) {
-	def pravegaVersion = pravegaVersion.standardOutput.toString()
-	command "${project.buildDir}${File.separator}pravega-${pravegaVersion}${File.separator}bin${File.separator}pravega-standalone"
+	command "${pravegaDstDir}${File.separator}bin${File.separator}pravega-standalone"
 	ready "Controller event processors startUp complete"
 	pidLockFileName ".pravega.pid.lock"
 }
