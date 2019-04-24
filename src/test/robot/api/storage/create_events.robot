@@ -18,6 +18,7 @@ Create Events Test
     ${args} =  Catenate  SEPARATOR= \\\n\t
     ...  --load-step-id=${step_id}
     ...  --load-op-limit-count=10
+    ...  --storage-driver-control-timeoutMillis=1000000
     ...  --storage-namespace=goose
     ${std_out} =  Execute Mongoose Scenario  ${args}
     Log  ${std_out}

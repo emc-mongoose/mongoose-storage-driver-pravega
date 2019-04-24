@@ -21,6 +21,7 @@ Create Events Test
     ...  --item-data-size=1KB
     ...  --item-output-path=${stream_name}
     ...  --load-op-limit-count=1
+    ...  --storage-driver-control-timeoutMillis=1000000
     ...  --storage-namespace=goose
     ${std_out} =  Execute Mongoose Scenario  ${args}
     Log  ${std_out}
