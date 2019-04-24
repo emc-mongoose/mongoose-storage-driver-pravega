@@ -113,7 +113,7 @@ build_docker_image:
     - docker load < ${IMAGE_FILE_NAME}
     # Run Pravega
     - ./gradlew pravegaExtract
-    - nohup build/pravega_/bin/pravega-standalone 1,2 > build/pravega_nohup.out &
+    - build/pravega_/bin/pravega-standalone &
     - sleep 15
     # Run the tests
     - robot --outputdir build/robotest --suite ${SUITE} --include ${TEST} src/test/robot
