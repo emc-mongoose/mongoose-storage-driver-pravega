@@ -7,7 +7,7 @@ variables:
   IMAGE_FILE_NAME: build/mongoose-storage-driver-pravega.tar
   JAVA_HOME: /opt/jdk-11.0.2+9
   ROBOTEST_CONTAINER_WORKING_DIR: /root/mongoose
-  SERVICE_HOST: docker # should be used instead of the "localhost"/"127.0.0.1" in GL CI
+  SERVICE_HOST: 172.17.0.4 # should be used instead of the "localhost"/"127.0.0.1" in GL CI
 
 services:
   - docker:dind
