@@ -115,8 +115,6 @@ build_docker_image:
     - ./gradlew pravegaExtract
     - nohup build/pravega_/bin/pravega-standalone 1,2 > build/pravega_nohup.out &
     - sleep 15
-    - ps alx | grep java
-    - cat build/pravega_nodup.out
     # Run the tests
     - robot --outputdir build/robotest --suite ${SUITE} --include ${TEST} src/test/robot
   after_script:
