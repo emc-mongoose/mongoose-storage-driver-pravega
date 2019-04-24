@@ -485,15 +485,20 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
                     ? evtItem.offset() % createRoutingKeysPeriod
                     : evtItem.offset(),
                 Character.MAX_RADIX);
-        writeEvtFuture = evtWriter.writeEvent(routingKey, evtItem);
+        evtOp.startRequest();
+		  evtOp.finishRequest();
+		  writeEvtFuture = evtWriter.writeEvent(routingKey, evtItem);
       } else {
+        evtOp.startRequest();
+        evtOp.finishRequest();
         writeEvtFuture = evtWriter.writeEvent(evtItem);
       }
-      evtOp.startRequest();
       writeEvtFuture.handle(
           (returned, thrown) -> {
             if (null == thrown) {
-              try {
+				evtOp.startResponse();
+				evtOp.finishResponse();
+				try {
                 evtOp.countBytesDone(evtItem.size());
               } catch (final IOException ignored) {
               }
@@ -630,9 +635,6 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
   boolean completeOperation(final O op, final Status status) {
     concurrencyThrottle.release();
     op.status(status);
-    op.finishRequest();
-    op.startResponse();
-    op.finishResponse();
     return handleCompleted(op);
   }
 
@@ -643,10 +645,14 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 
   boolean handleStreamSealBeforeDeletion(
       final String streamName, final Controller controller, final O streamOp) {
+  	streamOp.startRequest();
     val deleteFuture = controller.deleteStream(scopeName, streamName);
+    streamOp.finishRequest();
     deleteFuture.handle(
         (result, thrown) -> {
           if (null == thrown) {
+          	streamOp.startResponse();
+          	streamOp.finishResponse();
             completeOperation(streamOp, SUCC);
           } else {
             completeFailedOperation(streamOp, thrown);
