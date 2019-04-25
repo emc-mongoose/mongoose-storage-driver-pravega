@@ -23,7 +23,7 @@ Create Events Test
     ...  --storage-net-node-addrs=${node_addr}
     ${std_out} =  Execute Mongoose Scenario  ${args}
     Log  ${std_out}
-    Validate Metrics Total Log File  ${step_id}  CREATE  10  0  1048576
+    Validate Metrics Total Log File  ${step_id}  CREATE  10  0  10485760
 
 *** Keyword ***
 Execute Mongoose Scenario
