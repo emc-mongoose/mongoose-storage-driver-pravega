@@ -26,8 +26,8 @@ public class PravegaEventReadTest {
 	public void testEventRead()
 			throws Exception {
 		/* writing */
-		val scopeName = "Scope";
-		val streamName = "Stream";
+		val scopeName = getClass().getSimpleName() + "Scope";
+		val streamName = getClass().getSimpleName() + "Stream";
 		val controllerURI = URI.create("tcp://" + PravegaNode.addr() + ":" + PravegaNode.PORT);
 		val routingKey = "RoutingKey";
 		val testEvent = "TestEvent";
