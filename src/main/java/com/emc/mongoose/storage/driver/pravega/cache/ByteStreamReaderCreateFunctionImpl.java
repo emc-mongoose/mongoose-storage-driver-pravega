@@ -7,10 +7,10 @@ import lombok.Value;
 @Value
 public final class ByteStreamReaderCreateFunctionImpl implements ByteStreamReaderCreateFunction {
 
-  ByteStreamClientFactory clientFactory;
+	ByteStreamClientFactory clientFactory;
 
-  @Override
-  public final ByteStreamReader apply(final String streamName) {
-    return clientFactory.createByteStreamReader(streamName);
-  }
+	@Override
+	public final ByteStreamReader apply(final String streamName) {
+		return clientFactory.createByteStreamReader(streamName);
+	}
 }

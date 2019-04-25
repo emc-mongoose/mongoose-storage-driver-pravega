@@ -9,7 +9,7 @@ import java.util.function.Function;
  A function to create the event stream reader using the reader group name as the function argument
  */
 public interface ReaderCreateFunction
-extends Function<String, EventStreamReader<ByteBuffer>> {
+				extends Function<String, EventStreamReader<ByteBuffer>> {
 
 	/**
 	 @param readerGroup the reader group name

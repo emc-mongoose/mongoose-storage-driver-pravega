@@ -8,7 +8,7 @@ import java.util.function.Function;
  A function to create the reader group manager using the scope name as the function argument
  */
 public interface ReaderGroupManagerCreateFunction
-extends Function<String, ReaderGroupManager> {
+				extends Function<String, ReaderGroupManager> {
 
 	/**
 	 @param scopeName the scope name

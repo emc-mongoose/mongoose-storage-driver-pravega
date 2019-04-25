@@ -8,7 +8,7 @@ import java.util.function.Function;
  A function to create the client factory using the scope name as the function argument
  */
 public interface EventStreamClientFactoryCreateFunction
-extends Function<String, EventStreamClientFactory> {
+				extends Function<String, EventStreamClientFactory> {
 
 	/**
 	 @param scopeName the scope name

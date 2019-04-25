@@ -10,7 +10,7 @@ import java.util.function.Function;
  A function to create the scope using the scope name as a function argument
  */
 public interface ScopeCreateFunction
-extends Function<String, StreamCreateFunction> {
+				extends Function<String, StreamCreateFunction> {
 
 	/**
 	 @param scopeName the name of the scope to create

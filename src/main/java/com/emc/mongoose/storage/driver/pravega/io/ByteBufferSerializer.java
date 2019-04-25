@@ -6,7 +6,7 @@ import java.io.Serializable;
 import java.nio.ByteBuffer;
 
 public class ByteBufferSerializer
-implements Serializer<ByteBuffer>, Serializable {
+				implements Serializer<ByteBuffer>, Serializable {
 
 	/**
 	 * Not implemented. Do not invoke this.
@@ -26,7 +26,7 @@ implements Serializer<ByteBuffer>, Serializable {
 	 */
 	@Override
 	public final ByteBuffer deserialize(final ByteBuffer serializedValue)
-	throws OutOfMemoryError, IllegalArgumentException {
+					throws OutOfMemoryError, IllegalArgumentException {
 		return serializedValue;
 	}
 }
