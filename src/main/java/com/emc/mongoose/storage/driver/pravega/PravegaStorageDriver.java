@@ -461,7 +461,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 			// create the event stream writer if necessary
 			val evtWriterPool = evtWriterPoolCache.computeIfAbsent(streamName, this::createEventWriterPool);
 			var evtWriter_ = evtWriterPool.poll();
-			if(null == evtWriter_) {
+			if (null == evtWriter_) {
 				evtWriter_ = clientFactory.createEventWriter(streamName, evtSerializer, evtWriterConfig);
 			}
 			val evtWriter = evtWriter_;
@@ -497,7 +497,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 								}
 							});
 		} catch (final NullPointerException e) {
-			if(!isStarted()) { // occurs on manual interruption which is normal so should be handled
+			if (!isStarted()) { // occurs on manual interruption which is normal so should be handled
 				completeOperation(evtOp, INTERRUPTED);
 			} else {
 				completeFailedOperation(evtOp, e);
@@ -518,15 +518,15 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 			val stream = Stream.of(scopeName, streamName);
 			val readerGroupConfig = readerGroupConfigBuilder.stream(stream).build();
 			val readerGroupManagerCreateFunc = readerGroupManagerCreateFuncCache.computeIfAbsent(
-				endpointUri, ReaderGroupManagerCreateFunctionImpl::new);
+							endpointUri, ReaderGroupManagerCreateFunctionImpl::new);
 			val readerGroupManager = readerGroupManagerCache.computeIfAbsent(scopeName, readerGroupManagerCreateFunc);
 			readerGroupManager.createReaderGroup(readerGroup, readerGroupConfig);
 			val clientConfig = clientConfigCache.computeIfAbsent(endpointUri, this::createClientConfig);
 			val clientFactoryCreateFunc = clientFactoryCreateFuncCache.computeIfAbsent(
-				clientConfig, EventStreamClientFactoryCreateFunctionImpl::new);
+							clientConfig, EventStreamClientFactoryCreateFunctionImpl::new);
 			val clientFactory = clientFactoryCache.computeIfAbsent(scopeName, clientFactoryCreateFunc);
 			val readerCreateFunc = eventStreamReaderCreateFuncCache.computeIfAbsent(
-				clientFactory, ReaderCreateFunctionImpl::new);
+							clientFactory, ReaderCreateFunctionImpl::new);
 			val evtReader = eventStreamReaderCache.computeIfAbsent(readerGroup, readerCreateFunc);
 			Loggers.MSG.trace("Reading all the events from {} {}", scopeName, streamName);
 			val evt = evtReader.readNextEvent(readTimeoutMillis);
@@ -704,11 +704,10 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		closeAllWithTimeout(clientFactoryCache.values());
 		clientFactoryCache.clear();
 		evtWriterPoolCache.values().forEach(
-			pool -> {
-				closeAllWithTimeout(pool);
-				pool.clear();
-			}
-		);
+						pool -> {
+							closeAllWithTimeout(pool);
+							pool.clear();
+						});
 		evtWriterPoolCache.clear();
 		readerGroupManagerCreateFuncCache.clear();
 		closeAllWithTimeout(readerGroupManagerCache.values());
