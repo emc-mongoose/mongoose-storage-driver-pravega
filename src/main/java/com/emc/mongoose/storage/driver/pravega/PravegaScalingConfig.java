@@ -8,9 +8,7 @@ import lombok.val;
 public interface PravegaScalingConfig {
 
 	enum Type {
-		FIXED,
-		EVENT_RATE,
-		KBYTE_RATE,
+		FIXED, EVENT_RATE, KBYTE_RATE,
 	}
 
 	/**
@@ -22,20 +20,20 @@ public interface PravegaScalingConfig {
 	 @throws NullPointerException if the config is null either scaling type string is null
 	 */
 	static ScalingPolicy scalingPolicy(final Config scalingConfig)
-	throws IllegalArgumentException, NullPointerException {
+					throws IllegalArgumentException, NullPointerException {
 		val scalingType = Type.valueOf(scalingConfig.stringVal("type").toUpperCase());
 		val rate = scalingConfig.intVal("rate");
 		val factor = scalingConfig.intVal("factor");
 		val segmentCount = scalingConfig.intVal("segments");
-		switch(scalingType) {
-			case FIXED:
-				return ScalingPolicy.fixed(segmentCount);
-			case EVENT_RATE:
-				return ScalingPolicy.byEventRate(rate, factor, segmentCount);
-			case KBYTE_RATE:
-				return ScalingPolicy.byDataRate(rate, factor, segmentCount);
-			default:
-				throw new AssertionError();
+		switch (scalingType) {
+		case FIXED:
+			return ScalingPolicy.fixed(segmentCount);
+		case EVENT_RATE:
+			return ScalingPolicy.byEventRate(rate, factor, segmentCount);
+		case KBYTE_RATE:
+			return ScalingPolicy.byDataRate(rate, factor, segmentCount);
+		default:
+			throw new AssertionError();
 		}
 	}
 }

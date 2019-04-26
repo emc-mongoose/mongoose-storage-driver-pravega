@@ -8,7 +8,7 @@ import java.util.function.Function;
  A function to create the scope using the scope name as a function argument
  */
 public interface ScopeCreateFunctionForStreamConfig
-extends Function<String, StreamConfiguration> {
+				extends Function<String, StreamConfiguration> {
 
 	/**
 	 @param scopeName the name of the scope to create

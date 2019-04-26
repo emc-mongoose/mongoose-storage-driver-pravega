@@ -7,10 +7,10 @@ import lombok.Value;
 @Value
 public final class ByteStreamWriterCreateFunctionImpl implements ByteStreamWriterCreateFunction {
 
-  ByteStreamClient client;
+	ByteStreamClient client;
 
-  @Override
-  public final ByteStreamWriter apply(final String streamName) {
-    return client.createByteStreamWriter(streamName);
-  }
+	@Override
+	public final ByteStreamWriter apply(final String streamName) {
+		return client.createByteStreamWriter(streamName);
+	}
 }

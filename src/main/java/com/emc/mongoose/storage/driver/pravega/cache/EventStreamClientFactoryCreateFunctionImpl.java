@@ -6,7 +6,7 @@ import lombok.Value;
 
 @Value
 public final class EventStreamClientFactoryCreateFunctionImpl
-implements EventStreamClientFactoryCreateFunction {
+				implements EventStreamClientFactoryCreateFunction {
 
 	ClientConfig clientConfig;
 

@@ -5,6 +5,6 @@ import java.util.function.Function;
 
 public interface ByteStreamReaderCreateFunction extends Function<String, ByteStreamReader> {
 
-  @Override
-  ByteStreamReader apply(final String streamName);
+	@Override
+	ByteStreamReader apply(final String streamName);
 }

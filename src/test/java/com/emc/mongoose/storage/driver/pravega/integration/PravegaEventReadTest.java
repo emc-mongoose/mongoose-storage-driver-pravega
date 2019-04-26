@@ -1,7 +1,6 @@
 package com.emc.mongoose.storage.driver.pravega.integration;
 
 import com.emc.mongoose.storage.driver.pravega.util.PravegaNode;
-import com.emc.mongoose.storage.driver.pravega.util.docker.PravegaNodeContainer;
 
 import io.pravega.client.ClientFactory;
 import io.pravega.client.admin.ReaderGroupManager;
@@ -9,9 +8,6 @@ import io.pravega.client.admin.StreamManager;
 import io.pravega.client.stream.*;
 import io.pravega.client.stream.impl.JavaSerializer;
 import lombok.val;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.net.URI;
@@ -24,7 +20,7 @@ public class PravegaEventReadTest {
 
 	@Test
 	public void testEventRead()
-			throws Exception {
+					throws Exception {
 		/* writing */
 		val scopeName = getClass().getSimpleName() + "Scope";
 		val streamName = getClass().getSimpleName() + "Stream";
@@ -35,21 +31,18 @@ public class PravegaEventReadTest {
 		val streamManager = StreamManager.create(controllerURI);
 		val scopeIsNew = streamManager.createScope(scopeName);
 		val streamConfig = StreamConfiguration.builder()
-			.scalingPolicy(ScalingPolicy.fixed(1))
-			.build();
+						.scalingPolicy(ScalingPolicy.fixed(1))
+						.build();
 		streamManager.createStream(scopeName, streamName, streamConfig);
-		try(
-			val clientFactory = ClientFactory.withScope(scopeName, controllerURI);
-			val writer = clientFactory.createEventWriter(
-				streamName, new JavaSerializer<>(), EventWriterConfig.builder().build()
-			)
-		) {
+		try (
+						val clientFactory = ClientFactory.withScope(scopeName, controllerURI);
+						val writer = clientFactory.createEventWriter(
+										streamName, new JavaSerializer<>(), EventWriterConfig.builder().build())) {
 			writer.writeEvent(routingKey, testEvent);
 			System.out.format(
-				"Writing message: '%s' with routing-key: '%s' to stream '%s / %s'%n", testEvent, routingKey, scopeName,
-				streamName
-			);
-		} catch(final Throwable thrown) {
+							"Writing message: '%s' with routing-key: '%s' to stream '%s / %s'%n", testEvent, routingKey, scopeName,
+							streamName);
+		} catch (final Throwable thrown) {
 			thrown.printStackTrace(System.err);
 		}
 		/*end of writing*/
@@ -57,23 +50,20 @@ public class PravegaEventReadTest {
 		/*reading*/
 		val readerGroup = UUID.randomUUID().toString().replace("-", "");
 		val readerGroupConfig = ReaderGroupConfig.builder()
-			.stream(Stream.of(scopeName, streamName))
-			.build();
-		try(val readerGroupManager = ReaderGroupManager.withScope(scopeName, controllerURI)) {
+						.stream(Stream.of(scopeName, streamName))
+						.build();
+		try (val readerGroupManager = ReaderGroupManager.withScope(scopeName, controllerURI)) {
 			readerGroupManager.createReaderGroup(readerGroup, readerGroupConfig);
 		}
-		try(
-			val clientFactory = ClientFactory.withScope(scopeName, controllerURI);
-			val reader = clientFactory.createReader(
-				"reader", readerGroup, new JavaSerializer<>(), ReaderConfig.builder().build()
-			)
-		) {
+		try (
+						val clientFactory = ClientFactory.withScope(scopeName, controllerURI);
+						val reader = clientFactory.createReader(
+										"reader", readerGroup, new JavaSerializer<>(), ReaderConfig.builder().build())) {
 			val event1 = reader.readNextEvent(readerTimeoutMs);
-			if(event1.getEvent() != null) {
+			if (event1.getEvent() != null) {
 				System.out.format("Read event '%s'%n", event1.getEvent());
 				assertEquals(
-					"we didn't read the event string we had put into stream", "TestEvent", event1.getEvent()
-				);
+								"we didn't read the event string we had put into stream", "TestEvent", event1.getEvent());
 			}
 			val event2 = reader.readNextEvent(readerTimeoutMs);
 			assertNull("there should't be anything else in the stream", event2.getEvent());

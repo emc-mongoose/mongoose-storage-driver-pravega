@@ -9,7 +9,7 @@ public interface PravegaNode {
 		if(ciFlag) {
 			return "pravega";
 		} else {*/
-			return "localhost";
+		return "localhost";
 		//}
 	}
 }
