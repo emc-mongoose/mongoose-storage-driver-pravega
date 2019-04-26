@@ -40,7 +40,7 @@ Create Byte Streams Test
     ...  --storage-net-node-addrs=${node_addr}
     ${std_out} =  Execute Mongoose Scenario  ${args}
     Log  ${std_out}
-    Validate Metrics Total Log File  ${step_id}  CREATE  100  0  1048576000
+    Validate Metrics Total Log File  ${step_id}  CREATE  100  0  104857600
 
 *** Keyword ***
 Execute Mongoose Scenario
