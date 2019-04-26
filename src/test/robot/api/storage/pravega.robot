@@ -32,7 +32,6 @@ Create Byte Streams Test
     ${step_id} =  Set Variable  create_byte_streams_test
     Remove Directory  ${LOG_DIR}/${step_id}  recursive=True
     ${args} =  Catenate  SEPARATOR= \\\n\t
-    ...  --item-data-size=10MB
     ...  --load-step-id=${step_id}
     ...  --load-op-limit-count=100
     ...  --storage-driver-limit-concurrency=10
