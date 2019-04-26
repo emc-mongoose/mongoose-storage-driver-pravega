@@ -33,6 +33,7 @@ Create Byte Streams Test
     Remove Directory  ${LOG_DIR}/${step_id}  recursive=True
     ${args} =  Catenate  SEPARATOR= \\\n\t
     ...  --load-step-id=${step_id}
+    ...  --load-step-limit-time=3m
     ...  --load-op-limit-count=100
     ...  --storage-driver-limit-concurrency=10
     ...  --storage-driver-stream-data=bytes
