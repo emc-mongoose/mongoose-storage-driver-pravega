@@ -47,18 +47,21 @@ source commit number.
 
 # 2. Features
 
-* Authentication: TBD
-* SSL/TLS: TBD
+* Authentication: not implemented yet
+* SSL/TLS: not implemented yet
 * Item Types:
-    * `data` -> "event"
-    * `path` -> "stream"
+    * `data`: corresponds to an ***event*** either ***byte stream*** depending on the configuration 
+    * `path`: not supported
+    * `token`: not supported
 * Supported load operations:
     * `create` (events)
     * `read` (streams)
     * `delete` (streams)
 * Storage-specific:
+    * Scaling policies
     * Stream sealing
     * Routing keys
+    * Byte streams
 
 # 3. Usage
 
@@ -174,7 +177,7 @@ Mongoose and Pravega are using quite different concepts. So it's necessary to de
 
 | Pravega | Mongoose |
 |---------|----------|
-| [Stream](http://pravega.io/docs/latest/pravega-concepts/#streams) | *Path Item* |
+| [Stream](http://pravega.io/docs/latest/pravega-concepts/#streams) | *Item Path* or *Byte Stream* |
 | Scope | Storage Namespace
 | [Event](http://pravega.io/docs/latest/pravega-concepts/#events) | *Data Item* |
 | Stream Segment | N/A |
@@ -230,15 +233,29 @@ is set to `bytes`. This means that the whole streams are being accounted as *ite
 
 ### 4.2.1. Create
 
-Creates the [byte streams](https://github.com/pravega/pravega/wiki/PDP-30-ByteStream-API).
+Creates the [byte streams](https://github.com/pravega/pravega/wiki/PDP-30-ByteStream-API). The created byte stream is 
+filled with content up to the size determined by the `item-data-size` option. The create operation will fail with the 
+[status code](https://github.com/emc-mongoose/mongoose-base/tree/master/doc/interfaces/output#232-files) #7 if the 
+stream existed before. 
+
+**Example** ():
+```bash
+docker run \
+    --network host \
+    emcmongoose/mongoose-storage-driver-pravega \
+    --storage-driver-stream-data=bytes \
+    --storage-namespace=scope1 \
+    --storage-driver-limit-concurrency=100
+```
 
 ### 4.2.2. Read
 
 Reads the [byte streams](https://github.com/pravega/pravega/wiki/PDP-30-ByteStream-API).
+Not implemented yet
 
 ### 4.2.3. Update
 
-Not supported
+Not implemented yet
 
 ### 4.2.4. Delete
 

@@ -1,5 +1,4 @@
 *** Settings ***
-Force Tags  create_events
 Library  OperatingSystem
 Library  CSVLibrary
 Test Setup  Start Containers
@@ -12,18 +11,37 @@ ${MONGOOSE_CONTAINER_NAME} =  mongoose-storage-driver-pravega
 ${LOG_DIR} =  build/log
 
 *** Test Cases ***
-Create Events Test
+Create Event Stream Test
+    [Tags]  create_event_stream
     ${node_addr} =  Get Environment Variable  SERVICE_HOST  127.0.0.1
-    ${step_id} =  Set Variable  create_events_test
+    ${step_id} =  Set Variable  create_event_stream_test
     Remove Directory  ${LOG_DIR}/${step_id}  recursive=True
     ${args} =  Catenate  SEPARATOR= \\\n\t
     ...  --load-step-id=${step_id}
-    ...  --load-op-limit-count=10
-    ...  --storage-namespace=goose
+    ...  --load-op-limit-count=1000
+    ...  --storage-driver-limit-concurrency=10
+    ...  --storage-namespace=scope1
     ...  --storage-net-node-addrs=${node_addr}
     ${std_out} =  Execute Mongoose Scenario  ${args}
     Log  ${std_out}
-    Validate Metrics Total Log File  ${step_id}  CREATE  10  0  10485760
+    Validate Metrics Total Log File  ${step_id}  CREATE  1000  0  1048576000
+
+Create Byte Streams Test
+    [Tags]  create_byte_streams
+    ${node_addr} =  Get Environment Variable  SERVICE_HOST  127.0.0.1
+    ${step_id} =  Set Variable  create_byte_streams_test
+    Remove Directory  ${LOG_DIR}/${step_id}  recursive=True
+    ${args} =  Catenate  SEPARATOR= \\\n\t
+    ...  --load-step-id=${step_id}
+    ...  --load-op-limit-count=100
+    ...  --storage-driver-limit-concurrency=10
+    ...  --storage-driver-stream-data=bytes
+    ...  --storage-namespace=scope2
+    ...  --storage-net-node-addrs=${node_addr}
+    ...  --item-data-size=10MB
+    ${std_out} =  Execute Mongoose Scenario  ${args}
+    Log  ${std_out}
+    Validate Metrics Total Log File  ${step_id}  CREATE  100  0  1048576000
 
 *** Keyword ***
 Execute Mongoose Scenario

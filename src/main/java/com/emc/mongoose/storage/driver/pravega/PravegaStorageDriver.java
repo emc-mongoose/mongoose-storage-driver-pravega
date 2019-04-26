@@ -6,6 +6,8 @@ import static com.emc.mongoose.base.item.op.Operation.SLASH;
 import static com.emc.mongoose.base.item.op.Operation.Status.FAIL_IO;
 import static com.emc.mongoose.base.item.op.Operation.Status.FAIL_UNKNOWN;
 import static com.emc.mongoose.base.item.op.Operation.Status.INTERRUPTED;
+import static com.emc.mongoose.base.item.op.Operation.Status.RESP_FAIL_CLIENT;
+import static com.emc.mongoose.base.item.op.Operation.Status.RESP_FAIL_UNKNOWN;
 import static com.emc.mongoose.base.item.op.Operation.Status.SUCC;
 import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.DRIVER_NAME;
 import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.MAX_BACKOFF_MILLIS;
@@ -25,6 +27,7 @@ import com.emc.mongoose.base.logging.LogUtil;
 import com.emc.mongoose.base.logging.Loggers;
 import com.emc.mongoose.base.storage.Credential;
 import com.emc.mongoose.storage.driver.coop.CoopStorageDriverBase;
+import com.emc.mongoose.storage.driver.pravega.cache.ByteStreamClientFactoryCreateFunction;
 import com.emc.mongoose.storage.driver.pravega.cache.EventStreamClientFactoryCreateFunction;
 import com.emc.mongoose.storage.driver.pravega.cache.EventStreamClientFactoryCreateFunctionImpl;
 import com.emc.mongoose.storage.driver.pravega.cache.ReaderCreateFunction;
@@ -34,12 +37,18 @@ import com.emc.mongoose.storage.driver.pravega.cache.ScopeCreateFunction;
 import com.emc.mongoose.storage.driver.pravega.cache.ScopeCreateFunctionForStreamConfig;
 import com.emc.mongoose.storage.driver.pravega.cache.StreamCreateFunction;
 import com.emc.mongoose.storage.driver.pravega.io.ByteBufferSerializer;
+import com.emc.mongoose.storage.driver.pravega.io.ByteStreamWriteChannel;
 import com.emc.mongoose.storage.driver.pravega.io.DataItemSerializer;
 import com.emc.mongoose.storage.driver.pravega.io.StreamDataType;
 import com.github.akurilov.confuse.Config;
+import io.pravega.client.ByteStreamClientFactory;
 import io.pravega.client.ClientConfig;
 import io.pravega.client.EventStreamClientFactory;
 import io.pravega.client.admin.ReaderGroupManager;
+import io.pravega.client.byteStream.impl.ByteStreamClientImpl;
+import io.pravega.client.netty.impl.ConnectionFactory;
+import io.pravega.client.netty.impl.ConnectionFactoryImpl;
+import io.pravega.client.netty.impl.ConnectionPoolImpl;
 import io.pravega.client.stream.EventStreamReader;
 import io.pravega.client.stream.EventStreamWriter;
 import io.pravega.client.stream.EventWriterConfig;
@@ -58,7 +67,6 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -96,7 +104,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	// round-robin counter to select the endpoint node for each load operation in order to distribute
 	// them uniformly
 	private final AtomicInteger rrc = new AtomicInteger(0);
-	private final ScheduledExecutorService bgExecutor;
+	private final ScheduledExecutorService executor;
 
 	private volatile boolean listWasCalled = false;
 
@@ -186,7 +194,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	}
 
 	@Value
-	public final class ReaderCreateFunctionImpl
+	final class ReaderCreateFunctionImpl
 					implements ReaderCreateFunction {
 
 		EventStreamClientFactory clientFactory;
@@ -194,6 +202,18 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		@Override
 		public EventStreamReader<ByteBuffer> apply(String readerGroup) {
 			return clientFactory.createReader("reader", readerGroup, evtDeserializer, evtReaderConfig);
+		}
+	}
+
+	@Value
+	final class ByteStreamClientFactoryCreateFunctionImpl
+	implements ByteStreamClientFactoryCreateFunction {
+
+		ConnectionFactory connFactory;
+
+		@Override
+		public ByteStreamClientFactory apply(final Controller controller) {
+			return new ByteStreamClientImpl(scopeName, controller, connFactory);
 		}
 	}
 
@@ -209,10 +229,10 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	private final Map<String, StreamCreateFunction> streamCreateFuncCache = new ConcurrentHashMap<>();
 	// * streams
 	private final Map<String, Map<String, StreamConfiguration>> scopeStreamsCache = new ConcurrentHashMap<>();
-	// * client factories
+	// * event stream client factories
 	private final Map<ClientConfig, EventStreamClientFactoryCreateFunction> clientFactoryCreateFuncCache = new ConcurrentHashMap<>();
 	private final Map<String, EventStreamClientFactory> clientFactoryCache = new ConcurrentHashMap<>();
-	// * event writers
+	// * event stream writers
 	private final Map<String, Queue<EventStreamWriter<DataItem>>> evtWriterPoolCache = new ConcurrentHashMap<>();
 	// * reader group managers
 	private final Map<URI, ReaderGroupManagerCreateFunction> readerGroupManagerCreateFuncCache = new ConcurrentHashMap<>();
@@ -223,6 +243,13 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	// * scopes with StreamConfigs
 	private final Map<Controller, ScopeCreateFunctionForStreamConfig> scopeCreateFuncForStreamConfigCache = new ConcurrentHashMap<>();
 	private final Map<String, StreamConfiguration> scopeStreamConfigsCache = new ConcurrentHashMap<>();
+	// * connection factory cache
+	private final Map<ClientConfig, ConnectionFactory> connFactoryCache = new ConcurrentHashMap<>();
+	// * byte stream client cache
+	private final Map<ConnectionFactory, ByteStreamClientFactoryCreateFunction> byteStreamClientCreateFuncCache = new ConcurrentHashMap<>();
+	private final Map<Controller, ByteStreamClientFactory> byteStreamClientFactoryCache = new ConcurrentHashMap<>();
+	// * byte stream writer cache
+	private final Map<ByteStreamClientFactory, Queue<ByteStreamWriteChannel>> byteStreamWriteChanPoolCache = new ConcurrentHashMap<>();
 
 	public PravegaStorageDriver(
 					final String stepId,
@@ -254,7 +281,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		this.endpointAddrs = endpointAddrList.toArray(new String[endpointAddrList.size()]);
 		this.requestAuthTokenFunc = null; // do not use
 		this.requestNewPathFunc = null; // do not use
-		this.bgExecutor = Executors.newScheduledThreadPool(
+		this.executor = Executors.newScheduledThreadPool(
 						ioWorkerCount,
 						new LogContextThreadFactory(toString(), true));
 	}
@@ -283,22 +310,39 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	}
 
 	ClientConfig createClientConfig(final URI endpointUri) {
-		return ClientConfig.builder().controllerURI(endpointUri).build();
+		return ClientConfig.builder()
+			.controllerURI(endpointUri)
+			.maxConnectionsPerSegmentStore(concurrencyLimit > 0 ? concurrencyLimit : Integer.MAX_VALUE)
+			.build();
 	}
 
-	@SuppressWarnings("UnstableApiUsage")
 	Controller createController(final ClientConfig clientConfig) {
-		val controllerConfig = ControllerImplConfig.builder()
-						.clientConfig(clientConfig)
-						.maxBackoffMillis(MAX_BACKOFF_MILLIS)
-						.build();
-		return new ControllerImpl(controllerConfig, bgExecutor);
+		val controllerConfig = ControllerImplConfig
+			.builder().clientConfig(clientConfig).maxBackoffMillis(MAX_BACKOFF_MILLIS).build();
+		return new ControllerImpl(controllerConfig, executor);
 	}
 
-	Queue<EventStreamWriter<DataItem>> createEventWriterPool(final String unused) {
+	ConnectionFactory createConnectionFactory(final ClientConfig clientConfig) {
+		val connPool = new ConnectionPoolImpl(clientConfig);
+		return new ConnectionFactoryImpl(clientConfig, connPool, executor);
+	}
+
+	Queue<EventStreamWriter<DataItem>> createEventWriterPool(final Object ignored) {
 		// it's an assumption that the count of the service worker threads will be equal to the cpu thread count
 		// however, it may be different if not by default
 		return new ArrayBlockingQueue<>(Runtime.getRuntime().availableProcessors());
+	}
+
+	Queue<ByteStreamWriteChannel> createByteWriterPool(final Object ignored) {
+		// it's an assumption that the count of the service worker threads will be equal to the cpu thread count
+		// however, it may be different if not by default
+		return new ArrayBlockingQueue<>(Runtime.getRuntime().availableProcessors());
+	}
+
+	ByteStreamClientFactory createByteStreamClientFactory(
+		final Controller controller, final ConnectionFactory connFactory
+	) {
+		return new ByteStreamClientImpl(scopeName, controller, connFactory);
 	}
 
 	/**
@@ -326,16 +370,11 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 					final I lastPrevItem,
 					final int count)
 					throws EOFException {
-
 		if (listWasCalled) {
 			throw new EOFException();
 		}
-		// this must be changed to the number of working load generator's threads
-		val buff = new ArrayList<I>(1);
-		buff.add(itemFactory.getItem(path + prefix, 0, 0));
-
 		listWasCalled = true;
-		return buff;
+		return List.of(itemFactory.getItem(path + prefix, 0, 0));
 	}
 
 	/**
@@ -475,13 +514,12 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 												: evtItem.offset(),
 								Character.MAX_RADIX);
 				evtOp.startRequest();
-				evtOp.finishRequest();
 				writeEvtFuture = evtWriter.writeEvent(routingKey, evtItem);
 			} else {
 				evtOp.startRequest();
-				evtOp.finishRequest();
 				writeEvtFuture = evtWriter.writeEvent(evtItem);
 			}
+			evtOp.finishRequest();
 			writeEvtFuture.handle(
 							(returned, thrown) -> {
 								evtWriterPool.offer(evtWriter);
@@ -551,20 +589,33 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 							controller, ScopeCreateFunctionForStreamConfigImpl::new);
 			val streamConfig = scopeStreamConfigsCache.computeIfAbsent(scopeName, scopeCreateFuncForStreamConfig);
 			val streamName = extractStreamName(streamOp.item().name());
-			val createStreamFuture = controller.createStream(streamName, scopeName, streamConfig);
-			createStreamFuture.handle(
-							(result, thrown) -> {
-								if (null == thrown) {
-									LogUtil.exception(
-													Level.DEBUG,
-													thrown,
-													"Failed to create the stream {} in the scope {}",
-													streamName,
-													scopeName);
-								}
-								handleStreamCreate(endpointUri, streamName, streamOp);
-								return result;
-							});
+			streamOp.startRequest();
+			controller
+				.createStream(scopeName, streamName, streamConfig)
+				.handle(
+					(createdFlag, thrown) -> {
+						streamOp.startResponse();
+						if (null != thrown) {
+							LogUtil.exception(
+											Level.DEBUG,
+											thrown,
+											"Failed to create the stream {} in the scope {}",
+											streamName,
+											scopeName);
+						}
+						if(!createdFlag) {
+							Loggers.ERR.warn(
+								"{}: failed to create the stream \"{}\" in the scope \"{}\", may be existing before",
+								stepId, streamName, scopeName
+							);
+							completeOperation(streamOp, RESP_FAIL_UNKNOWN);
+						} else {
+							handleByteStreamWrite(controller, clientConfig, streamName, streamOp);
+						}
+						return createdFlag;
+					}
+				);
+			streamOp.finishRequest();
 		} catch (final NullPointerException e) {
 			if (!isStarted()) {
 				completeOperation(streamOp, INTERRUPTED);
@@ -587,23 +638,25 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 			val endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
 			val clientConfig = clientConfigCache.computeIfAbsent(endpointUri, this::createClientConfig);
 			val controller = controllerCache.computeIfAbsent(clientConfig, this::createController);
-			val sealFuture = controller.sealStream(scopeName, streamName);
-			sealFuture.handle(
-							(result, thrown) -> {
-								if (null != thrown) {
-									LogUtil.exception(
-													Level.DEBUG,
-													thrown,
-													"Failed to seal the stream {} in the scope {}",
-													streamName,
-													scopeName);
-								}
-								if (!result) {
-									Loggers.ERR.debug(
-													"Failed to seal the stream {} in the scope {}", streamName, scopeName);
-								}
-								return handleStreamSealBeforeDeletion(streamName, controller, streamOp);
-							});
+			controller
+				.sealStream(scopeName, streamName)
+				.handle(
+					(result, thrown) -> {
+						if (null != thrown) {
+							LogUtil.exception(
+											Level.DEBUG,
+											thrown,
+											"Failed to seal the stream {} in the scope {}",
+											streamName,
+											scopeName);
+						}
+						if (!result) {
+							Loggers.ERR.debug(
+											"Failed to seal the stream {} in the scope {}", streamName, scopeName);
+						}
+						return handleStreamSealBeforeDeletion(streamName, controller, streamOp);
+					}
+				);
 		} catch (final NullPointerException e) {
 			if (!isStarted()) {
 				completeOperation(streamOp, INTERRUPTED);
@@ -647,42 +700,55 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	}
 
 	/**
-	 * @param endpointUri selected storage node URI
+	 * @param controller  pravega controller instance
+	 * @param clientConfig pravega client config instance
 	 * @param streamName  stream name
 	 * @param streamOp    stream operation instance
 	 */
-	void handleStreamCreate(final URI endpointUri, final String streamName, final O streamOp) {
-		var countBytesDone = 0L;
+	void handleByteStreamWrite(
+		final Controller controller, final ClientConfig clientConfig, final String streamName, final O streamOp
+	) {
 		val streamItem = streamOp.item();
 		try {
-			val streamSize = streamItem.size();
-			if (streamSize > 0) {
-				// TODO create the client factory create function if necessary
-				// TODO create the client factory if necessary
-				/*val byteStreamClient =
-				    byteStreamClientCache.computeIfAbsent(
-				clientFactory, ClientFactory::createByteStreamClient);
-				val byteStreamWriterCreateFunc =
-				    byteStreamWriterCreateFuncCache.computeIfAbsent(
-				byteStreamClient, ByteStreamWriterCreateFunctionImpl::new);
-				val byteStreamWriter =
-				    byteStreamWriterCache.computeIfAbsent(streamName, byteStreamWriterCreateFunc);
-				var byteBuff = (ByteBuffer) null;
-				var n = 0;
-				while (countBytesDone < streamSize) {
-				  byteBuff = DirectMemUtil.getThreadLocalReusableBuff(streamSize - countBytesDone);
-				  n = streamItem.read(byteBuff);
-				  byteStreamWriter.write(byteBuff);
-				  countBytesDone += n;
-				}*/
+			var remainingBytes = streamItem.size();
+			if (remainingBytes > 0) {
+				val connFactory = connFactoryCache.computeIfAbsent(clientConfig, this::createConnectionFactory);
+				val clientFactoryCreateFunc = byteStreamClientCreateFuncCache.computeIfAbsent(
+					connFactory, ByteStreamClientFactoryCreateFunctionImpl::new
+				);
+				val clientFactory = byteStreamClientFactoryCache.computeIfAbsent(controller, clientFactoryCreateFunc);
+				val byteStreamWriteChanPool = byteStreamWriteChanPoolCache.computeIfAbsent(
+					clientFactory, this::createByteWriterPool
+				);
+				var countBytesDone = 0L;
+				try(
+					val byteStreamWriteChan = ByteStreamWriteChannel.newOrReuseInstance(
+						clientFactory, streamName, byteStreamWriteChanPool.poll()
+					)
+				) {
+					var n = 0L;
+					try {
+						while (remainingBytes > 0) {
+							n = streamItem.writeToSocketChannel(byteStreamWriteChan, remainingBytes);
+							if(0 < countBytesDone) {
+								streamOp.startDataResponse();
+							}
+							countBytesDone += n;
+							remainingBytes -= n;
+						}
+					} finally {
+						streamOp.finishResponse();
+						byteStreamWriteChanPool.offer(byteStreamWriteChan);
+					}
+				} finally {
+					streamOp.countBytesDone(countBytesDone);
+					streamItem.size(countBytesDone);
+				}
 			}
 			completeOperation(streamOp, SUCC);
 		} catch (final IOException e) {
 			LogUtil.exception(Level.DEBUG, e, "Failed to write the bytes stream {}", streamName);
 			completeOperation(streamOp, FAIL_IO);
-		} finally {
-			streamOp.countBytesDone(countBytesDone);
-			streamItem.size(countBytesDone);
 		}
 	}
 
@@ -690,7 +756,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	protected void doClose()
 					throws IOException {
 		super.doClose();
-		bgExecutor.shutdownNow();
+		executor.shutdownNow();
 		// clear all caches
 		endpointCache.clear();
 		clientConfigCache.clear();
