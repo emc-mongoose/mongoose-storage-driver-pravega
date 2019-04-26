@@ -12,7 +12,7 @@ import java.io.Serializable;
 import java.nio.ByteBuffer;
 
 public final class DataItemSerializer
-implements Serializer<DataItem>, Serializable {
+				implements Serializer<DataItem>, Serializable {
 
 	private final boolean useDirectMem;
 
@@ -32,27 +32,25 @@ implements Serializer<DataItem>, Serializable {
 	 */
 	@Override
 	public final ByteBuffer serialize(final DataItem dataItem)
-	throws OutOfMemoryError, IllegalArgumentException {
+					throws OutOfMemoryError, IllegalArgumentException {
 		try {
 			final var dataItemSize = dataItem.size();
-			if(Integer.MAX_VALUE < dataItemSize) {
+			if (Integer.MAX_VALUE < dataItemSize) {
 				throw new IllegalArgumentException("Can't serialize the data item with size > 2^31 - 1");
 			}
-			if(MAX_EVENT_SIZE < dataItemSize) {
+			if (MAX_EVENT_SIZE < dataItemSize) {
 				Loggers.ERR.warn(
-					"Event size is {}, Pravega storage doesn't support the event size more than {}",
-					SizeInBytes.formatFixedSize(dataItemSize), SizeInBytes.formatFixedSize(MAX_EVENT_SIZE)
-				);
+								"Event size is {}, Pravega storage doesn't support the event size more than {}",
+								SizeInBytes.formatFixedSize(dataItemSize), SizeInBytes.formatFixedSize(MAX_EVENT_SIZE));
 			}
-			final var dstBuff = useDirectMem ?
-				ByteBuffer.allocateDirect((int) dataItemSize) : // will crash if not enough memory
-				ByteBuffer.allocate((int) dataItemSize); // will throw OOM error if not enough memory
-			while(dstBuff.remaining() > 0) {
+			final var dstBuff = useDirectMem ? ByteBuffer.allocateDirect((int) dataItemSize) : // will crash if not enough memory
+							ByteBuffer.allocate((int) dataItemSize); // will throw OOM error if not enough memory
+			while (dstBuff.remaining() > 0) {
 				dataItem.read(dstBuff);
 			}
 			dstBuff.flip();
 			return dstBuff;
-		} catch(final IOException e) {
+		} catch (final IOException e) {
 			throw new AssertionError(e);
 		}
 	}

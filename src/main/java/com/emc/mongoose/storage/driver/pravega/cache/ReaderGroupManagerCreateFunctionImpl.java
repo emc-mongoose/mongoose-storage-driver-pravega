@@ -7,7 +7,7 @@ import java.net.URI;
 
 @Value
 public final class ReaderGroupManagerCreateFunctionImpl
-implements ReaderGroupManagerCreateFunction {
+				implements ReaderGroupManagerCreateFunction {
 
 	URI endpointUri;
 

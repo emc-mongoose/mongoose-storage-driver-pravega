@@ -13,6 +13,7 @@ ${LOG_DIR} =  build/log
 
 *** Test Cases ***
 Create Events Test
+    ${node_addr} =  Get Environment Variable  SERVICE_HOST  127.0.0.1
     ${step_id} =  Set Variable  create_stream_test
     ${stream_name} =  Set Variable  streamtest
     Remove Directory  ${LOG_DIR}/${step_id}  recursive=True
@@ -22,6 +23,7 @@ Create Events Test
     ...  --item-output-path=${stream_name}
     ...  --load-op-limit-count=1
     ...  --storage-namespace=goose
+    ...  --storage-net-node-addrs=${node_addr}
     ${std_out} =  Execute Mongoose Scenario  ${args}
     Log  ${std_out}
     Validate Metrics Log File  ${step_id}  ${stream_name}

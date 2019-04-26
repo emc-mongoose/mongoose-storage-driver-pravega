@@ -8,7 +8,7 @@ import java.util.function.Function;
  A function to create the stream using the stream name as a function argument
  */
 public interface StreamCreateFunction
-extends Function<String, StreamConfiguration> {
+				extends Function<String, StreamConfiguration> {
 
 	/**
 	 @param streamName the name of the stream to create

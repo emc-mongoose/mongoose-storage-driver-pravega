@@ -1,19 +1,19 @@
 package com.emc.mongoose.storage.driver.pravega.cache;
 
-import io.pravega.client.ClientFactory;
+import io.pravega.client.EventStreamClientFactory;
 
 import java.util.function.Function;
 
 /**
  A function to create the client factory using the scope name as the function argument
  */
-public interface ClientFactoryCreateFunction
-extends Function<String, ClientFactory> {
+public interface EventStreamClientFactoryCreateFunction
+				extends Function<String, EventStreamClientFactory> {
 
 	/**
 	 @param scopeName the scope name
 	 @return the created client factory
 	 */
 	@Override
-	ClientFactory apply(final String scopeName);
+	EventStreamClientFactory apply(final String scopeName);
 }

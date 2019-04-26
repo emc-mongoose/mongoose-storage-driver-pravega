@@ -5,8 +5,7 @@ import io.pravega.client.byteStream.ByteStreamWriter;
 import lombok.Value;
 
 @Value
-public final class ByteStreamWriterCreateFunctionImpl
-implements ByteStreamWriterCreateFunction {
+public final class ByteStreamWriterCreateFunctionImpl implements ByteStreamWriterCreateFunction {
 
 	ByteStreamClient client;
 

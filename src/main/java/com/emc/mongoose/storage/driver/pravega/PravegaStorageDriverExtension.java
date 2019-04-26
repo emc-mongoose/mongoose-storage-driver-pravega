@@ -12,15 +12,11 @@ import com.emc.mongoose.base.storage.driver.StorageDriverFactory;
 import com.github.akurilov.confuse.Config;
 import com.github.akurilov.confuse.SchemaProvider;
 import com.github.akurilov.confuse.io.yaml.YamlSchemaProviderBase;
-
 import java.io.InputStream;
 import java.util.List;
 
-public final class PravegaStorageDriverExtension<
-	I extends DataItem, O extends DataOperation<I>, T extends PravegaStorageDriver<I, O>
->
-extends ExtensionBase
-implements StorageDriverFactory<I, O, T> {
+public final class PravegaStorageDriverExtension<I extends DataItem, O extends DataOperation<I>, T extends PravegaStorageDriver<I, O>>
+				extends ExtensionBase implements StorageDriverFactory<I, O, T> {
 
 	private static final SchemaProvider SCHEMA_PROVIDER = new YamlSchemaProviderBase() {
 
@@ -38,10 +34,11 @@ implements StorageDriverFactory<I, O, T> {
 	private static final String DEFAULTS_FILE_NAME = "defaults-storage-driver-" + DRIVER_NAME + ".yaml";
 
 	private static final List<String> RES_INSTALL_FILES = List.of(
-		"config/" + DEFAULTS_FILE_NAME, "example/scenario/js/pravega/manual_scaling.js",
-		"example/scenario/js/pravega/scenario_1.js", "example/scenario/js/pravega/scenario_2.js",
-		"example/scenario/js/pravega/scenario_3.js"
-	);
+					"config/" + DEFAULTS_FILE_NAME,
+					"example/scenario/js/pravega/manual_scaling.js",
+					"example/scenario/js/pravega/scenario_1.js",
+					"example/scenario/js/pravega/scenario_2.js",
+					"example/scenario/js/pravega/scenario_3.js");
 
 	@Override
 	public final String id() {
@@ -65,9 +62,12 @@ implements StorageDriverFactory<I, O, T> {
 
 	@Override
 	public T create(
-		final String stepId, final DataInput dataInput, final Config storageConfig, final boolean verifyFlag,
-		final int batchSize
-	) throws IllegalConfigurationException, InterruptedException {
+					final String stepId,
+					final DataInput dataInput,
+					final Config storageConfig,
+					final boolean verifyFlag,
+					final int batchSize)
+					throws IllegalConfigurationException, InterruptedException {
 		return (T) new PravegaStorageDriver<I, O>(stepId, dataInput, storageConfig, verifyFlag, batchSize);
 	}
 }

@@ -7,7 +7,7 @@ variables:
   IMAGE_FILE_NAME: build/mongoose-storage-driver-pravega.tar
   JAVA_HOME: /opt/jdk-11.0.2+9
   ROBOTEST_CONTAINER_WORKING_DIR: /root/mongoose
-  SERVICE_HOST: docker # should be used instead of the "localhost"/"127.0.0.1" in GL CI
+  SERVICE_HOST: 172.17.0.4 # should be used instead of the "localhost"/"127.0.0.1" in GL CI
 
 services:
   - docker:dind
@@ -20,11 +20,8 @@ stages:
   - deploy
 
 before_script:
-
-  - export PRAVEGA_VERSION=$(cat build.gradle | grep pravega\ | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
-
   # install AdoptOpenJDK 11
-  - apk add --update --no-cache ca-certificates curl openssl binutils xz gnupg busybox-extras
+  - apk add --update --no-cache ca-certificates curl openssl binutils xz gnupg busybox-extras git bash
   - curl -Lks https://github.com/AdoptOpenJDK/openjdk11-binaries/releases/download/jdk-11.0.2%2B9/OpenJDK11U-jdk_x64_linux_hotspot_11.0.2_9.tar.gz -o /tmp/jdk11.tgz
   - tar xvf /tmp/jdk11.tgz -C /opt
   - rm -rf /tmp/jdk11.tgz
@@ -55,7 +52,8 @@ before_script:
 build:
   stage: build
   script:
-    - ./gradlew clean jar
+    - ./gradlew clean pravegaClientJars
+    - ./gradlew jar
   artifacts:
     paths:
       - build/libs/mongoose-*.jar
@@ -63,6 +61,7 @@ build:
 test_unit:
   stage: test
   script:
+    - ./gradlew clean pravegaClientJars
     - ./gradlew test
   artifacts:
     paths:
@@ -72,19 +71,15 @@ test_unit:
 test_integration:
   stage: test
   script:
-    # Install Pravega
-    - curl -L https://github.com/pravega/pravega/releases/download/v${PRAVEGA_VERSION}/pravega-${PRAVEGA_VERSION}.tgz -o /opt/pravega.tgz
-    - cd /opt
-    - tar xvf pravega.tgz
-    - cd ${CI_PROJECT_DIR}
-    - nohup /opt/pravega-${PRAVEGA_VERSION}/bin/pravega-standalone 1,2> /tmp/pravega_nohup.out &
-    # Run the tests
+    - ./gradlew pravegaExtract
+    - nohup build/pravega_/bin/pravega-standalone 1,2 > build/pravega_nohup.out &
+    - sleep 15
     - ./gradlew integrationTest
   after_script:
     - killall java
   artifacts:
     paths:
-      - /tmp/pravega_nohup.out
+      - build/pravega_nohup.out
       - build/reports/tests/integrationTest/*
     when: on_failure
 
@@ -111,21 +106,23 @@ build_docker_image:
     - pip install -U robotframework
     - pip install -U robotframework-requests
     - pip install -U robotframework-csvlibrary
-    # Run Pravega
-    - docker run -d --name pravega_standalone --network host pravega/pravega:${PRAVEGA_VERSION} standalone
     # Load the testing docker image
     - export BASE_VERSION=$(cat build.gradle | grep mongooseBase  | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
     - export VERSION=$(cat build.gradle | grep version\ = | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
     - docker login -u ${DOCKER_USER} -p ${DOCKER_PASS}
     - docker load < ${IMAGE_FILE_NAME}
+    # Run Pravega
+    - ./gradlew pravegaExtract
+    - nohup build/pravega_/bin/pravega-standalone 1,2 > build/pravega_nohup.out &
+    - sleep 15
     # Run the tests
     - robot --outputdir build/robotest --suite ${SUITE} --include ${TEST} src/test/robot
   after_script:
-    - docker stop pravega_standalone
-    - docker rm pravega_standalone
+    - killall java
     - rebot build/robotest/output.xml
   artifacts:
     paths:
+      - build/pravega_nohup.out
       - build/robotest/*.html
     when: on_failure
 
