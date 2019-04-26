@@ -6,7 +6,6 @@ import static com.emc.mongoose.base.item.op.Operation.SLASH;
 import static com.emc.mongoose.base.item.op.Operation.Status.FAIL_IO;
 import static com.emc.mongoose.base.item.op.Operation.Status.FAIL_UNKNOWN;
 import static com.emc.mongoose.base.item.op.Operation.Status.INTERRUPTED;
-import static com.emc.mongoose.base.item.op.Operation.Status.RESP_FAIL_CLIENT;
 import static com.emc.mongoose.base.item.op.Operation.Status.RESP_FAIL_UNKNOWN;
 import static com.emc.mongoose.base.item.op.Operation.Status.SUCC;
 import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.DRIVER_NAME;
@@ -86,6 +85,8 @@ import org.apache.logging.log4j.Level;
 
 public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>>
 				extends CoopStorageDriverBase<I, O> {
+
+	private static final int INSTANCE_POOL_SIZE = 1000;
 
 	protected final String uriSchema;
 	protected final String scopeName;
@@ -328,15 +329,11 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	}
 
 	Queue<EventStreamWriter<DataItem>> createEventWriterPool(final Object ignored) {
-		// it's an assumption that the count of the service worker threads will be equal to the cpu thread count
-		// however, it may be different if not by default
-		return new ArrayBlockingQueue<>(Runtime.getRuntime().availableProcessors());
+		return new ArrayBlockingQueue<>(INSTANCE_POOL_SIZE);
 	}
 
 	Queue<ByteStreamWriteChannel> createByteWriterPool(final Object ignored) {
-		// it's an assumption that the count of the service worker threads will be equal to the cpu thread count
-		// however, it may be different if not by default
-		return new ArrayBlockingQueue<>(Runtime.getRuntime().availableProcessors());
+		return new ArrayBlockingQueue<>(INSTANCE_POOL_SIZE);
 	}
 
 	ByteStreamClientFactory createByteStreamClientFactory(
@@ -721,26 +718,23 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 					clientFactory, this::createByteWriterPool
 				);
 				var countBytesDone = 0L;
-				try(
-					val byteStreamWriteChan = ByteStreamWriteChannel.newOrReuseInstance(
-						clientFactory, streamName, byteStreamWriteChanPool.poll()
-					)
-				) {
-					var n = 0L;
-					try {
-						while (remainingBytes > 0) {
-							n = streamItem.writeToSocketChannel(byteStreamWriteChan, remainingBytes);
-							if(0 < countBytesDone) {
-								streamOp.startDataResponse();
-							}
-							countBytesDone += n;
-							remainingBytes -= n;
+				var n = 0L;
+				val byteStreamWriteChan = ByteStreamWriteChannel.newOrReuseInstance(
+					clientFactory, streamName, byteStreamWriteChanPool.poll()
+				);
+				try {
+					while (remainingBytes > 0) {
+						n = streamItem.writeToSocketChannel(byteStreamWriteChan, remainingBytes);
+						if(0 < countBytesDone) {
+							streamOp.startDataResponse();
 						}
-					} finally {
-						streamOp.finishResponse();
-						byteStreamWriteChanPool.offer(byteStreamWriteChan);
+						countBytesDone += n;
+						remainingBytes -= n;
 					}
 				} finally {
+					streamOp.finishResponse();
+					byteStreamWriteChan.close();
+					byteStreamWriteChanPool.offer(byteStreamWriteChan);
 					streamOp.countBytesDone(countBytesDone);
 					streamItem.size(countBytesDone);
 				}
@@ -749,6 +743,10 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		} catch (final IOException e) {
 			LogUtil.exception(Level.DEBUG, e, "Failed to write the bytes stream {}", streamName);
 			completeOperation(streamOp, FAIL_IO);
+		} catch(final Throwable e) {
+			throwUncheckedIfInterrupted(e);
+			LogUtil.exception(Level.WARN, e, "Failed to write the bytes stream {}", streamName);
+			completeOperation(streamOp, FAIL_UNKNOWN);
 		}
 	}
 

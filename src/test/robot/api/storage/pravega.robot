@@ -32,8 +32,8 @@ Create Byte Streams Test
     ${step_id} =  Set Variable  create_byte_streams_test
     Remove Directory  ${LOG_DIR}/${step_id}  recursive=True
     ${args} =  Catenate  SEPARATOR= \\\n\t
+    ...  --item-data-size=10MB
     ...  --load-step-id=${step_id}
-    ...  --load-step-limit-time=3m
     ...  --load-op-limit-count=100
     ...  --storage-driver-limit-concurrency=10
     ...  --storage-driver-stream-data=bytes
@@ -41,7 +41,7 @@ Create Byte Streams Test
     ...  --storage-net-node-addrs=${node_addr}
     ${std_out} =  Execute Mongoose Scenario  ${args}
     Log  ${std_out}
-    Validate Metrics Total Log File  ${step_id}  CREATE  100  0  104857600
+    Validate Metrics Total Log File  ${step_id}  CREATE  100  0  1048576000
 
 *** Keyword ***
 Execute Mongoose Scenario
