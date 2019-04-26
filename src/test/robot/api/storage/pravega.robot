@@ -18,13 +18,13 @@ Create Event Stream Test
     Remove Directory  ${LOG_DIR}/${step_id}  recursive=True
     ${args} =  Catenate  SEPARATOR= \\\n\t
     ...  --load-step-id=${step_id}
-    ...  --load-op-limit-count=100
+    ...  --load-op-limit-count=1000
     ...  --storage-driver-limit-concurrency=10
     ...  --storage-namespace=scope1
     ...  --storage-net-node-addrs=${node_addr}
     ${std_out} =  Execute Mongoose Scenario  ${args}
     Log  ${std_out}
-    Validate Metrics Total Log File  ${step_id}  CREATE  100  0  104857600
+    Validate Metrics Total Log File  ${step_id}  CREATE  1000  0  1048576000
 
 Create Byte Streams Test
     [Tags]  create_byte_streams
