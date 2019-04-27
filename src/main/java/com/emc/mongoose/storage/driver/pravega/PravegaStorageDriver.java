@@ -70,6 +70,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -647,16 +648,20 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 					byteStreamReader_ = byteStreamReaderCreateFunc.apply(streamName);
 				}
 				val byteStreamReader = byteStreamReader_;
+				streamOp.startRequest();
 				byteStreamReader
 					.onDataAvailable()
 					.handle(
-						(availableByteCount, thrown) ->
-							handleByteStreamRead(
+						(availableByteCount, thrown) -> {
+							streamOp.startResponse();
+							streamOp.startDataResponse();
+							return handleByteStreamRead(
 								streamOp, byteStreamReaderPool, byteStreamReader, availableByteCount, thrown
-							)
+							);
+						}
 					);
+				streamOp.finishRequest();
 			}
-			completeOperation(streamOp, SUCC);
 		} catch (final IOException e) {
 			LogUtil.exception(Level.DEBUG, e, "Failed to write the bytes stream {}", streamName);
 			completeOperation(streamOp, FAIL_IO);
@@ -797,41 +802,48 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 			try {
 				val n = reader.read(buff);
 				if(n > 0) {
-					streamOp.countBytesDone(streamOp.countBytesDone() + n);
-					reader
-						.onDataAvailable()
-						.handle(
-							(availableByteCount_, thrown_) ->
-								handleByteStreamRead(streamOp, readerPool, reader, availableByteCount_, thrown_)
-						);
+					val transferredByteCount = streamOp.countBytesDone() + n;
+					streamOp.countBytesDone(transferredByteCount);
+					val expectedStreamSize = streamOp.item().size();
+					if(expectedStreamSize > transferredByteCount) {
+						reader
+							.onDataAvailable()
+							.handle(
+								(availableByteCount_, thrown_) ->
+									handleByteStreamRead(streamOp, readerPool, reader, availableByteCount_, thrown_)
+							);
+					} else {
+						completeByteStreamRead(streamOp, readerPool, reader, null);
+					}
 				} else { // end of byte stream
-					completeOperation(streamOp, SUCC);
-					streamOp.item().size(streamOp.countBytesDone());
+					completeByteStreamRead(streamOp, readerPool, reader, null);
 				}
-			} catch(final IOException e) {
-				readerPool.offer(reader);
-				streamOp.status(FAIL_IO);
-				streamOp.item().size(streamOp.countBytesDone());
 			} catch(final Throwable e) {
-				readerPool.offer(reader);
-				if(e instanceof InterruptedException) {
-					streamOp.status(INTERRUPTED);
-					throw e;
-				} else {
-					LogUtil.exception(Level.WARN, e, "{}: failure", streamOp);
-					streamOp.status(FAIL_UNKNOWN);
-				}
-				streamOp.item().size(streamOp.countBytesDone());
+				completeByteStreamRead(streamOp, readerPool, reader, e);
 			}
 		} else {
-			if(thrown instanceof InterruptedException) {
-				streamOp.status(INTERRUPTED);
-				throwUnchecked(thrown);
-			}
-			LogUtil.exception(Level.WARN, thrown, "{}: failure", streamOp);
-			streamOp.item().size(streamOp.countBytesDone());
+			completeByteStreamRead(streamOp, readerPool, reader, thrown);
 		}
 		return availableByteCount;
+	}
+
+	void completeByteStreamRead(
+		final O streamOp, final Queue<ByteStreamReader> readerPool, final ByteStreamReader reader, final Throwable e
+	) {
+		streamOp.finishResponse();
+		readerPool.offer(reader);
+		if(null == e) {
+			completeOperation(streamOp, SUCC);
+		} else if(e instanceof IOException) {
+			LogUtil.exception(Level.DEBUG, e, "{}: failure", streamOp);
+			completeOperation(streamOp, FAIL_IO);
+		} else if(e instanceof InterruptedException) {
+			completeOperation(streamOp, INTERRUPTED);
+			throwUnchecked(e);
+		} else {
+			LogUtil.exception(Level.WARN, e, "{}: failure", streamOp);
+			completeOperation(streamOp, FAIL_UNKNOWN);
+		}
 	}
 
 	@Override
@@ -839,7 +851,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 					throws IOException {
 		super.doClose();
 		executor.shutdownNow();
-		// clear all caches
+		// clear all caches & pools
 		endpointCache.clear();
 		clientConfigCache.clear();
 		closeAllWithTimeout(controllerCache.values());
@@ -851,11 +863,16 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		clientFactoryCreateFuncCache.clear();
 		closeAllWithTimeout(clientFactoryCache.values());
 		clientFactoryCache.clear();
-		evtWriterPoolCache.values().forEach(
-						pool -> {
-							closeAllWithTimeout(pool);
-							pool.clear();
-						});
+		val allEvtWriters = new ArrayList<AutoCloseable>();
+		evtWriterPoolCache
+			.values()
+			.forEach(
+				pool -> {
+					allEvtWriters.addAll(pool);
+					pool.clear();
+				}
+			);
+		closeAllWithTimeout(allEvtWriters);
 		evtWriterPoolCache.clear();
 		readerGroupManagerCreateFuncCache.clear();
 		closeAllWithTimeout(readerGroupManagerCache.values());
@@ -864,6 +881,35 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		eventStreamReaderCreateFuncCache.clear();
 		closeAllWithTimeout(eventStreamReaderCache.values());
 		eventStreamReaderCache.clear();
+		scopeStreamConfigsCache.clear();
+		closeAllWithTimeout(connFactoryCache.values());
+		connFactoryCache.clear();
+		byteStreamClientCreateFuncCache.clear();
+		closeAllWithTimeout(byteStreamClientFactoryCache.values());
+		byteStreamClientFactoryCache.clear();
+		val allByteStreamWriteChans = new ArrayList<AutoCloseable>();
+		byteStreamWriteChanPoolCache
+			.values()
+			.forEach(
+				pool -> {
+					allByteStreamWriteChans.addAll(pool);
+					pool.clear();
+				}
+			);
+		byteStreamWriteChanPoolCache.clear();
+		closeAllWithTimeout(allByteStreamWriteChans);
+		byteStreamReaderCreateFuncCache.clear();
+		val allByteStreamReaders = new ArrayList<AutoCloseable>();
+		byteStreamReaderPoolCache
+			.values()
+			.forEach(
+				pool -> {
+					allByteStreamReaders.addAll(pool);
+					pool.clear();
+				}
+			);
+		byteStreamReaderPoolCache.clear();
+		closeAllWithTimeout(allByteStreamReaders);
 	}
 
 	void closeAllWithTimeout(final Collection<? extends AutoCloseable> closeables) {

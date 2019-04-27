@@ -5,10 +5,10 @@ Test Setup  Start Containers
 Test Teardown  Stop Containers
 
 *** Variables ***
+${DATA_DIR} =  src/test/robot/api/storage/data
+${LOG_DIR} =  build/log
 ${MONGOOSE_IMAGE_NAME} =  emcmongoose/mongoose-storage-driver-pravega
 ${MONGOOSE_CONTAINER_NAME} =  mongoose-storage-driver-pravega
-
-${LOG_DIR} =  build/log
 
 *** Test Cases ***
 Create Event Stream Test
@@ -22,7 +22,8 @@ Create Event Stream Test
     ...  --storage-driver-limit-concurrency=10
     ...  --storage-namespace=scope1
     ...  --storage-net-node-addrs=${node_addr}
-    ${std_out} =  Execute Mongoose Scenario  ${args}
+    &{env_params} =  Create Dictionary
+    ${std_out} =  Execute Mongoose Scenario  ${DATA_DIR}  ${env_params}  ${args}
     Log  ${std_out}
     Validate Metrics Total Log File  ${step_id}  CREATE  1000  0  1048576000
 
@@ -33,29 +34,50 @@ Create Byte Streams Test
     Remove Directory  ${LOG_DIR}/${step_id}  recursive=True
     ${args} =  Catenate  SEPARATOR= \\\n\t
     ...  --load-step-id=${step_id}
-    ...  --load-step-limit-time=1m
-    ...  --load-op-limit-count=1
-    ...  --storage-driver-limit-concurrency=1
+    ...  --load-op-limit-count=100
+    ...  --storage-driver-limit-concurrency=10
     ...  --storage-driver-stream-data=bytes
     ...  --storage-namespace=scope2
     ...  --storage-net-node-addrs=${node_addr}
-    ${std_out} =  Execute Mongoose Scenario  ${args}
+    &{env_params} =  Create Dictionary
+    ${std_out} =  Execute Mongoose Scenario  ${DATA_DIR}  ${env_params}  ${args}
     Log  ${std_out}
-    Validate Metrics Total Log File  ${step_id}  CREATE  1  0  1048576
+    Validate Metrics Total Log File  ${step_id}  CREATE  100  0  104857600
+
+Read Byte Streams Test
+    [Tags]  read_byte_streams
+    ${node_addr} =  Get Environment Variable  SERVICE_HOST  127.0.0.1
+    ${step_id} =  Set Variable  read_byte_streams_test
+    Remove Directory  ${LOG_DIR}/${step_id}  recursive=True
+    ${args} =  Catenate  SEPARATOR= \\\n\t
+    ...  --load-step-id=${step_id}
+    ...  --load-op-limit-count=100
+    ...  --storage-driver-limit-concurrency=10
+    ...  --storage-driver-stream-data=bytes
+    ...  --storage-namespace=scope3
+    ...  --storage-net-node-addrs=${node_addr}
+    ...  --run-scenario=${MONGOOSE_CONTAINER_DATA_DIR}/read.js
+    &{env_params} =  Create Dictionary  ITEM_LIST_FILE=${MONGOOSE_CONTAINER_DATA_DIR}/${step_id}.csv
+    ${std_out} =  Execute Mongoose Scenario  ${DATA_DIR}  ${env_params}  ${args}
+    Log  ${std_out}
+    Validate Metrics Total Log File  ${step_id}  READ  100  0  104857600
 
 *** Keyword ***
 Execute Mongoose Scenario
     [Timeout]  5 minutes
-    [Arguments]  ${args}
+    [Arguments]   ${shared_data_dir}  ${env}  ${args}
+    ${docker_env_vars} =  Evaluate  ' '.join(['-e %s=%s' % (key, value) for (key, value) in ${env}.items()])
     ${host_working_dir} =  Get Environment Variable  HOST_WORKING_DIR
-    Log  ${host_working_dir}
-    ${version} =  Get Environment Variable  BASE_VERSION
+    Log  Host working dir: ${host_working_dir}
+    ${base_version} =  Get Environment Variable  BASE_VERSION
     ${image_version} =  Get Environment Variable  VERSION
     ${cmd} =  Catenate  SEPARATOR= \\\n\t
     ...  docker run
     ...  --name ${MONGOOSE_CONTAINER_NAME}
     ...  --network host
-    ...  --volume ${host_working_dir}/${LOG_DIR}:/root/.mongoose/${version}/log
+    ...  ${docker_env_vars}
+    ...  --volume ${host_working_dir}/${shared_data_dir}:${MONGOOSE_CONTAINER_DATA_DIR}
+    ...  --volume ${host_working_dir}/${LOG_DIR}:/root/.mongoose/${base_version}/log
     ...  ${MONGOOSE_IMAGE_NAME}:${image_version}
     ...  ${args}
     ${std_out} =  Run  ${cmd}
