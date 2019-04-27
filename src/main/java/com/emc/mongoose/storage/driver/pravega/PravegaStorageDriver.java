@@ -41,6 +41,7 @@ import com.emc.mongoose.storage.driver.pravega.io.ByteBufferSerializer;
 import com.emc.mongoose.storage.driver.pravega.io.ByteStreamWriteChannel;
 import com.emc.mongoose.storage.driver.pravega.io.DataItemSerializer;
 import com.emc.mongoose.storage.driver.pravega.io.StreamDataType;
+import com.github.akurilov.commons.system.DirectMemUtil;
 import com.github.akurilov.confuse.Config;
 import io.pravega.client.ByteStreamClientFactory;
 import io.pravega.client.ClientConfig;
@@ -797,7 +798,18 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		final O streamOp, final Queue<ByteStreamReader> readerPool, final ByteStreamReader reader,
 		final int availableByteCount
 	) {
-
+		val buff = DirectMemUtil.getThreadLocalReusableBuff(availableByteCount);
+		try {
+			val n = reader.read(buff);
+		} catch(final IOException e) {
+			readerPool.offer(reader);
+		} catch(final Throwable e) {
+			readerPool.offer(reader);
+			if(e instanceof InterruptedException) {
+				streamOp.status(INTERRUPTED);
+				throw e;
+			}
+		}
 	}
 
 	@Override
