@@ -238,7 +238,7 @@ filled with content up to the size determined by the `item-data-size` option. Th
 [status code](https://github.com/emc-mongoose/mongoose-base/tree/master/doc/interfaces/output#232-files) #7 if the 
 stream existed before. 
 
-**Example** ():
+**Example**:
 ```bash
 docker run \
     --network host \
@@ -251,7 +251,18 @@ docker run \
 ### 4.2.2. Read
 
 Reads the [byte streams](https://github.com/pravega/pravega/wiki/PDP-30-ByteStream-API).
-Not implemented yet
+
+**Example**"
+```bash
+docker run \
+    --network host \
+    emcmongoose/mongoose-storage-driver-pravega \
+    --item-input-file=streams.csv \
+    --read \
+    --storage-driver-stream-data=bytes \
+    --storage-driver-limit-concurrency=10 \
+    --storage-namespace=scope1
+```
 
 ### 4.2.3. Update
 
