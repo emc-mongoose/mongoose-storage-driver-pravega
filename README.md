@@ -250,9 +250,12 @@ docker run \
 
 ### 4.2.2. Read
 
-Reads the [byte streams](https://github.com/pravega/pravega/wiki/PDP-30-ByteStream-API).
+Reads the [byte streams](https://github.com/pravega/pravega/wiki/PDP-30-ByteStream-API). Currently it's necessary to 
+supply the streams metadata list file. Each byte stream could be read only until the size specified by the corresponding 
+record in that file. If the given byte stream has less bytes the read operation will block until the stream has enough
+bytes. This may cause the whole load step to get stuck.
 
-**Example**"
+**Example**:
 ```bash
 docker run \
     --network host \

@@ -8,6 +8,7 @@ Test Teardown  Stop Containers
 ${DATA_DIR} =  src/test/robot/api/storage/data
 ${LOG_DIR} =  build/log
 ${MONGOOSE_IMAGE_NAME} =  emcmongoose/mongoose-storage-driver-pravega
+${MONGOOSE_CONTAINER_DATA_DIR} =  /data
 ${MONGOOSE_CONTAINER_NAME} =  mongoose-storage-driver-pravega
 
 *** Test Cases ***
