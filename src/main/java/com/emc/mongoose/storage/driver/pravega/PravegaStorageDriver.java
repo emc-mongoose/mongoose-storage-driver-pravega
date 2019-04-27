@@ -650,16 +650,10 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				byteStreamReader
 					.onDataAvailable()
 					.handle(
-						(availableByteCount, thrown) -> {
-							if(null == thrown) {
-								byteStreamReaderPool.offer(byteStreamReader);
-							} else {
-								handleByteStreamRead(
-									streamOp, byteStreamReaderPool, byteStreamReader, availableByteCount
-								);
-							}
-							return availableByteCount;
-						}
+						(availableByteCount, thrown) ->
+							handleByteStreamRead(
+								streamOp, byteStreamReaderPool, byteStreamReader, availableByteCount, thrown
+							)
 					);
 			}
 			completeOperation(streamOp, SUCC);
@@ -794,22 +788,50 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		}
 	}
 
-	void handleByteStreamRead(
+	int handleByteStreamRead(
 		final O streamOp, final Queue<ByteStreamReader> readerPool, final ByteStreamReader reader,
-		final int availableByteCount
+		final int availableByteCount, final Throwable thrown
 	) {
-		val buff = DirectMemUtil.getThreadLocalReusableBuff(availableByteCount);
-		try {
-			val n = reader.read(buff);
-		} catch(final IOException e) {
-			readerPool.offer(reader);
-		} catch(final Throwable e) {
-			readerPool.offer(reader);
-			if(e instanceof InterruptedException) {
-				streamOp.status(INTERRUPTED);
-				throw e;
+		if(thrown == null) {
+			val buff = DirectMemUtil.getThreadLocalReusableBuff(availableByteCount);
+			try {
+				val n = reader.read(buff);
+				if(n > 0) {
+					streamOp.countBytesDone(streamOp.countBytesDone() + n);
+					reader
+						.onDataAvailable()
+						.handle(
+							(availableByteCount_, thrown_) ->
+								handleByteStreamRead(streamOp, readerPool, reader, availableByteCount_, thrown_)
+						);
+				} else { // end of byte stream
+					completeOperation(streamOp, SUCC);
+					streamOp.item().size(streamOp.countBytesDone());
+				}
+			} catch(final IOException e) {
+				readerPool.offer(reader);
+				streamOp.status(FAIL_IO);
+				streamOp.item().size(streamOp.countBytesDone());
+			} catch(final Throwable e) {
+				readerPool.offer(reader);
+				if(e instanceof InterruptedException) {
+					streamOp.status(INTERRUPTED);
+					throw e;
+				} else {
+					LogUtil.exception(Level.WARN, e, "{}: failure", streamOp);
+					streamOp.status(FAIL_UNKNOWN);
+				}
+				streamOp.item().size(streamOp.countBytesDone());
 			}
+		} else {
+			if(thrown instanceof InterruptedException) {
+				streamOp.status(INTERRUPTED);
+				throwUnchecked(thrown);
+			}
+			LogUtil.exception(Level.WARN, thrown, "{}: failure", streamOp);
+			streamOp.item().size(streamOp.countBytesDone());
 		}
+		return availableByteCount;
 	}
 
 	@Override
