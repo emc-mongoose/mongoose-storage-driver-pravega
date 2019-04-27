@@ -27,6 +27,8 @@ import com.emc.mongoose.base.logging.Loggers;
 import com.emc.mongoose.base.storage.Credential;
 import com.emc.mongoose.storage.driver.coop.CoopStorageDriverBase;
 import com.emc.mongoose.storage.driver.pravega.cache.ByteStreamClientFactoryCreateFunction;
+import com.emc.mongoose.storage.driver.pravega.cache.ByteStreamReaderCreateFunction;
+import com.emc.mongoose.storage.driver.pravega.cache.ByteStreamReaderCreateFunctionImpl;
 import com.emc.mongoose.storage.driver.pravega.cache.EventStreamClientFactoryCreateFunction;
 import com.emc.mongoose.storage.driver.pravega.cache.EventStreamClientFactoryCreateFunctionImpl;
 import com.emc.mongoose.storage.driver.pravega.cache.ReaderCreateFunction;
@@ -44,6 +46,7 @@ import io.pravega.client.ByteStreamClientFactory;
 import io.pravega.client.ClientConfig;
 import io.pravega.client.EventStreamClientFactory;
 import io.pravega.client.admin.ReaderGroupManager;
+import io.pravega.client.byteStream.ByteStreamReader;
 import io.pravega.client.byteStream.impl.ByteStreamClientImpl;
 import io.pravega.client.netty.impl.ConnectionFactory;
 import io.pravega.client.netty.impl.ConnectionFactoryImpl;
@@ -251,6 +254,9 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	private final Map<Controller, ByteStreamClientFactory> byteStreamClientFactoryCache = new ConcurrentHashMap<>();
 	// * byte stream writer cache
 	private final Map<ByteStreamClientFactory, Queue<ByteStreamWriteChannel>> byteStreamWriteChanPoolCache = new ConcurrentHashMap<>();
+	// * byte stream reader cache
+	private final Map<ByteStreamClientFactory, ByteStreamReaderCreateFunction> byteStreamReaderCreateFuncCache = new ConcurrentHashMap<>();
+	private final Map<String, Queue<ByteStreamReader>> byteStreamReaderPoolCache = new ConcurrentHashMap<>();
 
 	public PravegaStorageDriver(
 					final String stepId,
@@ -328,18 +334,8 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		return new ConnectionFactoryImpl(clientConfig, connPool, executor);
 	}
 
-	Queue<EventStreamWriter<DataItem>> createEventWriterPool(final Object ignored) {
+	<T> Queue<T> createInstancePool(final Object ignored) {
 		return new ArrayBlockingQueue<>(INSTANCE_POOL_SIZE);
-	}
-
-	Queue<ByteStreamWriteChannel> createByteWriterPool(final Object ignored) {
-		return new ArrayBlockingQueue<>(INSTANCE_POOL_SIZE);
-	}
-
-	ByteStreamClientFactory createByteStreamClientFactory(
-		final Controller controller, final ConnectionFactory connFactory
-	) {
-		return new ByteStreamClientImpl(scopeName, controller, connFactory);
 	}
 
 	/**
@@ -495,7 +491,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 			// create the client factory if necessary
 			val clientFactory = clientFactoryCache.computeIfAbsent(scopeName, clientFactoryCreateFunc);
 			// create the event stream writer if necessary
-			val evtWriterPool = evtWriterPoolCache.computeIfAbsent(streamName, this::createEventWriterPool);
+			val evtWriterPool = evtWriterPoolCache.computeIfAbsent(streamName, this::createInstancePool);
 			var evtWriter_ = evtWriterPool.poll();
 			if (null == evtWriter_) {
 				evtWriter_ = clientFactory.createEventWriter(streamName, evtSerializer, evtWriterConfig);
@@ -626,7 +622,54 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	}
 
 	void submitStreamReadOperation(final O streamOp, final String nodeAddr) {
-		// TODO: Alex, issue SDP-51
+		val endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
+		val clientConfig = clientConfigCache.computeIfAbsent(endpointUri, this::createClientConfig);
+		val controller = controllerCache.computeIfAbsent(clientConfig, this::createController);
+		val streamItem = streamOp.item();
+		val streamName = extractStreamName(streamItem.name());
+		try {
+			var remainingBytes = streamItem.size();
+			if (remainingBytes > 0) {
+				val connFactory = connFactoryCache.computeIfAbsent(clientConfig, this::createConnectionFactory);
+				val clientFactoryCreateFunc = byteStreamClientCreateFuncCache.computeIfAbsent(
+					connFactory, ByteStreamClientFactoryCreateFunctionImpl::new
+				);
+				val byteStreamReaderPool = byteStreamReaderPoolCache.computeIfAbsent(
+					streamName, this::createInstancePool
+				);
+				var byteStreamReader_ = byteStreamReaderPool.poll();
+				if(null == byteStreamReader_) {
+					val clientFactory = byteStreamClientFactoryCache.computeIfAbsent(controller, clientFactoryCreateFunc);
+					val byteStreamReaderCreateFunc = byteStreamReaderCreateFuncCache.computeIfAbsent(
+						clientFactory, ByteStreamReaderCreateFunctionImpl::new
+					);
+					byteStreamReader_ = byteStreamReaderCreateFunc.apply(streamName);
+				}
+				val byteStreamReader = byteStreamReader_;
+				byteStreamReader
+					.onDataAvailable()
+					.handle(
+						(availableByteCount, thrown) -> {
+							if(null == thrown) {
+								byteStreamReaderPool.offer(byteStreamReader);
+							} else {
+								handleByteStreamRead(
+									streamOp, byteStreamReaderPool, byteStreamReader, availableByteCount
+								);
+							}
+							return availableByteCount;
+						}
+					);
+			}
+			completeOperation(streamOp, SUCC);
+		} catch (final IOException e) {
+			LogUtil.exception(Level.DEBUG, e, "Failed to write the bytes stream {}", streamName);
+			completeOperation(streamOp, FAIL_IO);
+		} catch(final Throwable e) {
+			throwUncheckedIfInterrupted(e);
+			LogUtil.exception(Level.WARN, e, "Failed to write the bytes stream {}", streamName);
+			completeOperation(streamOp, FAIL_UNKNOWN);
+		}
 	}
 
 	void submitStreamDeleteOperation(final O streamOp, final String nodeAddr) {
@@ -715,7 +758,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				);
 				val clientFactory = byteStreamClientFactoryCache.computeIfAbsent(controller, clientFactoryCreateFunc);
 				val byteStreamWriteChanPool = byteStreamWriteChanPoolCache.computeIfAbsent(
-					clientFactory, this::createByteWriterPool
+					clientFactory, this::createInstancePool
 				);
 				var countBytesDone = 0L;
 				var n = 0L;
@@ -748,6 +791,13 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 			LogUtil.exception(Level.WARN, e, "Failed to write the bytes stream {}", streamName);
 			completeOperation(streamOp, FAIL_UNKNOWN);
 		}
+	}
+
+	void handleByteStreamRead(
+		final O streamOp, final Queue<ByteStreamReader> readerPool, final ByteStreamReader reader,
+		final int availableByteCount
+	) {
+
 	}
 
 	@Override
