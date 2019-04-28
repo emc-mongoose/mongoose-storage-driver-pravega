@@ -42,38 +42,51 @@
 
 # 1. Introduction
 
-The storage driver extends the Mongoose's Abstract Coop Storage Driver and uses the following libraries:
-* `pravega-client` version 0.4.0
+The storage driver extends the Mongoose's Abstract Coop Storage Driver. It's being built against the specified Pravega
+source commit number.
 
 # 2. Features
 
-* Authentication: TBD
-* SSL/TLS: TBD
+* Authentication: not implemented yet
+* SSL/TLS: not implemented yet
 * Item Types:
-    * `data` -> "event"
-    * `path` -> "stream"
+    * `data`: corresponds to an ***event*** either ***byte stream*** depending on the configuration 
+    * `path`: not supported
+    * `token`: not supported
 * Supported load operations:
     * `create` (events)
     * `read` (streams)
     * `delete` (streams)
 * Storage-specific:
+    * Scaling policies
     * Stream sealing
     * Routing keys
+    * Byte streams
 
 # 3. Usage
 
+Java 11+ is required to build/run.
+
 ## 3.1. Basic
 
-Get the latest pre-built jar file which is available at:
-http://repo.maven.apache.org/maven2/com/github/emc-mongoose/mongoose-storage-driver-pravega/
-The jar file may be downloaded manually and placed into the <USER_HOME_DIR>/.mongoose/4.1.1/ext directory of
-Mongoose to be automatically loaded into the runtime.
+1. Get the latest `mongoose-base` jar from the 
+[maven repo](http://repo.maven.apache.org/maven2/com/github/emc-mongoose/mongoose-base/)
+and put it to your working directory. Note the particular version, which is referred as *BASE_VERSION* below.
+
+2. Get the latest `mongoose-storage-driver-coop` jar from the
+[maven repo](http://repo.maven.apache.org/maven2/com/github/emc-mongoose/mongoose-storage-driver-coop/)
+and put it to the `~/.mongoose/<BASE_VERSION>/ext` directory.
+
+3. Get the latest `mongoose-storage-driver-pravega` jar from the
+[maven repo](http://repo.maven.apache.org/maven2/com/github/emc-mongoose/mongoose-storage-driver-pravega/)
+and put it to the `~/.mongoose/<BASE_VERSION>/ext` directory.
 
 ```bash
-java -jar mongoose-<MONGOOSE_VERSION>.jar \
+java -jar mongoose-base-<BASE_VERSION>.jar \
     --storage-driver-type=pravega \
+    --storage-namespace=scope1 \
     --storage-net-node-addrs=<NODE_IP_ADDRS> \
-    --storage-net-node-port=<NODE_PORT> \
+    --storage-net-node-port=9090 \
     ...
 ```
 
@@ -85,6 +98,7 @@ java -jar mongoose-<MONGOOSE_VERSION>.jar \
 docker run \
     --network host \
     emcmongoose/mongoose-storage-driver-pravega \
+    --storage-namespace=scope1 \
     --storage-net-node-addrs=<NODE_IP_ADDRS> \
     ...
 ```
@@ -143,7 +157,7 @@ For more details see the corresponding [scenario content](https://github.com/emc
 
 ### 3.4.2. Multiple Destination Streams
 
-The [configuration parameterization](https://gitlab.com/emcmongoose/mongoose/tree/master/doc/interfaces/input/configuration#2-parameterization)
+The configuration [expression language](https://github.com/emc-mongoose/mongoose-base/tree/master/src/main/java/com/emc/mongoose/base/config/el#52-variable-items-output-path)
 feature may be used to specify multiple destination streams to write the events. The example of the command to write
 the events into 1000 destination streams (in the random order):
 
@@ -163,7 +177,7 @@ Mongoose and Pravega are using quite different concepts. So it's necessary to de
 
 | Pravega | Mongoose |
 |---------|----------|
-| [Stream](http://pravega.io/docs/latest/pravega-concepts/#streams) | *Path Item* |
+| [Stream](http://pravega.io/docs/latest/pravega-concepts/#streams) | *Item Path* or *Byte Stream* |
 | Scope | Storage Namespace
 | [Event](http://pravega.io/docs/latest/pravega-concepts/#events) | *Data Item* |
 | Stream Segment | N/A |
@@ -219,15 +233,43 @@ is set to `bytes`. This means that the whole streams are being accounted as *ite
 
 ### 4.2.1. Create
 
-Creates the [byte streams](https://github.com/pravega/pravega/wiki/PDP-30-ByteStream-API).
+Creates the [byte streams](https://github.com/pravega/pravega/wiki/PDP-30-ByteStream-API). The created byte stream is 
+filled with content up to the size determined by the `item-data-size` option. The create operation will fail with the 
+[status code](https://github.com/emc-mongoose/mongoose-base/tree/master/doc/interfaces/output#232-files) #7 if the 
+stream existed before. 
+
+**Example**:
+```bash
+docker run \
+    --network host \
+    emcmongoose/mongoose-storage-driver-pravega \
+    --storage-driver-stream-data=bytes \
+    --storage-namespace=scope1 \
+    --storage-driver-limit-concurrency=100
+```
 
 ### 4.2.2. Read
 
-Reads the [byte streams](https://github.com/pravega/pravega/wiki/PDP-30-ByteStream-API).
+Reads the [byte streams](https://github.com/pravega/pravega/wiki/PDP-30-ByteStream-API). Currently it's necessary to 
+supply the streams metadata list file. Each byte stream could be read only until the size specified by the corresponding 
+record in that file. If the given byte stream has less bytes the read operation will block until the stream has enough
+bytes. This may cause the whole load step to get stuck.
+
+**Example**:
+```bash
+docker run \
+    --network host \
+    emcmongoose/mongoose-storage-driver-pravega \
+    --item-input-file=streams.csv \
+    --read \
+    --storage-driver-stream-data=bytes \
+    --storage-driver-limit-concurrency=10 \
+    --storage-namespace=scope1
+```
 
 ### 4.2.3. Update
 
-Not supported
+Not implemented yet
 
 ### 4.2.4. Delete
 
@@ -236,7 +278,7 @@ the deletion too.
 
 ## 4.3. Open Issues
 
-* https://github.com/pravega/pravega/issues/3587
+* <https://github.com/pravega/pravega/issues/3587>
 
 # 5. Development
 
