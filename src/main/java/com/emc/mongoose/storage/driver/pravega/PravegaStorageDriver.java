@@ -320,6 +320,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
     // however, it may be different if not by default
     return new ArrayBlockingQueue<>(Runtime.getRuntime().availableProcessors());
   }
+
   /** Not used in this driver implementation */
   @Override
   protected String requestNewPath(final String path) {
