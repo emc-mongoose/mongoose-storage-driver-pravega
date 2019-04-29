@@ -117,8 +117,6 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	private final ScheduledExecutorService executor;
 	private final RoutingKeyFunction<I> routingKeyFunc;
 
-	private volatile boolean listWasCalled = false;
-
 	@Value
 	final class ScopeCreateFunctionImpl
 					implements ScopeCreateFunction {
@@ -379,11 +377,10 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 					final I lastPrevItem,
 					final int count)
 					throws EOFException {
-		if (listWasCalled) {
+		if(null != lastPrevItem) {
 			throw new EOFException();
 		}
-		listWasCalled = true;
-		return List.of(itemFactory.getItem(path + prefix, 0, 0));
+		return List.of(itemFactory.getItem(path + SLASH + "0", 0, 0));
 	}
 
 	/**
