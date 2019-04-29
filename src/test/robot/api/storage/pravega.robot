@@ -1,10 +1,12 @@
 *** Settings ***
+
 Library  OperatingSystem
 Library  CSVLibrary
 Test Setup  Start Containers
 Test Teardown  Stop Containers
 
 *** Variables ***
+
 ${DATA_DIR} =  src/test/robot/api/storage/data
 ${LOG_DIR} =  build/log
 ${MONGOOSE_IMAGE_NAME} =  emcmongoose/mongoose-storage-driver-pravega
@@ -12,6 +14,7 @@ ${MONGOOSE_CONTAINER_DATA_DIR} =  /data
 ${MONGOOSE_CONTAINER_NAME} =  mongoose-storage-driver-pravega
 
 *** Test Cases ***
+
 Create Event Stream Test
     [Tags]  create_event_stream
     ${node_addr} =  Get Environment Variable  SERVICE_HOST  127.0.0.1
@@ -91,7 +94,6 @@ Batch Create Event Stream Test
     Remove Directory  ${LOG_DIR}/${step_id}  recursive=True
     ${args} =  Catenate  SEPARATOR= \\\n\t
     ...  --storage-namespace=scope5
-    ...  --storage-driver-event-batch
     ...  --load-op-limit-count=${count_limit}
     ...  --load-step-id=${step_id}
     ...  --load-batch-size=456
@@ -103,6 +105,7 @@ Batch Create Event Stream Test
     Validate Metrics Total Log File  ${step_id}  CREATE  ${count_limit}  0  1230000
 
 *** Keyword ***
+
 Execute Mongoose Scenario
     [Timeout]  5 minutes
     [Arguments]   ${shared_data_dir}  ${env}  ${args}
