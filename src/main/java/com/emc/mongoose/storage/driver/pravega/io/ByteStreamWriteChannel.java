@@ -39,7 +39,9 @@ implements WritableByteChannel {
 	@Override
 	public final void close()
 	throws IOException {
-		out.flush();
-		out = null;
+		if(out != null) {
+			out.flush();
+			out = null;
+		}
 	}
 }

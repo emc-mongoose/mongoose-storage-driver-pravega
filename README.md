@@ -22,6 +22,7 @@
 4. [Design](#4-design)<br/>
 &nbsp;&nbsp;4.1. [Event Stream Operations](#41-event-stream-operations)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;4.1.1. [Create](#411-create)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;4.1.1.1. [Transactional](#4111-transactional)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;4.1.2. [Read](#412-read)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;4.1.3. [Update](#413-update)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;4.1.4. [Delete](#414-delete)<br/>
@@ -198,6 +199,28 @@ Steps:
 7. Submit the event writing, use a routing key if configured.
 8. Submit the load operation completion handler.
 
+#### 4.1.1.1. Transactional
+
+Using the [transactions](http://pravega.io/docs/latest/transactions/#pravega-transactions) to create the events allows 
+to write the events in the batch mode. The maximum count of the events per transaction is defined by the 
+`load-batch-size` configuration option value.
+
+Example:
+```bash
+docker run \
+    --network host \
+    emcmongoose/mongoose-storage-driver-pravega \
+    --storage-namespace=scope1 \
+    --storage-driver-event-batch \
+    --load-step-limit-count=100000 \
+    --load-batch-size=1024 \
+    --item-output-path=eventsStream1 \
+    --item-data-size=10KB
+```
+
+**Note**:
+> The transactional events create concurrency is limited currently by 1 due to the [issue #1](#43-open-issues).
+
 ### 4.1.2. Read
 
 **Notes**:
@@ -278,7 +301,9 @@ the deletion too.
 
 ## 4.3. Open Issues
 
-* <https://github.com/pravega/pravega/issues/3587>
+| Issue | Description |
+|-------|-------------|
+| 1 | [Pravega #3697](https://github.com/pravega/pravega/issues/3697): Missing asynchronous read event and byte stream write methods
 
 # 5. Development
 
