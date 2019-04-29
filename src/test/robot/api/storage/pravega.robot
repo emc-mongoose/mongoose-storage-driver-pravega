@@ -70,20 +70,20 @@ Batch Create Event Stream Test
     [Tags]  batch_create_event_stream
     ${node_addr} =  Get Environment Variable  SERVICE_HOST  127.0.0.1
     ${step_id} =  Set Variable  batch_create_event_stream
-    ${count_limit} =  Set Variable  100000
+    ${count_limit} =  Set Variable  10000
     Remove Directory  ${LOG_DIR}/${step_id}  recursive=True
     ${args} =  Catenate  SEPARATOR= \\\n\t
     ...  --storage-namespace=scope1
     ...  --storage-driver-event-batch
     ...  --load-op-limit-count=${count_limit}
     ...  --load-step-id=${step_id}
-    ...  --load-batch-size=1234
+    ...  --load-batch-size=456
     ...  --item-output-path=eventsStream1
     ...  --item-data-size=123
     &{env_params} =  Create Dictionary
     ${std_out} =  Execute Mongoose Scenario  ${DATA_DIR}  ${env_params}  ${args}
     Log  ${std_out}
-    Validate Metrics Total Log File  ${step_id}  CREATE  ${count_limit}  0  12300000
+    Validate Metrics Total Log File  ${step_id}  CREATE  ${count_limit}  0  1230000
 
 *** Keyword ***
 Execute Mongoose Scenario
