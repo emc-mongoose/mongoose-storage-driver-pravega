@@ -4,6 +4,7 @@ storage:
     control:
       timeoutMillis: int
     event:
+      batch: boolean
       key:
         enabled: boolean
         count: long
