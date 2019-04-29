@@ -66,6 +66,23 @@ Read Byte Streams Test
     Log  ${std_out}
     Validate Metrics Total Log File  ${step_id}  READ  ${count_limit}  0  104857600
 
+Read All Byte Streams Test
+    [Tags]  read_all_byte_streams
+    ${node_addr} =  Get Environment Variable  SERVICE_HOST  127.0.0.1
+    ${step_id} =  Set Variable  read_all_byte_streams_test
+    ${count_limit} =  Set Variable  100
+    Remove Directory  ${LOG_DIR}/${step_id}  recursive=True
+    ${args} =  Catenate  SEPARATOR= \\\n\t
+    ...  --load-step-id=${step_id}
+    ...  --load-op-limit-count=${count_limit}
+    ...  --storage-driver-limit-concurrency=10
+    ...  --storage-net-node-addrs=${node_addr}
+    ...  --run-scenario=${MONGOOSE_CONTAINER_DATA_DIR}/read_all_byte_streams.js
+    &{env_params} =  Create Dictionary  SCOPE_NAME=scope4
+    ${std_out} =  Execute Mongoose Scenario  ${DATA_DIR}  ${env_params}  ${args}
+    Log  ${std_out}
+    Validate Metrics Total Log File  ${step_id}  READ  ${count_limit}  0  104857600
+
 Batch Create Event Stream Test
     [Tags]  batch_create_event_stream
     ${node_addr} =  Get Environment Variable  SERVICE_HOST  127.0.0.1
@@ -73,7 +90,7 @@ Batch Create Event Stream Test
     ${count_limit} =  Set Variable  100000
     Remove Directory  ${LOG_DIR}/${step_id}  recursive=True
     ${args} =  Catenate  SEPARATOR= \\\n\t
-    ...  --storage-namespace=scope1
+    ...  --storage-namespace=scope5
     ...  --storage-driver-event-batch
     ...  --load-op-limit-count=${count_limit}
     ...  --load-step-id=${step_id}
