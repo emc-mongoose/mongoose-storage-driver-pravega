@@ -45,7 +45,7 @@ Create Byte Streams Test
     &{env_params} =  Create Dictionary
     ${std_out} =  Execute Mongoose Scenario  ${DATA_DIR}  ${env_params}  ${args}
     Log  ${std_out}
-    Validate Metrics Total Log File  ${step_id}  CREATE  ${count_limit}}  0  104857600
+    Validate Metrics Total Log File  ${step_id}  CREATE  ${count_limit}  0  104857600
 
 Read Byte Streams Test
     [Tags]  read_byte_streams
@@ -75,15 +75,15 @@ Batch Create Event Stream Test
     ${args} =  Catenate  SEPARATOR= \\\n\t
     ...  --storage-namespace=scope1
     ...  --storage-driver-event-batch
+    ...  --load-op-limit-count=${count_limit}
     ...  --load-step-id=${step_id}
-    ...  --load-step-limit-count=${count_limit}
     ...  --load-batch-size=1234
     ...  --item-output-path=eventsStream1
     ...  --item-data-size=123
     &{env_params} =  Create Dictionary
     ${std_out} =  Execute Mongoose Scenario  ${DATA_DIR}  ${env_params}  ${args}
     Log  ${std_out}
-    Validate Metrics Total Log File  ${step_id}  CREATE  ${count_limit}}  0  12300000
+    Validate Metrics Total Log File  ${step_id}  CREATE  ${count_limit}  0  12300000
 
 *** Keyword ***
 Execute Mongoose Scenario
