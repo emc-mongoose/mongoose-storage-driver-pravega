@@ -58,30 +58,30 @@ build:
     paths:
       - build/libs/mongoose-*.jar
 
-test_unit:
-  stage: test
-  script:
-    - ./gradlew clean pravegaClientJars
-    - ./gradlew test
-  artifacts:
-    paths:
-      - build/reports/tests/test/*
-    when: on_failure
-
-test_integration:
-  stage: test
-  script:
-    - ./gradlew pravegaExtract
-    - nohup build/pravega_/bin/pravega-standalone 1,2 > build/pravega_nohup.out &
-    - sleep 15
-    - ./gradlew integrationTest
-  after_script:
-    - killall java
-  artifacts:
-    paths:
-      - build/pravega_nohup.out
-      - build/reports/tests/integrationTest/*
-    when: on_failure
+#test_unit:
+#  stage: test
+#  script:
+#    - ./gradlew clean pravegaClientJars
+#    - ./gradlew test
+#  artifacts:
+#    paths:
+#      - build/reports/tests/test/*
+#    when: on_failure
+#
+#test_integration:
+#  stage: test
+#  script:
+#    - ./gradlew pravegaExtract
+#    - nohup build/pravega_/bin/pravega-standalone 1,2 > build/pravega_nohup.out &
+#    - sleep 15
+#    - ./gradlew integrationTest
+#  after_script:
+#    - killall java
+#  artifacts:
+#    paths:
+#      - build/pravega_nohup.out
+#      - build/reports/tests/integrationTest/*
+#    when: on_failure
 
 build_docker_image:
   stage: build_docker_image
@@ -126,35 +126,35 @@ build_docker_image:
       - build/robotest/*.html
     when: on_failure
 
-test_create_event_stream:
-  extends: .test_robot
-  variables:
-    SUITE: api.storage
-    TEST: create_event_stream
-
-test_create_byte_streams:
-  extends: .test_robot
-  variables:
-    SUITE: api.storage
-    TEST: create_byte_streams
-
-test_read_byte_streams:
-  extends: .test_robot
-  variables:
-    SUITE: api.storage
-    TEST: read_byte_streams
-
-test_read_all_byte_streams:
-  extends: .test_robot
-  variables:
-    SUITE: api.storage
-    TEST: read_all_byte_streams
-
-#test_batch_create_event_stream:
+#test_create_event_stream:
 #  extends: .test_robot
 #  variables:
 #    SUITE: api.storage
-#    TEST: batch_create_event_stream
+#    TEST: create_event_stream
+#
+#test_create_byte_streams:
+#  extends: .test_robot
+#  variables:
+#    SUITE: api.storage
+#    TEST: create_byte_streams
+#
+#test_read_byte_streams:
+#  extends: .test_robot
+#  variables:
+#    SUITE: api.storage
+#    TEST: read_byte_streams
+#
+#test_read_all_byte_streams:
+#  extends: .test_robot
+#  variables:
+#    SUITE: api.storage
+#    TEST: read_all_byte_streams
+
+test_batch_create_event_stream:
+  extends: .test_robot
+  variables:
+    SUITE: api.storage
+    TEST: batch_create_event_stream
 
 release_to_maven_repo:
   stage: deploy
