@@ -273,10 +273,7 @@ docker run \
 
 ### 4.2.2. Read
 
-Reads the [byte streams](https://github.com/pravega/pravega/wiki/PDP-30-ByteStream-API). Currently it's necessary to 
-supply the streams metadata list file. Each byte stream could be read only until the size specified by the corresponding 
-record in that file. If the given byte stream has less bytes the read operation will block until the stream has enough
-bytes. This may cause the whole load step to get stuck.
+Reads the [byte streams](https://github.com/pravega/pravega/wiki/PDP-30-ByteStream-API).
 
 **Example**:
 ```bash
@@ -289,6 +286,19 @@ docker run \
     --storage-driver-limit-concurrency=10 \
     --storage-namespace=scope1
 ```
+
+It's also possible to perform the byte streams read w/o the input stream items file:
+```bash
+docker run \
+    --network host \
+    emcmongoose/mongoose-storage-driver-pravega \
+    --item-input-path=scope1 \
+    --read \
+    --storage-driver-stream-data=bytes \
+    --storage-driver-limit-concurrency=10 \
+    --storage-namespace=scope1
+```
+All streams in the specified scope are listed and analyzed for the current size before the reading.
 
 ### 4.2.3. Update
 
