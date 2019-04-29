@@ -96,8 +96,7 @@ Batch Create Event Stream Test
     ...  --storage-namespace=scope5
     ...  --load-op-limit-count=${count_limit}
     ...  --load-step-id=${step_id}
-    ...  --load-batch-size=456
-    ...  --item-output-path=eventsStream1
+    ...  --load-batch-size=256
     ...  --item-data-size=123
     &{env_params} =  Create Dictionary
     ${std_out} =  Execute Mongoose Scenario  ${DATA_DIR}  ${env_params}  ${args}
