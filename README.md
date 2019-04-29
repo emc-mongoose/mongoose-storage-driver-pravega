@@ -287,6 +287,19 @@ docker run \
     --storage-namespace=scope1
 ```
 
+It's also possible to perform the byte streams read w/o the input stream items file:
+```bash
+docker run \
+    --network host \
+    emcmongoose/mongoose-storage-driver-pravega \
+    --item-input-path=scope1 \
+    --read \
+    --storage-driver-stream-data=bytes \
+    --storage-driver-limit-concurrency=10 \
+    --storage-namespace=scope1
+```
+All streams in the specified scope are listed and analyzed for the current size before the reading.
+
 ### 4.2.3. Update
 
 Not implemented yet
