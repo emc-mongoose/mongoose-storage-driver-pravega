@@ -89,10 +89,10 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import io.pravega.common.util.AsyncIterator;
 import lombok.Value;
 import lombok.val;
 import org.apache.logging.log4j.Level;
@@ -120,6 +120,8 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	private final AtomicInteger rrc = new AtomicInteger(0);
 	private final ScheduledExecutorService executor;
 	private final RoutingKeyFunction<I> routingKeyFunc;
+
+	private volatile AsyncIterator<Stream> streamIterator = null;
 
 	@Value
 	final class ScopeCreateFunctionImpl
@@ -381,42 +383,58 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 					final I lastPrevItem,
 					final int count)
 					throws EOFException {
-		List<I> result;
+		List<I> items;
 		if(BYTES.equals(streamDataType)) {
-			result = listStreams(itemFactory, path, prefix, idRadix, lastPrevItem, count);
+			items = listStreams(itemFactory, path, prefix, idRadix, lastPrevItem, count);
 		} else {
-			result = generateEventItemOnce(itemFactory, path, lastPrevItem);
+			items = makeSingleEventItem(itemFactory, path, prefix, lastPrevItem);
 		}
-		return result;
+		return items;
 	}
 
 	List<I> listStreams(
 		final ItemFactory<I> itemFactory, final String path, final String prefix, final int idRadix,
 		final I lastPrevItem, final int count
 	) throws EOFException {
-		val endpointUri = endpointCache.computeIfAbsent(endpointAddrs[0], this::createEndpointUri);
-		val clientConfig = clientConfigCache.computeIfAbsent(endpointUri, this::createClientConfig);
-		val controller = controllerCache.computeIfAbsent(clientConfig, this::createController);
-		val streamIterator = controller.listStreams(scopeName);
-		Stream stream;
+
+		if(streamIterator == null) {
+			val endpointUri = endpointCache.computeIfAbsent(endpointAddrs[0], this::createEndpointUri);
+			val clientConfig = clientConfigCache.computeIfAbsent(endpointUri, this::createClientConfig);
+			val controller = controllerCache.computeIfAbsent(clientConfig, this::createController);
+			val scopeName = path.startsWith(SLASH) ? path.substring(1) : path;
+			streamIterator = controller.listStreams(scopeName);
+		}
+
+		final int prefixLength = (prefix == null || prefix.isEmpty()) ? 0 : prefix.length();
+		final List<I> streamItems = new ArrayList<>(count);
+		var i = 0;
 		try {
-			for(var i = 0; i < count; i ++) {
-				stream = streamIterator.getNext().get(controlApiTimeoutMillis, MILLISECONDS);
+			while(i < count) {
+				val stream = streamIterator.getNext().get(controlApiTimeoutMillis, MILLISECONDS);
 				if(null == stream) {
+					streamIterator = null;
 					if(i == 0) {
-						throw new EOFException();
+						throw new EOFException("End of stream listing");
 					} else {
 						break;
 					}
 				} else {
-					val segments = controller
-						.getCurrentSegments(scopeName, stream.getStreamName())
-						.get(controlApiTimeoutMillis, MILLISECONDS)
-						.getSegments();
-					for(val segment: segments) {
-						segment.
+					val streamName = stream.getStreamName();
+					if(prefixLength > 0) {
+						if(streamName.startsWith(prefix)) {
+							val offset = Long.parseLong(streamName.substring(prefixLength), idRadix);
+							val streamItem = itemFactory.getItem(
+								SLASH + stream.getScopedName(), offset, Long.MAX_VALUE
+							);
+							streamItems.add(streamItem);
+							i ++;
+						}
+					} else {
+						val offset = Long.parseLong(streamName, idRadix);
+						val streamItem = itemFactory.getItem(SLASH + stream.getScopedName(), offset, Long.MAX_VALUE);
+						streamItems.add(streamItem);
+						i ++;
 					}
-					itemFactory.getItem(SLASH + stream.getScopedName(), );
 				}
 			}
 		} catch(final InterruptedException e) {
@@ -426,14 +444,16 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		} catch(final TimeoutException e) {
 			LogUtil.exception(Level.WARN, e, "{}: scope \"{}\" streams listing timeout", stepId, scopeName);
 		}
+		return streamItems;
 	}
 
-	List<I> generateEventItemOnce(final ItemFactory<I> itemFactory, final String path, final I lastPrevItem)
-	throws EOFException {
+	List<I> makeSingleEventItem(
+		final ItemFactory<I> itemFactory, final String path, final String prefix, final I lastPrevItem
+	) throws EOFException {
 		if(null != lastPrevItem) {
 			throw new EOFException();
 		}
-		return List.of(itemFactory.getItem(path + SLASH + "0", 0, 0));
+		return List.of(itemFactory.getItem(path + SLASH + prefix, 0, 0));
 	}
 
 	/**
@@ -528,6 +548,9 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 			break;
 		case READ:
 			submitStreamReadOperation(op, nodeAddr);
+			break;
+		case UPDATE:
+			submitStreamAppendOperation(op, nodeAddr);
 			break;
 		case DELETE:
 			submitStreamDeleteOperation(op, nodeAddr);
@@ -815,6 +838,10 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		}
 	}
 
+	void submitStreamAppendOperation(final O streamOp, final String nodeAddr) {
+		// TODO
+	}
+
 	void submitStreamDeleteOperation(final O streamOp, final String nodeAddr) {
 		try {
 			val streamName = extractStreamName(streamOp.item().name());
@@ -965,16 +992,15 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				if(n > 0) {
 					val transferredByteCount = streamOp.countBytesDone() + n;
 					streamOp.countBytesDone(transferredByteCount);
-					val expectedStreamSize = streamOp.item().size();
-					if(expectedStreamSize > transferredByteCount) {
+					if(reader.getOffset() == reader.fetchTailOffset()) {
+						completeByteStreamRead(streamOp, readerPool, reader, null);
+					} else {
 						reader
 							.onDataAvailable()
 							.handle(
 								(availableByteCount_, thrown_) ->
 									handleByteStreamRead(streamOp, readerPool, reader, availableByteCount_, thrown_)
 							);
-					} else {
-						completeByteStreamRead(streamOp, readerPool, reader, null);
 					}
 				} else { // end of byte stream
 					completeByteStreamRead(streamOp, readerPool, reader, null);
@@ -1011,19 +1037,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	protected void doClose()
 					throws IOException {
 		super.doClose();
-		executor.shutdownNow();
 		// clear all caches & pools
-		endpointCache.clear();
-		clientConfigCache.clear();
-		closeAllWithTimeout(controllerCache.values());
-		controllerCache.clear();
-		scopeCreateFuncCache.clear();
-		streamCreateFuncCache.clear();
-		scopeStreamsCache.values().forEach(Map::clear);
-		scopeStreamsCache.clear();
-		clientFactoryCreateFuncCache.clear();
-		closeAllWithTimeout(clientFactoryCache.values());
-		clientFactoryCache.clear();
 		val allEvtWriters = new ArrayList<AutoCloseable>();
 		evtWriterPoolCache
 			.values()
@@ -1070,7 +1084,24 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				}
 			);
 		byteStreamReaderPoolCache.clear();
+		//
+		scopeCreateFuncCache.clear();
+		streamCreateFuncCache.clear();
+		scopeStreamsCache.values().forEach(Map::clear);
+		scopeStreamsCache.clear();
+		clientFactoryCreateFuncCache.clear();
+		closeAllWithTimeout(clientFactoryCache.values());
+		clientFactoryCache.clear();
+		//
 		closeAllWithTimeout(allByteStreamReaders);
+		clientConfigCache.clear();
+		//
+		closeAllWithTimeout(controllerCache.values());
+		controllerCache.clear();
+		//
+		endpointCache.clear();
+		//
+		executor.shutdownNow();
 	}
 
 	void closeAllWithTimeout(final Collection<? extends AutoCloseable> closeables) {
