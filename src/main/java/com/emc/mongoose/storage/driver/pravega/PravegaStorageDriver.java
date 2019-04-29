@@ -11,6 +11,7 @@ import static com.emc.mongoose.base.item.op.Operation.Status.RESP_FAIL_UNKNOWN;
 import static com.emc.mongoose.base.item.op.Operation.Status.SUCC;
 import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.DRIVER_NAME;
 import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.MAX_BACKOFF_MILLIS;
+import static com.emc.mongoose.storage.driver.pravega.io.StreamDataType.BYTES;
 import static com.emc.mongoose.storage.driver.pravega.io.StreamDataType.EVENTS;
 import static com.emc.mongoose.storage.driver.pravega.io.StreamScaleUtil.scaleToFixedSegmentCount;
 import static com.github.akurilov.commons.lang.Exceptions.throwUnchecked;
@@ -84,9 +85,12 @@ import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import lombok.Value;
@@ -377,6 +381,55 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 					final I lastPrevItem,
 					final int count)
 					throws EOFException {
+		List<I> result;
+		if(BYTES.equals(streamDataType)) {
+			result = listStreams(itemFactory, path, prefix, idRadix, lastPrevItem, count);
+		} else {
+			result = generateEventItemOnce(itemFactory, path, lastPrevItem);
+		}
+		return result;
+	}
+
+	List<I> listStreams(
+		final ItemFactory<I> itemFactory, final String path, final String prefix, final int idRadix,
+		final I lastPrevItem, final int count
+	) throws EOFException {
+		val endpointUri = endpointCache.computeIfAbsent(endpointAddrs[0], this::createEndpointUri);
+		val clientConfig = clientConfigCache.computeIfAbsent(endpointUri, this::createClientConfig);
+		val controller = controllerCache.computeIfAbsent(clientConfig, this::createController);
+		val streamIterator = controller.listStreams(scopeName);
+		Stream stream;
+		try {
+			for(var i = 0; i < count; i ++) {
+				stream = streamIterator.getNext().get(controlApiTimeoutMillis, MILLISECONDS);
+				if(null == stream) {
+					if(i == 0) {
+						throw new EOFException();
+					} else {
+						break;
+					}
+				} else {
+					val segments = controller
+						.getCurrentSegments(scopeName, stream.getStreamName())
+						.get(controlApiTimeoutMillis, MILLISECONDS)
+						.getSegments();
+					for(val segment: segments) {
+						segment.
+					}
+					itemFactory.getItem(SLASH + stream.getScopedName(), );
+				}
+			}
+		} catch(final InterruptedException e) {
+			throwUnchecked(e);
+		} catch(final ExecutionException e) {
+			LogUtil.exception(Level.WARN, e, "{}: scope \"{}\" streams listing failure", stepId, scopeName);
+		} catch(final TimeoutException e) {
+			LogUtil.exception(Level.WARN, e, "{}: scope \"{}\" streams listing timeout", stepId, scopeName);
+		}
+	}
+
+	List<I> generateEventItemOnce(final ItemFactory<I> itemFactory, final String path, final I lastPrevItem)
+	throws EOFException {
 		if(null != lastPrevItem) {
 			throw new EOFException();
 		}
