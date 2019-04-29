@@ -52,15 +52,7 @@ import io.pravega.client.byteStream.impl.ByteStreamClientImpl;
 import io.pravega.client.netty.impl.ConnectionFactory;
 import io.pravega.client.netty.impl.ConnectionFactoryImpl;
 import io.pravega.client.netty.impl.ConnectionPoolImpl;
-import io.pravega.client.stream.EventStreamReader;
-import io.pravega.client.stream.EventStreamWriter;
-import io.pravega.client.stream.EventWriterConfig;
-import io.pravega.client.stream.ReaderConfig;
-import io.pravega.client.stream.ReaderGroupConfig;
-import io.pravega.client.stream.ScalingPolicy;
-import io.pravega.client.stream.Serializer;
-import io.pravega.client.stream.Stream;
-import io.pravega.client.stream.StreamConfiguration;
+import io.pravega.client.stream.*;
 import io.pravega.client.stream.impl.Controller;
 import io.pravega.client.stream.impl.ControllerImpl;
 import io.pravega.client.stream.impl.ControllerImplConfig;
@@ -569,10 +561,6 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
           clientFactoryCreateFuncCache.computeIfAbsent(
               clientConfig, EventStreamClientFactoryCreateFunctionImpl::new);
       val clientFactory = clientFactoryCache.computeIfAbsent(scopeName, clientFactoryCreateFunc);
-      val readerCreateFunc =
-          eventStreamReaderCreateFuncCache.computeIfAbsent(
-              clientFactory, ReaderCreateFunctionImpl::new);
-      // val evtReader = eventStreamReaderCache.computeIfAbsent(readerGroup, readerCreateFunc);
       // TODO: response time
 
       val evtReaderPool = evtReaderPoolCache.computeIfAbsent(streamName, this::createInstancePool);
@@ -583,14 +571,19 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
       }
       val evtReader = evtReader_;
 
-      // public EventStreamReader<ByteBuffer> apply(String readerGroup) {
-      // return clientFactory.createReader("reader", readerGroup, evtDeserializer, evtReaderConfig);
-
       Loggers.MSG.trace("Reading all the events from {} {}", scopeName, streamName);
       val evt = evtReader.readNextEvent(readTimeoutMillis);
       val payload = evt.getEvent();
-      evtReaderPool.offer(evtReader);
+
+      // TODO:remove output
       System.out.println(payload != null);
+
+      if (payload == null) {
+        evtOp.countBytesDone(0);
+        completeOperation(evtOp, FAIL_IO);
+      }
+
+      evtReaderPool.offer(evtReader);
       val bytesDone = payload.remaining();
       val evtItem = evtOp.item();
       evtItem.size(bytesDone);
@@ -908,16 +901,24 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
               allEvtWriters.addAll(pool);
               pool.clear();
             });
+
+    val allEvtReaders = new ArrayList<AutoCloseable>();
+    evtReaderPoolCache
+        .values()
+        .forEach(
+            pool -> {
+              allEvtReaders.addAll(pool);
+              pool.clear();
+            });
+
     closeAllWithTimeout(allEvtWriters);
+    closeAllWithTimeout(allEvtReaders);
     evtWriterPoolCache.clear();
     readerGroupManagerCreateFuncCache.clear();
     closeAllWithTimeout(readerGroupManagerCache.values());
     readerGroupManagerCache.clear();
     readerGroupCache.clear();
-    closeAllWithTimeout(eventStreamReaderCreateFuncCache.keySet());
-    eventStreamReaderCreateFuncCache.clear();
-    closeAllWithTimeout(eventStreamReaderCache.values());
-    eventStreamReaderCache.clear();
+    evtReaderPoolCache.clear();
     scopeStreamConfigsCache.clear();
     closeAllWithTimeout(connFactoryCache.values());
     connFactoryCache.clear();
