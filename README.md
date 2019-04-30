@@ -227,10 +227,14 @@ docker run \
 > * The Pravega storage doesn't support reading the stream events in the random order.
 > * Works synchronously
 
-There is also another option, called `storage-driver-read-timeoutMillis`. Pravega documentation says it only works when
+There is a specific option (config parameter) for reading called `storage-driver-event-timeoutMillis`. Pravega documentation says it only works when
 there is no available event in the stream. `readNextEvent()` will block for the specified time in ms. So, in theory 0
 and 1 should work just fine. They do not. In practice, this value should be somewhere between 100 and 2000 ms (2000 is
 Pravega default value).
+
+Another specific option is `storage-driver-event-retries`. This option is needed whenever you try to read 
+events from the stream. It defines the maximum count of the event read failure recoveries. 
+This may be useful to continue the reading if the stream contains some corrupted events.
 
 Steps:
 1. Get the endpoint URI from the cache.
