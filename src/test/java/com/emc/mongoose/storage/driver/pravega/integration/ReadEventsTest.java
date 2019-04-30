@@ -3,7 +3,6 @@ package com.emc.mongoose.storage.driver.pravega.integration;
 import com.emc.mongoose.base.data.DataInput;
 import com.emc.mongoose.base.item.DataItem;
 import com.emc.mongoose.base.item.DataItemImpl;
-import com.emc.mongoose.base.item.op.OpType;
 import com.emc.mongoose.base.item.op.data.DataOperation;
 import com.emc.mongoose.base.item.op.data.DataOperationImpl;
 import com.emc.mongoose.base.storage.Credential;
