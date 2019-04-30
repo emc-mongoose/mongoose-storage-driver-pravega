@@ -28,7 +28,7 @@ import static org.junit.Assert.assertEquals;
 
 public class ReadEventsTest {
 
-	private static final int EVENT_COUNT = 1000;
+	private static final int EVENT_COUNT = 100;
 	private static final String STREAM_NAME = "stream1";
 
 	private DataInput dataInput;
@@ -58,7 +58,13 @@ public class ReadEventsTest {
 			.collect(Collectors.toList());
 		for(var i = 0; i < EVENT_COUNT; i += driver.put(createOps, i, EVENT_COUNT));
 		val createResults = new ArrayList<DataOperation<DataItem>>(EVENT_COUNT);
-		for(var i = 0; i < EVENT_COUNT; i += driver.get(createResults, EVENT_COUNT - i));
+		var n = 0;
+		for(var i = 0; i < EVENT_COUNT; i += driver.get(createResults, EVENT_COUNT - i)) {
+			if(n < i) {
+				System.out.println((i + 1) + " events been written...");
+				n = i;
+			}
+		}
 		for(var i = 0; i < EVENT_COUNT; i ++) {
 			val createResult = createResults.get(i);
 			assertEquals(SUCC, createResult.status());
@@ -86,7 +92,13 @@ public class ReadEventsTest {
 			.collect(Collectors.toList());
 		for(var i = 0; i < EVENT_COUNT; i += driver.put(readOps, i, EVENT_COUNT));
 		val readResults = new ArrayList<DataOperation<DataItem>>(EVENT_COUNT);
-		for(var i = 0; i < EVENT_COUNT; i += driver.get(readResults, EVENT_COUNT - i));
+		var n = 0;
+		for(var i = 0; i < EVENT_COUNT; i += driver.get(readResults, EVENT_COUNT - i)) {
+			if(n < i) {
+				System.out.println((i + 1) + " events been read...");
+				n = i;
+			}
+		}
 		for(var i = 0; i < EVENT_COUNT; i ++) {
 			val readResult = readResults.get(i);
 			assertEquals(SUCC, readResult.status());
