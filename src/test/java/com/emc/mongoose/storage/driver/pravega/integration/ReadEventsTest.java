@@ -13,7 +13,6 @@ import com.github.akurilov.commons.system.SizeInBytes;
 import lombok.val;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -27,7 +26,6 @@ import static com.emc.mongoose.base.item.op.Operation.SLASH;
 import static com.emc.mongoose.base.item.op.Operation.Status.SUCC;
 import static org.junit.Assert.assertEquals;
 
-@Ignore
 public class ReadEventsTest {
 
 	private static final int EVENT_COUNT = 100;
@@ -82,7 +80,7 @@ public class ReadEventsTest {
 	}
 
 	@Test
-	public void testReadEvents1()
+	public void testReadEvents()
 	throws Exception {
 		val readOps = evtItems
 			.stream()
@@ -103,34 +101,7 @@ public class ReadEventsTest {
 		}
 		for(var i = 0; i < EVENT_COUNT; i ++) {
 			val readResult = readResults.get(i);
-			assertEquals("Event #" + i + " read failed", SUCC, readResult.status());
-			assertEquals(MIB, readResult.countBytesDone());
-		}
-	}
-
-	@Test
-	public void testReadEvents2()
-	throws Exception {
-		val readOps = evtItems
-			.stream()
-			.map(
-				evtItem -> new DataOperationImpl<>(
-					0, READ, evtItem, SLASH + STREAM_NAME, SLASH + STREAM_NAME, Credential.NONE, null, 0
-				)
-			)
-			.collect(Collectors.toList());
-		for(var i = 0; i < EVENT_COUNT; i += driver.put(readOps, i, EVENT_COUNT));
-		val readResults = new ArrayList<DataOperation<DataItem>>(EVENT_COUNT);
-		var n = 0;
-		for(var i = 0; i < EVENT_COUNT; i += driver.get(readResults, EVENT_COUNT - i)) {
-			if(n < i) {
-				System.out.println((i + 1) + " events been read...");
-				n = i;
-			}
-		}
-		for(var i = 0; i < EVENT_COUNT; i ++) {
-			val readResult = readResults.get(i);
-			assertEquals("Event #" + i + " read failed", SUCC, readResult.status());
+			assertEquals(SUCC, readResult.status());
 			assertEquals(MIB, readResult.countBytesDone());
 		}
 	}
