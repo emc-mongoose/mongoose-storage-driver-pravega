@@ -4,7 +4,6 @@ import static com.emc.mongoose.base.Exceptions.throwUncheckedIfInterrupted;
 import static com.emc.mongoose.base.item.op.OpType.CREATE;
 import static com.emc.mongoose.base.item.op.OpType.NOOP;
 import static com.emc.mongoose.base.item.op.Operation.SLASH;
-import static com.emc.mongoose.base.item.op.Operation.Status.ACTIVE;
 import static com.emc.mongoose.base.item.op.Operation.Status.FAIL_IO;
 import static com.emc.mongoose.base.item.op.Operation.Status.FAIL_TIMEOUT;
 import static com.emc.mongoose.base.item.op.Operation.Status.FAIL_UNKNOWN;
@@ -391,7 +390,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 					final I lastPrevItem,
 					final int count)
 					throws EOFException {
-		List<I> items;
+		final List<I> items;
 		if(BYTES.equals(streamDataType)) {
 			items = listStreams(itemFactory, path, prefix, idRadix, lastPrevItem, count);
 		} else {
