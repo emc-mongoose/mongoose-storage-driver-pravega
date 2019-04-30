@@ -95,7 +95,7 @@ Batch Create Event Stream Test
     ${args} =  Catenate  SEPARATOR= \\\n\t
     ...  --storage-namespace=scope5
     ...  --storage-driver-event-batch
-    ...  --storage-driver-control-timeoutMillis=100000
+    ...  --storage-net-node-addrs=${node_addr}
     ...  --load-op-limit-count=${count_limit}
     ...  --load-step-id=${step_id}
     ...  --load-batch-size=1234
