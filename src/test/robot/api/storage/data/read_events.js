@@ -1,10 +1,13 @@
+var sharedConfig = {
+    "storage": {
+        "namespace": SCOPE_NAME
+    }
+}
+
 PreconditionLoad
+	.config(sharedConfig)
 	.config({
 		"item" : {
-			"type" : "data",
-			"output" : {
-				"path" : "test"
-			},
             "data" : {
                 "size" : "1000KB"
             }
@@ -15,31 +18,22 @@ PreconditionLoad
                 	"count" : 1000
             	}
         	}
-    	},
-        "storage" : {
-            "namespace" : "goose"
-		}
+    	}
 	})
 	.run();
 
 ReadLoad
+    .config(sharedConfig)
 	.config({
 	    "item" : {
-	        "type" : "data",
 	        "input" : {
-	            "path" : "test"
-	        },
-            "data" : {
-                "size" : "1000KB"
-            }
+	            "path" : SCOPE_NAME
+	        }
 	    },   
 	    "load" : {
 	        "op" : {
 	            "type" : "read"
 	        }
-	    },
-        "storage" : {
-            "namespace" : "goose"
-        }
+	    }
 	})
 	.run();

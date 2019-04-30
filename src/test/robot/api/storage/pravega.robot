@@ -50,18 +50,6 @@ Create Byte Streams Test
     Log  ${std_out}
     Validate Metrics Total Log File  ${step_id}  CREATE  ${count_limit}  0  104857600
 
-Create and read Events Test
-    ${step_id} =  Set Variable  create_and_read_events_test
-    Remove Directory  ${LOG_DIR}/${step_id}  recursive=True
-    ${args} =  Catenate  SEPARATOR= \\\n\t
-    ...  --load-step-id=${step_id}
-    ...  --load-op-recycle
-    ...  --run-scenario=${MONGOOSE_CONTAINER_DATA_DIR}/${step_id}.js
-    &{env_params} =  Create Dictionary
-    ${std_out} =  Execute Mongoose Scenario  ${DATA_DIR}  ${env_params}  ${args}
-    Log  ${std_out}
-    Validate Metrics Total Log File  ${step_id}  READ  1000  2  1024000000
-
 Read Byte Streams Test
     [Tags]  read_byte_streams
     ${node_addr} =  Get Environment Variable  SERVICE_HOST  127.0.0.1
@@ -116,6 +104,19 @@ Batch Create Event Stream Test
     ${std_out} =  Execute Mongoose Scenario  ${DATA_DIR}  ${env_params}  ${args}
     Log  ${std_out}
     Validate Metrics Total Log File  ${step_id}  CREATE  ${count_limit}  0  12300000
+
+Read Events Test
+    ${step_id} =  Set Variable  read_events_test
+    Remove Directory  ${LOG_DIR}/${step_id}  recursive=True
+    ${args} =  Catenate  SEPARATOR= \\\n\t
+    ...  --load-step-id=${step_id}
+    ...  --storage-driver-limit-concurrency=10
+    ...  --load-op-recycle
+    ...  --run-scenario=${MONGOOSE_CONTAINER_DATA_DIR}/${step_id}.js
+    &{env_params} =  Create Dictionary SCOPE_NAME=scope6
+    ${std_out} =  Execute Mongoose Scenario  ${DATA_DIR}  ${env_params}  ${args}
+    Log  ${std_out}
+    Validate Metrics Total Log File  ${step_id}  READ  1000  2  1024000000
 
 *** Keyword ***
 
