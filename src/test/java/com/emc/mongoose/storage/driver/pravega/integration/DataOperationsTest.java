@@ -43,7 +43,7 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
 		}
 	}
 
-	private static Config getConfig() {
+	static Config getConfig() {
 		try {
 			val configSchemas = Extension.load(Thread.currentThread().getContextClassLoader()).stream()
 							.map(Extension::schemaProvider)
@@ -177,39 +177,32 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
 		dataItem.name("0000");
 		dataItem.dataInput(DATA_INPUT);
 		String streamName = "default";
-		final DataOperation<DataItem> createTask = new DataOperationImpl<>(
-						0, OpType.CREATE, dataItem, null, streamName, credential, null, 0, null);
-
+		final DataOperation<DataItem> createTask =
+			new DataOperationImpl<>(0, OpType.CREATE, dataItem, null, streamName, credential, null, 0, null);
 		String scope = "goose";
 		prepare(createTask);
 		createTask.status(Operation.Status.ACTIVE);
 		submit(createTask);
-
 		DataOperation<DataItem> result = get();
-		while (result == null) {
+		while(result == null) {
 			result = get();
 		} // need to wait for operation to be executed
 		assertEquals(Operation.Status.SUCC, result.status());
 		assertEquals(dataItem.size(), createTask.countBytesDone());
-
 		final DataItem dataItem2 = new DataItemImpl(0, MIB, 0);
 		dataItem2.name("0001");
-		final DataOperation<DataItem> createTask2 = new DataOperationImpl<>(
-						0, OpType.READ, dataItem2, null, streamName, credential, null, 0, null);
-
+		final DataOperation<DataItem> createTask2 =
+			new DataOperationImpl<>(0, OpType.READ, dataItem2, null, streamName, credential, null, 0, null);
 		prepare(createTask2);
 		createTask2.status(Operation.Status.ACTIVE);
 		boolean results = submit(createTask2);
-
 		DataOperation<DataItem> result2 = get();
-		while (result2 == null) {
+		while(result2 == null) {
 			result2 = get();
 		}
-
 		assertEquals(results, true);
-		assertEquals(
-						"we didn't read the same size we had put into stream",
-						(int) dataItem.size(),
-						(result2.item().size()));
+		assertEquals("we didn't read the same size we had put into stream", (int) dataItem.size(),
+			(result2.item().size())
+		);
 	}
 }

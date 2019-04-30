@@ -150,11 +150,11 @@ test_read_all_byte_streams:
     SUITE: api.storage
     TEST: read_all_byte_streams
 
-#test_batch_create_event_stream:
-#  extends: .test_robot
-#  variables:
-#    SUITE: api.storage
-#    TEST: batch_create_event_stream
+test_batch_create_event_stream:
+  extends: .test_robot
+  variables:
+    SUITE: api.storage
+    TEST: batch_create_event_stream
 
 release_to_maven_repo:
   stage: deploy
