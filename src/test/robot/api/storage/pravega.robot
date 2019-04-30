@@ -57,9 +57,10 @@ Create and read Events Test
     ...  --load-step-id=${step_id}
     ...  --load-op-recycle
     ...  --run-scenario=${MONGOOSE_CONTAINER_DATA_DIR}/${step_id}.js
-    ${std_out} =  Execute Mongoose Scenario  ${args}
+    &{env_params} =  Create Dictionary
+    ${std_out} =  Execute Mongoose Scenario  ${DATA_DIR}  ${env_params}  ${args}
     Log  ${std_out}
-Validate Metrics Total Log File ${step_id} READ 1000 2 1024000000
+    Validate Metrics Total Log File  ${step_id}  READ  1000  2  1024000000
 
 Read Byte Streams Test
     [Tags]  read_byte_streams
