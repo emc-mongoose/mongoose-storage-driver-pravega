@@ -112,6 +112,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	protected final int controlApiTimeoutMillis;
 	protected final boolean createBatchMode;
 	protected final int readTimeoutMillis;
+	protected final int retries;
 	protected final Serializer<I> evtSerializer = new DataItemSerializer<>(false);
 	protected final Serializer<ByteBuffer> evtDeserializer = new ByteBufferSerializer();
 	protected final EventWriterConfig evtWriterConfig = EventWriterConfig.builder().build();
@@ -306,6 +307,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		val createRoutingKeysPeriod = createRoutingKeysConfig.longVal("count");
 		this.routingKeyFunc = createRoutingKeys ? new RoutingKeyFunctionImpl<>(createRoutingKeysPeriod) : null;
 		this.readTimeoutMillis = eventConfig.intVal("timeoutMillis");
+		this.retries = eventConfig.intVal("retries");
 		this.streamDataType = StreamDataType.valueOf(driverConfig.stringVal("stream-data").toUpperCase());
 		if(EVENTS.equals(streamDataType)) {
 			this.createBatchMode = eventConfig.boolVal("batch");
@@ -398,7 +400,8 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		if(BYTES.equals(streamDataType)) {
 			items = listStreams(itemFactory, path, prefix, idRadix, lastPrevItem, count);
 		} else {
-			items = makeEventItems(itemFactory, path, prefix, lastPrevItem, 2);
+			//+1 is needed to correctly work with the end of the stream
+			items = makeEventItems(itemFactory, path, prefix, lastPrevItem, retries+1);
 		}
 		return items;
 	}
