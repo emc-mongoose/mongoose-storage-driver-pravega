@@ -109,9 +109,9 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	protected final String scopeName;
 	protected final String[] endpointAddrs;
 	protected final int nodePort;
-	protected final int controlApiTimeoutMillis;
+	protected final long controlApiTimeoutMillis;
 	protected final boolean createBatchMode;
-	protected final int readTimeoutMillis;
+	protected final long readTimeoutMillis;
 	protected final Serializer<I> evtSerializer = new DataItemSerializer<>(false);
 	protected final Serializer<ByteBuffer> evtDeserializer = new ByteBufferSerializer();
 	protected final EventWriterConfig evtWriterConfig = EventWriterConfig.builder().build();
@@ -288,7 +288,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 					throws IllegalConfigurationException, IllegalArgumentException {
 		super(stepId, dataInput, storageConfig, verifyFlag, batchSize);
 		val driverConfig = storageConfig.configVal("driver");
-		this.controlApiTimeoutMillis = driverConfig.intVal("control-timeoutMillis");
+		this.controlApiTimeoutMillis = driverConfig.longVal("control-timeoutMillis");
 		val scalingConfig = driverConfig.configVal("scaling");
 		this.scalingPolicy = PravegaScalingConfig.scalingPolicy(scalingConfig);
 		val netConfig = storageConfig.configVal("net");
@@ -305,7 +305,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		val createRoutingKeys = createRoutingKeysConfig.boolVal("enabled");
 		val createRoutingKeysPeriod = createRoutingKeysConfig.longVal("count");
 		this.routingKeyFunc = createRoutingKeys ? new RoutingKeyFunctionImpl<>(createRoutingKeysPeriod) : null;
-		this.readTimeoutMillis = eventConfig.intVal("timeoutMillis");
+		this.readTimeoutMillis = eventConfig.longVal("timeoutMillis");
 		this.streamDataType = StreamDataType.valueOf(driverConfig.stringVal("stream-data").toUpperCase());
 		if(EVENTS.equals(streamDataType)) {
 			this.createBatchMode = eventConfig.boolVal("batch");
@@ -777,8 +777,11 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 			val readerCreateFunc = eventStreamReaderCreateFuncCache.computeIfAbsent(
 							clientFactory, ReaderCreateFunctionImpl::new);
 			val evtReader = eventStreamReaderCache.computeIfAbsent(evtReaderGroupName, readerCreateFunc);
-			Loggers.MSG.trace("Reading all the events from {} {}", scopeName, streamName);
+			evtOp.startRequest();
+			evtOp.finishRequest();
 			val evtRead = evtReader.readNextEvent(readTimeoutMillis);
+			evtOp.startResponse();
+			evtOp.finishResponse();
 			if(null == evtRead) {
 				Loggers.MSG.info(
 					"{}: no more events in the stream \"{}\" @ the scope \"{}\"", stepId, streamName, scopeName
