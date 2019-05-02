@@ -232,9 +232,15 @@ there is no available event in the stream. `readNextEvent()` will block for the 
 and 1 should work just fine. They do not. In practice, this value should be somewhere between 100 and 2000 ms (2000 is
 Pravega default value).
 
-Another specific option is `storage-driver-event-retries`. This option is needed whenever you try to read 
-events from the stream. It defines the maximum count of the event read failure recoveries. 
-This may be useful to continue the reading if the stream contains some corrupted events.
+As Pravega is a streaming storage, it does not provide any information on a stream size. 
+So, we allocate memory for reading one event only and then repeat it until we meet the end of a stream.
+In terms of Mongoose it is called recycle-mode and activated via `--load-op-recycle` option.
+That makes this option obligatory for doing read operations on events.
+Learn more about recycle-mode here: https://github.com/emc-mongoose/mongoose-base/tree/master/doc/design/recycle_mode.
+
+There is one important fact considering the end of a stream. As we do not know the size of a stream,
+we only find out that it is the end, when `readNextEvent()` returns false, so 1 failed operation is not
+actually a fail, it's a sign of stream's end.
 
 Steps:
 1. Get the endpoint URI from the cache.

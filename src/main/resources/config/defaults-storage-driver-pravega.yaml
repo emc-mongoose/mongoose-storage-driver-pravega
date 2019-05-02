@@ -9,7 +9,6 @@ storage:
         enabled: false
         count: 0
       timeoutMillis: 100
-      retries: 1
     scaling:
       type: fixed
       rate: 0

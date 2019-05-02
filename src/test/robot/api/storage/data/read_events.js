@@ -7,11 +7,6 @@ var sharedConfig = {
 PreconditionLoad
 	.config(sharedConfig)
 	.config({
-		"item" : {
-            "data" : {
-                "size" : "1000KB"
-            }
-		},
 	    "load" : {
         	"op" : {
             	"limit" : {

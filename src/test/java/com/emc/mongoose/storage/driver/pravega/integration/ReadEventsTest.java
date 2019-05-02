@@ -13,6 +13,7 @@ import com.github.akurilov.commons.system.SizeInBytes;
 import lombok.val;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -25,7 +26,7 @@ import static com.emc.mongoose.base.item.op.OpType.READ;
 import static com.emc.mongoose.base.item.op.Operation.SLASH;
 import static com.emc.mongoose.base.item.op.Operation.Status.SUCC;
 import static org.junit.Assert.assertEquals;
-
+@Ignore
 public class ReadEventsTest {
 
 	private static final int EVENT_COUNT = 100;

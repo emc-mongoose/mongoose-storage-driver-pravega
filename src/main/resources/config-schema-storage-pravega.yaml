@@ -9,7 +9,6 @@ storage:
         enabled: boolean
         count: long
       timeoutMillis: int
-      retries: int
     scaling:
       type: string
       rate: int
