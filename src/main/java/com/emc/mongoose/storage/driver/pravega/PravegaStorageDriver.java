@@ -398,9 +398,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		if(BYTES.equals(streamDataType)) {
 			items = listStreams(itemFactory, path, prefix, idRadix, lastPrevItem, count);
 		} else {
-			// + 1 is needed to correctly work with the end of the stream
-			//TODO: change to 1 after making submit return false
-			items = makeEventItems(itemFactory, path, prefix, lastPrevItem,  2);
+			items = makeEventItems(itemFactory, path, prefix, lastPrevItem,  1);
 		}
 		return items;
 	}
@@ -519,6 +517,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	@Override
 	protected final boolean submit(final O op)
 					throws IllegalStateException {
+		boolean eventOpHasFailed = false;
 		if (concurrencyThrottle.tryAcquire()) {
 			val opType = op.type();
 			if (NOOP.equals(opType)) {
@@ -527,7 +526,9 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				final String nodeAddr = op.nodeAddr();
 				switch (streamDataType) {
 				case EVENTS:
-					submitEventOperation(op, nodeAddr);
+					if (!submitEventOperation(op, nodeAddr)) {
+						eventOpHasFailed = true;
+					}
 					break;
 				case BYTES:
 					submitByteStreamOperation(op, nodeAddr);
@@ -535,6 +536,9 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				default:
 					throw new AssertionError("Unexpected stream data type: " + streamDataType);
 				}
+			}
+			if (eventOpHasFailed){
+				return false;
 			}
 			return true;
 		} else {
@@ -569,18 +573,22 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		completeOperation(op, SUCC);
 	}
 
-	void submitEventOperation(final O op, final String nodeAddr) {
+	boolean submitEventOperation(final O op, final String nodeAddr) {
 		val type = op.type();
+		boolean returnValue = true;
 		switch (type) {
 		case CREATE:
 			submitEventCreateOperation(op, nodeAddr);
 			break;
 		case READ:
-			submitEventReadOperation(op, nodeAddr);
+			if (!submitEventReadOperation(op, nodeAddr)){
+				returnValue = false;
+			}
 			break;
 		default:
 			throw new AssertionError("Unsupported event operation type: " + type);
 		}
+		return returnValue;
 	}
 
 	void submitByteStreamOperation(final O op, final String nodeAddr) {
@@ -755,7 +763,8 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		}
 	}
 
-	void submitEventReadOperation(final O evtOp, final String nodeAddr) {
+	boolean submitEventReadOperation(final O evtOp, final String nodeAddr) {
+		boolean returnValue = true;
 		try {
 			val endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
 			val streamName = extractStreamName(evtOp.dstPath());
@@ -786,6 +795,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 					"{}: no more events in the stream \"{}\" @ the scope \"{}\"", stepId, streamName, scopeName
 				);
 				completeOperation(evtOp, FAIL_TIMEOUT);
+				return true;
 			} else {
 				val evtData = evtRead.getEvent();
 				if(null == evtData) {
@@ -798,8 +808,8 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 						} else {
 							lastFailedStreamPos = streamPos;
 							Loggers.ERR.warn("{}: corrupted event @ position {}", stepId, streamPos);
-							completeOperation(evtOp, RESP_FAIL_CORRUPT);
-							//return false;
+							//completeOperation(evtOp, RESP_FAIL_CORRUPT);
+							returnValue = false;
 						}
 					} finally {
 						lastFailedStreamPosLock.unlock();
@@ -816,6 +826,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 			throwUncheckedIfInterrupted(thrown);
 			completeFailedOperation(evtOp, thrown);
 		}
+		return returnValue;
 	}
 
 	void submitStreamCreateOperation(final O streamOp, final String nodeAddr) {
