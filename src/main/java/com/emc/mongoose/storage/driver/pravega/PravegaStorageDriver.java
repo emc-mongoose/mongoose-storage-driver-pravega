@@ -789,7 +789,12 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 							clientFactory, ReaderCreateFunctionImpl::new);
 			val evtReader = eventStreamReaderCache.computeIfAbsent(evtReaderGroupName, readerCreateFunc);
 			Loggers.MSG.trace("Reading all the events from {} {}", scopeName, streamName);
+			evtOp.startRequest();
 			val evtRead = evtReader.readNextEvent(readTimeoutMillis);
+            try {
+                evtOp.finishRequest();
+            } catch(final IllegalStateException ignored) {
+            }
 			if(null == evtRead) {
 				Loggers.MSG.info(
 					"{}: no more events in the stream \"{}\" @ the scope \"{}\"", stepId, streamName, scopeName
@@ -817,6 +822,8 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				} else {
 					val bytesDone = evtData.remaining();
 					val evtItem = evtOp.item();
+                    evtOp.startResponse();
+                    evtOp.finishResponse();
 					evtItem.size(bytesDone);
 					evtOp.countBytesDone(evtItem.size());
 					completeOperation(evtOp, SUCC);
