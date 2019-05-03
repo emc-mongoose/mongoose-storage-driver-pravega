@@ -1,18 +1,3 @@
-var sharedConfig = {
-	"storage": {
-		"driver": {
-			"type": "pravega"
-		}
-	},
-	"output": {
-		"metrics": {
-			"trace": {
-				"persist": true
-			}
-		}
-	}
-}
-
 var readConfig = {
 	"load": {
 		"op": {
@@ -29,7 +14,6 @@ var readConfig = {
 }
 
 PipelineLoad
-	.config(sharedConfig)
 	.append({})
 	.append(readConfig)
 	.run()

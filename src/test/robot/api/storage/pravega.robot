@@ -2,6 +2,7 @@
 
 Library  OperatingSystem
 Library  CSVLibrary
+Library  OpTrace
 Test Setup  Start Containers
 Test Teardown  Stop Containers
 
@@ -104,6 +105,28 @@ Batch Create Event Stream Test
     ${std_out} =  Execute Mongoose Scenario  ${DATA_DIR}  ${env_params}  ${args}
     Log  ${std_out}
     Validate Metrics Total Log File  ${step_id}  CREATE  ${count_limit}  0  12300000
+
+Events Pipeline Test
+    [Tags]  e2e_latency
+    ${node_addr} =  Get Environment Variable  SERVICE_HOST  127.0.0.1
+    ${step_id} =  Set Variable  e2e_latency
+    ${count_limit} =  Set Variable  100000
+    Remove Directory  ${LOG_DIR}/${step_id}  recursive=True
+    ${args} =  Catenate  SEPARATOR= \\\n\t
+    ...  --storage-namespace=scope7 \
+    ...  --item-output-path=stream7 \
+    ...  --run-scenario=${MONGOOSE_CONTAINER_DATA_DIR}/create_read_pipeline.js \
+    ...  --load-step-id=${step_id} \
+    ...  --item-data-size=10KB \
+    ...  --load-op-limit-count=${count_limit} \
+    ...  --output-metrics-trace-persist
+    &{env_params} =  Create Dictionary
+    ${std_out} =  Execute Mongoose Scenario  ${DATA_DIR}  ${env_params}  ${args}
+    Log  ${std_out}
+    Validate Metrics Total Log File  ${step_id}  CREATE  ${count_limit}  0  102400000
+    Validate Metrics Total Log File  ${step_id}  READ  ${count_limit}  0  102400000
+    Validate Create Read Pipeline Op Trace Log File  file_name=${LOG_DIR}/${step_id}/op.trace.csv  err_count_limit=10
+    ...  read_count_limit=${count_limit}
 
 *** Keyword ***
 
