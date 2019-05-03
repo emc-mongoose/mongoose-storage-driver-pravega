@@ -239,9 +239,26 @@ That makes this option obligatory for doing read operations on events.
 Learn more about recycle-mode here: https://github.com/emc-mongoose/mongoose-base/tree/master/doc/design/recycle_mode.
 
 There is one important fact considering the end of a stream. As we do not know the size of a stream,
-we only find out that it is the end, when `readNextEvent()` returns false, so 1 failed operation is not
+we only find out that it is the end when `readNextEvent()` returns `eventRead` object which
+returns null on `getEvent()` call. So, in the Mongoose output 1 failed operation is not
 actually a fail, it's a sign of stream's end.
 
+**Example**:
+```bash
+docker run \
+    --network host \
+    emcmongoose/mongoose-storage-driver-pravega \
+    --load-op-type=read \
+    --storage-namespace=scope1 \
+    --item-input-path=eventsStream1 \
+    --storage-driver-limit-concurrency=10 \
+    --load-op-recycle
+
+```
+Notice that `--item-input-path` for read and `--item-output-path` for write should be the same, as this option
+defines a stream events are written to.
+The same is true for the `--storage-namespace` parameter.
+    
 Steps:
 1. Get the endpoint URI from the cache.
 2. Check if the corresponding `StreamManager` exists using the cache, create a new one if it doesn't.

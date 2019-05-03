@@ -6,15 +6,7 @@ var sharedConfig = {
 
 PreconditionLoad
 	.config(sharedConfig)
-	.config({
-	    "load" : {
-        	"op" : {
-            	"limit" : {
-                	"count" : 1000
-            	}
-        	}
-    	}
-	})
+	.config({})
 	.run();
 
 ReadLoad
