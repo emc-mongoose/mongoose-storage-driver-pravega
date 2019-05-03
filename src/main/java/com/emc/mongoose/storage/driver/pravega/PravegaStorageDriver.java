@@ -31,17 +31,7 @@ import com.emc.mongoose.base.logging.LogUtil;
 import com.emc.mongoose.base.logging.Loggers;
 import com.emc.mongoose.base.storage.Credential;
 import com.emc.mongoose.storage.driver.coop.CoopStorageDriverBase;
-import com.emc.mongoose.storage.driver.pravega.cache.ByteStreamClientFactoryCreateFunction;
-import com.emc.mongoose.storage.driver.pravega.cache.ByteStreamReaderCreateFunction;
-import com.emc.mongoose.storage.driver.pravega.cache.ByteStreamReaderCreateFunctionImpl;
-import com.emc.mongoose.storage.driver.pravega.cache.EventStreamClientFactoryCreateFunction;
-import com.emc.mongoose.storage.driver.pravega.cache.EventStreamClientFactoryCreateFunctionImpl;
-import com.emc.mongoose.storage.driver.pravega.cache.ReaderCreateFunction;
-import com.emc.mongoose.storage.driver.pravega.cache.ReaderGroupManagerCreateFunction;
-import com.emc.mongoose.storage.driver.pravega.cache.ReaderGroupManagerCreateFunctionImpl;
-import com.emc.mongoose.storage.driver.pravega.cache.ScopeCreateFunction;
-import com.emc.mongoose.storage.driver.pravega.cache.ScopeCreateFunctionForStreamConfig;
-import com.emc.mongoose.storage.driver.pravega.cache.StreamCreateFunction;
+import com.emc.mongoose.storage.driver.pravega.cache.*;
 import com.emc.mongoose.storage.driver.pravega.io.ByteBufferSerializer;
 import com.emc.mongoose.storage.driver.pravega.io.ByteStreamWriteChannel;
 import com.emc.mongoose.storage.driver.pravega.io.DataItemSerializer;
@@ -216,6 +206,20 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	}
 
 	@Value
+	final class ReaderGroupCreateFunctionImpl
+	implements ReaderGroupCreateFunction {
+
+		ReaderGroupConfig readerGroupConfig;
+
+		@Override
+		public String apply(String readerGroupName) {
+			val readerGroupManager = evtReaderGroupManagerCache.get(scopeName);
+			readerGroupManager.createReaderGroup(evtReaderGroupName, readerGroupConfig);
+			return readerGroupName;
+		}
+	}
+
+	@Value
 	final class ReaderCreateFunctionImpl
 					implements ReaderCreateFunction {
 
@@ -278,6 +282,8 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	private final Map<String, Queue<ByteStreamReader>> byteStreamReaderPoolCache = new ConcurrentHashMap<>();
 	// * batch event writers
 	private final Map<EventStreamClientFactory, Queue<TransactionalEventStreamWriter<I>>> batchEvtWriterPoolCache = new ConcurrentHashMap<>();
+	private final Map<ReaderGroupConfig, ReaderGroupCreateFunction> readerGroupCreateFuncCache= new ConcurrentHashMap<>();
+	private final Map<String, String> readerGroupCache = new ConcurrentHashMap<>();
 
 	public PravegaStorageDriver(
 					final String stepId,
@@ -369,9 +375,9 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		return new ConcurrentHashMap<>();
 	}
 
-	ReaderGroupConfig createReaderGroupConfig(final String readerGroupName) {
+	ReaderGroupConfig createReaderGroupConfig(final String scopeStreamName) {
         val readerGroupConfigBuilder = evtReaderGroupConfigBuilder.get();
-        return readerGroupConfigBuilder.stream(readerGroupName).build();
+        return readerGroupConfigBuilder.stream(scopeStreamName).build();
     }
 	/**
 	 * Not used in this driver implementation
@@ -758,22 +764,22 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		}
 	}
 
+
+
 	boolean submitEventReadOperation(final O evtOp, final String nodeAddr) {
 		boolean ok = true;
 		try {
 			val endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
-			val streamName = extractStreamName(evtOp.dstPath());
+			val streamName = extractStreamName(evtOp.dstPath()); //srcPath()?
 			val readerGroupConfig = evtReaderGroupConfigCache.computeIfAbsent(
 			                scopeName + SLASH + streamName, this::createReaderGroupConfig);
 			val readerGroupManagerCreateFunc = evtReaderGroupManagerCreateFuncCache.computeIfAbsent(
 							endpointUri, ReaderGroupManagerCreateFunctionImpl::new);
-			evtReaderGroupManagerCache.computeIfAbsent(
-				scopeName, key -> {
-					val readerGroupManager = readerGroupManagerCreateFunc.apply(key);
-					readerGroupManager.createReaderGroup(evtReaderGroupName, readerGroupConfig);
-					return readerGroupManager;
-				}
-			);
+			evtReaderGroupManagerCache.computeIfAbsent(scopeName, readerGroupManagerCreateFunc);
+			val readerGroupCreateFunc = readerGroupCreateFuncCache.computeIfAbsent(
+							readerGroupConfig,ReaderGroupCreateFunctionImpl::new);
+			readerGroupCache.computeIfAbsent(evtReaderGroupName, readerGroupCreateFunc);
+
 			val clientConfig = clientConfigCache.computeIfAbsent(endpointUri, this::createClientConfig);
 			val clientFactoryCreateFunc = clientFactoryCreateFuncCache.computeIfAbsent(
 							clientConfig, EventStreamClientFactoryCreateFunctionImpl::new);
@@ -800,7 +806,6 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 						} else {
 							lastFailedStreamPos = streamPos;
 							Loggers.MSG.debug("{}: corrupted event @ position {}", stepId, streamPos);
-							//completeOperation(evtOp, RESP_FAIL_CORRUPT);
 							ok = false;
 						}
 					} finally {
