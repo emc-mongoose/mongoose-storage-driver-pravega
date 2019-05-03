@@ -369,6 +369,10 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		return new ConcurrentHashMap<>();
 	}
 
+	ReaderGroupConfig createReaderGroupConfig(final String readerGroupName) {
+        val readerGroupConfigBuilder = evtReaderGroupConfigBuilder.get();
+        return readerGroupConfigBuilder.stream(readerGroupName).build();
+    }
 	/**
 	 * Not used in this driver implementation
 	 */
@@ -755,14 +759,12 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	}
 
 	boolean submitEventReadOperation(final O evtOp, final String nodeAddr) {
-		boolean returnValue = true;
+		boolean ok = true;
 		try {
 			val endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
 			val streamName = extractStreamName(evtOp.dstPath());
-			val readerGroupConfigBuilder = evtReaderGroupConfigBuilder.get();
 			val readerGroupConfig = evtReaderGroupConfigCache.computeIfAbsent(
-				scopeName + SLASH + streamName, key -> readerGroupConfigBuilder.stream(key).build()
-			);
+			                scopeName + SLASH + streamName, this::createReaderGroupConfig);
 			val readerGroupManagerCreateFunc = evtReaderGroupManagerCreateFuncCache.computeIfAbsent(
 							endpointUri, ReaderGroupManagerCreateFunctionImpl::new);
 			evtReaderGroupManagerCache.computeIfAbsent(
@@ -786,7 +788,6 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 					"{}: no more events in the stream \"{}\" @ the scope \"{}\"", stepId, streamName, scopeName
 				);
 				completeOperation(evtOp, FAIL_TIMEOUT);
-				return true;
 			} else {
 				val evtData = evtRead.getEvent();
 				if(null == evtData) {
@@ -798,9 +799,9 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 							completeOperation(evtOp, FAIL_TIMEOUT);
 						} else {
 							lastFailedStreamPos = streamPos;
-							Loggers.ERR.warn("{}: corrupted event @ position {}", stepId, streamPos);
+							Loggers.MSG.debug("{}: corrupted event @ position {}", stepId, streamPos);
 							//completeOperation(evtOp, RESP_FAIL_CORRUPT);
-							returnValue = false;
+							ok = false;
 						}
 					} finally {
 						lastFailedStreamPosLock.unlock();
@@ -817,7 +818,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 			throwUncheckedIfInterrupted(thrown);
 			completeFailedOperation(evtOp, thrown);
 		}
-		return returnValue;
+		return ok;
 	}
 
 	void submitStreamCreateOperation(final O streamOp, final String nodeAddr) {
