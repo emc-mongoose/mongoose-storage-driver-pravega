@@ -156,6 +156,12 @@ test_batch_create_event_stream:
     SUITE: api.storage
     TEST: batch_create_event_stream
 
+test_events_pipeline:
+  extends: .test_robot
+  variables:
+    SUITE: api.storage
+    TEST: events_pipeline
+
 release_to_maven_repo:
   stage: deploy
   script:

@@ -107,7 +107,7 @@ Batch Create Event Stream Test
     Validate Metrics Total Log File  ${step_id}  CREATE  ${count_limit}  0  12300000
 
 Events Pipeline Test
-    [Tags]  e2e_latency
+    [Tags]  events_pipeline
     ${node_addr} =  Get Environment Variable  SERVICE_HOST  127.0.0.1
     ${step_id} =  Set Variable  e2e_latency
     ${count_limit} =  Set Variable  100000
