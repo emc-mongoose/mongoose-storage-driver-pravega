@@ -18,7 +18,8 @@ def validate_create_read_pipeline_op_trace_log_file(file_name, err_count_limit, 
 			status_code = row[3]
 			if status_code != 4:
 				err_count += 1
-				assert err_count < err_count_limit
+				assert err_count < err_count_limit, \
+					"Error count %d should be less than %d" % (err_count, err_count_limit)
 				continue
 			item_path = row[1]
 			op_type_code = row[2]
@@ -35,6 +36,7 @@ def validate_create_read_pipeline_op_trace_log_file(file_name, err_count_limit, 
 				read_latency_micros = row[6]
 				e2e_latency_micros = time_start_micros + read_latency_micros - create_trace_rec.time_start_micros \
 					- create_trace_rec.duration_micros
-				assert e2e_latency_micros > 0
+				assert e2e_latency_micros > 0, "End-to-end latency %d should be more than 0" % e2e_latency_micros
 				read_count += 1
-		assert read_count + err_count == read_count_limit
+		assert read_count + err_count == read_count_limit, \
+			"Read count %d + error count %d != count limit %d" % (read_count, err_count, read_count_limit)
