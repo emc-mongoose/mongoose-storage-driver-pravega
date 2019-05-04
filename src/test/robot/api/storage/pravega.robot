@@ -124,8 +124,6 @@ Events Pipeline Test
     &{env_params} =  Create Dictionary
     ${std_out} =  Execute Mongoose Scenario  ${DATA_DIR}  ${env_params}  ${args}
     Log  ${std_out}
-    Validate Metrics Total Log File  ${step_id}  CREATE  ${count_limit}  0  102400000
-    Validate Metrics Total Log File  ${step_id}  READ  ${count_limit}  0  102400000
     Validate Create Read Pipeline Op Trace Log File  file_name=${LOG_DIR}/${step_id}/op.trace.csv  err_count_limit=10
     ...  read_count_limit=${count_limit}
 
