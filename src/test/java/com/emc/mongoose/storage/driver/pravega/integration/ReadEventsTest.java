@@ -27,6 +27,7 @@ import static com.emc.mongoose.base.item.op.Operation.SLASH;
 import static com.emc.mongoose.base.item.op.Operation.Status.SUCC;
 import static org.junit.Assert.assertEquals;
 
+@Ignore
 public class ReadEventsTest {
 
 	private static final int EVENT_COUNT = 100;
