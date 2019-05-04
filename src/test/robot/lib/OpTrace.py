@@ -33,10 +33,13 @@ def validate_create_read_pipeline_op_trace_log_file(file_name, err_count_limit, 
 			elif op_type_code == 2:
 				create_trace_rec = create_trace_recs.pop(item_path, None)
 				assert create_trace_rec is not None
-				read_latency_micros = long(row[6])
-				e2e_latency_micros = time_start_micros + read_latency_micros - create_trace_rec.time_start_micros \
-					- create_trace_rec.duration_micros
-				assert e2e_latency_micros > 0, "End-to-end latency %d should be more than 0" % e2e_latency_micros
-				read_count += 1
+				try:
+					read_latency_micros = long(row[6])
+					e2e_latency_micros = time_start_micros + read_latency_micros - create_trace_rec.time_start_micros \
+						- create_trace_rec.duration_micros
+					assert e2e_latency_micros > 0, "End-to-end latency %d should be more than 0" % e2e_latency_micros
+					read_count += 1
+				except ValueError:
+					pass
 		assert read_count + err_count == read_count_limit, \
 			"Read count %d + error count %d != count limit %d" % (read_count, err_count, read_count_limit)
