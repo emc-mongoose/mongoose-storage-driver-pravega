@@ -3,7 +3,6 @@ package com.emc.mongoose.storage.driver.pravega.integration;
 import com.emc.mongoose.base.data.DataInput;
 import com.emc.mongoose.base.item.DataItem;
 import com.emc.mongoose.base.item.DataItemImpl;
-import com.emc.mongoose.base.item.op.OpType;
 import com.emc.mongoose.base.item.op.data.DataOperation;
 import com.emc.mongoose.base.item.op.data.DataOperationImpl;
 import com.emc.mongoose.base.storage.Credential;
@@ -82,7 +81,7 @@ public class ReadEventsTest {
 	}
 
 	@Test
-	public void testReadEvents()
+	public void testReadEvents1()
 	throws Exception {
 		val readOps = evtItems
 			.stream()
@@ -103,7 +102,34 @@ public class ReadEventsTest {
 		}
 		for(var i = 0; i < EVENT_COUNT; i ++) {
 			val readResult = readResults.get(i);
-			assertEquals(SUCC, readResult.status());
+			assertEquals("Event #" + i + " read failed", SUCC, readResult.status());
+			assertEquals(MIB, readResult.countBytesDone());
+		}
+	}
+
+	@Test
+	public void testReadEvents2()
+	throws Exception {
+		val readOps = evtItems
+			.stream()
+			.map(
+				evtItem -> new DataOperationImpl<>(
+					0, READ, evtItem, SLASH + STREAM_NAME, SLASH + STREAM_NAME, Credential.NONE, null, 0
+				)
+			)
+			.collect(Collectors.toList());
+		for(var i = 0; i < EVENT_COUNT; i += driver.put(readOps, i, EVENT_COUNT));
+		val readResults = new ArrayList<DataOperation<DataItem>>(EVENT_COUNT);
+		var n = 0;
+		for(var i = 0; i < EVENT_COUNT; i += driver.get(readResults, EVENT_COUNT - i)) {
+			if(n < i) {
+				System.out.println((i + 1) + " events been read...");
+				n = i;
+			}
+		}
+		for(var i = 0; i < EVENT_COUNT; i ++) {
+			val readResult = readResults.get(i);
+			assertEquals("Event #" + i + " read failed", SUCC, readResult.status());
 			assertEquals(MIB, readResult.countBytesDone());
 		}
 	}
