@@ -118,7 +118,7 @@ Read Events Test
     ...  --storage-driver-limit-concurrency=10
     ...  --load-op-recycle
     ...  --run-scenario=${MONGOOSE_CONTAINER_DATA_DIR}/${step_id}.js
-    &{env_params} =  Create Dictionary SCOPE_NAME=scope6
+    &{env_params} =  Create Dictionary  SCOPE_NAME=scope6
     ${std_out} =  Execute Mongoose Scenario  ${DATA_DIR}  ${env_params}  ${args}
     Log  ${std_out}
     Validate Metrics Total Log File  ${step_id}  READ  ${count_limit}  1  1024000000
