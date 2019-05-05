@@ -46,5 +46,6 @@ def validate_create_read_pipeline_op_trace_log_file(file_name, err_count_limit, 
 						pass
 			assert read_count + err_count == read_count_limit, \
 				"Read count %d + error count %d != count limit %d" % (read_count, err_count, read_count_limit)
-		except TypeError:
+		except TypeError as e:
 			traceback.print_exc(file=sys.stdout)
+			raise e
