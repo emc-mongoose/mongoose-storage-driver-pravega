@@ -11,6 +11,8 @@ class CreateTraceRecord:
 
 
 def validate_create_read_pipeline_op_trace_log_file(file_name, err_count_limit, read_count_limit):
+	err_count_limit = long(err_count_limit)
+	read_count_limit = long(read_count_limit)
 	err_count = 0
 	read_count = 0
 	create_trace_recs = dict()
