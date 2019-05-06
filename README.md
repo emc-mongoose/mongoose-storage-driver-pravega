@@ -261,11 +261,12 @@ The same is true for the `--storage-namespace` parameter.
     
 Steps:
 1. Get the endpoint URI from the cache.
-2. Check if the corresponding `StreamManager` exists using the cache, create a new one if it doesn't.
-3. Check if the corresponding `ClientFactory` exists using the cache, create a new one if it doesn't.
-4. Check if the corresponding `EventStreamReader<ByteBuffer>` exists using the cache, create a new one if it doesn't.
-5. Read the next event, verify the returned byte buffer content if configured so, discard it otherwise.
-6. Invoke the load operation completion handler.
+2. Check if the corresponding `ReaderGroupManager` exists using the cache, create a new one if it doesn't.
+3. Check if the corresponding `ReaderGroup` exists using the cache, create a new one if it doesn't.
+4. Check if the corresponding `ClientFactory` exists using the cache, create a new one if it doesn't.
+5. Check if the corresponding `EventStreamReader<ByteBuffer>` exists using the cache, create a new one if it doesn't.
+6. Read the next event, verify the returned byte buffer content if configured so, discard it otherwise.
+7. Invoke the load operation completion handler.
 
 ### 4.1.3. Update
 
