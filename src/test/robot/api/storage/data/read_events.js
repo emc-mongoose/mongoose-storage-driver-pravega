@@ -1,25 +1,24 @@
-var sharedConfig = {
-    "storage": {
-        "namespace": SCOPE_NAME
-    }
-}
-
 PreconditionLoad
-	.config(sharedConfig)
 	.config({
         "item" : {
             "output" : {
-                "path" : SCOPE_NAME
+                "path" : STREAM_NAME
+            },
+            "load" : {
+                "op" : {
+                    "limit" : {
+                        "count" : COUNT_LIMIT
+                    }
+                }
             }
 	}})
 	.run();
 
 ReadLoad
-    .config(sharedConfig)
 	.config({
 	    "item" : {
 	        "input" : {
-	            "path" : SCOPE_NAME
+	            "path" : STREAM_NAME
 	        }
 	    },   
 	    "load" : {
