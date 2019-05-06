@@ -408,7 +408,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		if(BYTES.equals(streamDataType)) {
 			items = listStreams(itemFactory, path, prefix, idRadix, lastPrevItem, count);
 		} else {
-			items = makeEventItems(itemFactory, path, prefix, lastPrevItem,  1);
+			items = makeEventItems(itemFactory, path, prefix, lastPrevItem,  2);
 		}
 		return items;
 	}
