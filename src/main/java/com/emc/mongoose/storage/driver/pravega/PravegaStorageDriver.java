@@ -779,7 +779,6 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 			val readerGroupCreateFunc = readerGroupCreateFuncCache.computeIfAbsent(
 							readerGroupConfig,ReaderGroupCreateFunctionImpl::new);
 			readerGroupCache.computeIfAbsent(evtReaderGroupName, readerGroupCreateFunc);
-
 			val clientConfig = clientConfigCache.computeIfAbsent(endpointUri, this::createClientConfig);
 			val clientFactoryCreateFunc = clientFactoryCreateFuncCache.computeIfAbsent(
 							clientConfig, EventStreamClientFactoryCreateFunctionImpl::new);
