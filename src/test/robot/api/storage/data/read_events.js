@@ -1,9 +1,10 @@
 PreconditionLoad
 	.config({
         "item" : {
-            "output" : {
-                "path" : STREAM_NAME
-            },
+            "output": {
+                "path": STREAM_NAME
+            }
+        },
             "load" : {
                 "op" : {
                     "limit" : {
@@ -11,7 +12,7 @@ PreconditionLoad
                     }
                 }
             }
-	}})
+	})
 	.run();
 
 ReadLoad
