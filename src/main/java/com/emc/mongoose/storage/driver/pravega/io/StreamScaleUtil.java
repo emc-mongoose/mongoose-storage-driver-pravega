@@ -23,8 +23,9 @@ import static com.github.akurilov.commons.lang.Exceptions.throwUnchecked;
 public interface StreamScaleUtil {
 
 	static void scaleToFixedSegmentCount(
-					final Controller controller, final int timeoutMillis, final String scopeName, final String streamName,
-					final ScalingPolicy scalingPolicy) {
+		final Controller controller, final long timeoutMillis, final String scopeName, final String streamName,
+		final ScalingPolicy scalingPolicy
+	) {
 		val segments = controller.getCurrentSegments(scopeName, streamName).join();
 		val segmentCount = segments.getSegments().size();
 		val targetSegmentCount = scalingPolicy.getMinNumSegments();

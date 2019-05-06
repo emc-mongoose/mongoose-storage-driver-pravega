@@ -2,13 +2,13 @@
 storage:
   driver:
     control:
-      timeoutMillis: int
+      timeoutMillis: long
     event:
       batch: boolean
       key:
         enabled: boolean
         count: long
-      timeoutMillis: int
+      timeoutMillis: long
     scaling:
       type: string
       rate: int
