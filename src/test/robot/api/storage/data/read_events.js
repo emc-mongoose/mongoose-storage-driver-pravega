@@ -11,7 +11,7 @@ PreconditionLoad
             "output" : {
                 "path" : SCOPE_NAME
             }
-	})
+	}})
 	.run();
 
 ReadLoad
