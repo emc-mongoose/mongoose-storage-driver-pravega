@@ -6,7 +6,12 @@ var sharedConfig = {
 
 PreconditionLoad
 	.config(sharedConfig)
-	.config({})
+	.config({
+        "item" : {
+            "output" : {
+                "path" : SCOPE_NAME
+            }
+	})
 	.run();
 
 ReadLoad
