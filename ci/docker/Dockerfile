@@ -18,6 +18,5 @@ COPY --from=0 /build/libs/mongoose-storage-driver-pravega-${VERSION}.jar /tmp/
 ADD ci/docker/entrypoint_storage_driver_pravega.sh /opt/mongoose/entrypoint_storage_driver_pravega.sh
 RUN mv -f /tmp/mongoose-storage-driver-pravega-*.jar $HOME/.mongoose/${BASE_VERSION}/ext/ \
     && chmod +x /opt/mongoose/entrypoint_storage_driver_pravega.sh \
-    && curl http://repo.maven.apache.org/maven2/com/github/emc-mongoose/mongoose-load-step-pipeline/${LOAD_STEP_PIPELINE_VERSION}/mongoose-load-step-pipeline-${LOAD_STEP_PIPELINE_VERSION}.jar -o $HOME/.mongoose/${BASE_VERSION}/ext/mongoose-load-step-pipeline.jar \
-    && curl http://repo.maven.apache.org/maven2/com/github/emc-mongoose/mongoose-storage-driver-coop/${STORAGE_DRIVER_COOP_VERSION}/mongoose-storage-driver-coop-${STORAGE_DRIVER_COOP_VERSION}.jar -o $HOME/.mongoose/${BASE_VERSION}/ext/mongoose-storage-driver-coop.jar
+    && curl http://repo.maven.apache.org/maven2/com/github/emc-mongoose/mongoose-load-step-pipeline/${LOAD_STEP_PIPELINE_VERSION}/mongoose-load-step-pipeline-${LOAD_STEP_PIPELINE_VERSION}.jar -o $HOME/.mongoose/${BASE_VERSION}/ext/mongoose-load-step-pipeline.jar
 ENTRYPOINT ["/opt/mongoose/entrypoint_storage_driver_pravega.sh"]

@@ -28,7 +28,7 @@ repositories {
 }
 description = "Mongoose is a high-load storage performance testing tool"
 group = "com.github.emc-mongoose"
-version = "4.2.13"
+version = "4.2.14"
 sourceCompatibility = 11
 targetCompatibility = 11
 ext {
@@ -44,7 +44,6 @@ ext {
 		log4j                    : "2.8.2",
 		mongooseBase             : "4.2.11",
 		mongooseLoadStepPipeline : "4.2.9",
-		mongooseStorageDriverCoop: "4.2.18",
 		netty                    : "4.1.16.Final",
 		nettyTcNative            : "2.0.17.Final",
 		protobuf                 : "3.5.1",
@@ -151,7 +150,6 @@ dependencies {
 	compileOnly(
 		"org.projectlombok:lombok:1.18.6",
 		"com.github.emc-mongoose:mongoose-base:${depVersion.mongooseBase}",
-		"com.github.emc-mongoose:mongoose-storage-driver-coop:${depVersion.mongooseStorageDriverCoop}",
 		"com.github.akurilov:confuse:${depVersion.confuse}",
 		"com.github.akurilov:confuse-io-yaml:${depVersion.confuseIoYaml}",
 		"com.github.akurilov:java-commons:${depVersion.commonsJava}",

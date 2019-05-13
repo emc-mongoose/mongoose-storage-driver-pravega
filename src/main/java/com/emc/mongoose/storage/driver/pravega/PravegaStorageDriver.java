@@ -30,7 +30,7 @@ import com.emc.mongoose.base.logging.LogContextThreadFactory;
 import com.emc.mongoose.base.logging.LogUtil;
 import com.emc.mongoose.base.logging.Loggers;
 import com.emc.mongoose.base.storage.Credential;
-import com.emc.mongoose.storage.driver.coop.CoopStorageDriverBase;
+import com.emc.mongoose.base.storage.driver.StorageDriverBase;
 import com.emc.mongoose.storage.driver.pravega.cache.ByteStreamClientFactoryCreateFunction;
 import com.emc.mongoose.storage.driver.pravega.cache.ByteStreamReaderCreateFunction;
 import com.emc.mongoose.storage.driver.pravega.cache.ByteStreamReaderCreateFunctionImpl;
@@ -90,8 +90,10 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.LongAdder;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -101,7 +103,7 @@ import lombok.val;
 import org.apache.logging.log4j.Level;
 
 public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>>
-				extends CoopStorageDriverBase<I, O> {
+				extends StorageDriverBase<I, O> {
 
 	private static final int INSTANCE_POOL_SIZE = 1000;
 
@@ -121,14 +123,16 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		evtReaderGroupConfigBuilder = ThreadLocal.withInitial(ReaderGroupConfig::builder);
 	protected final ScalingPolicy scalingPolicy;
 	protected final StreamDataType streamDataType;
-	// round-robin counter to select the endpoint node for each load operation in order to distribute
-	// them uniformly
+	// round-robin counter to select the endpoint node for each load operation in order to distribute them uniformly
 	private final AtomicInteger rrc = new AtomicInteger(0);
 	private final ScheduledExecutorService executor;
 	private final RoutingKeyFunction<I> routingKeyFunc;
 	private volatile Position lastFailedStreamPos = null;
 	private final Lock lastFailedStreamPosLock = new ReentrantLock();
 	private volatile AsyncIterator<Stream> streamIterator = null;
+	protected final Semaphore concurrencyThrottle;
+	private final LongAdder scheduledOpCount = new LongAdder();
+	private final LongAdder completedOpCount = new LongAdder();
 
 	@Value
 	final class ScopeCreateFunctionImpl
@@ -286,7 +290,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 					final boolean verifyFlag,
 					final int batchSize)
 					throws IllegalConfigurationException, IllegalArgumentException {
-		super(stepId, dataInput, storageConfig, verifyFlag, batchSize);
+		super(stepId, dataInput, storageConfig, verifyFlag);
 		val driverConfig = storageConfig.configVal("driver");
 		this.controlApiTimeoutMillis = driverConfig.longVal("control-timeoutMillis");
 		val scalingConfig = driverConfig.configVal("scaling");
@@ -318,6 +322,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		this.executor = Executors.newScheduledThreadPool(
 						ioWorkerCount,
 						new LogContextThreadFactory(toString(), true));
+		this.concurrencyThrottle = new Semaphore(concurrencyLimit > 0 ? concurrencyLimit : Integer.MAX_VALUE, true);
 	}
 
 	String nextEndpointAddr() {
@@ -367,6 +372,35 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 
 	<K, V> Map<K, V> createInstanceCache(final Object ignored) {
 		return new ConcurrentHashMap<>();
+	}
+
+	@Override
+	public final int activeOpCount() {
+		if (concurrencyLimit > 0) {
+			return concurrencyLimit - concurrencyThrottle.availablePermits();
+		} else {
+			return Integer.MAX_VALUE - concurrencyThrottle.availablePermits();
+		}
+	}
+
+	@Override
+	public final long scheduledOpCount() {
+		return scheduledOpCount.sum();
+	}
+
+	@Override
+	public final long completedOpCount() {
+		return completedOpCount.sum();
+	}
+
+	@Override
+	public final boolean isIdle() {
+		if (concurrencyLimit > 0) {
+			return !concurrencyThrottle.hasQueuedThreads()
+				&& concurrencyThrottle.availablePermits() >= concurrencyLimit;
+		} else {
+			return concurrencyThrottle.availablePermits() == Integer.MAX_VALUE;
+		}
 	}
 
 	/**
@@ -515,9 +549,9 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	}
 
 	@Override
-	protected final boolean submit(final O op)
+	public final boolean put(final O op)
 					throws IllegalStateException {
-		if (concurrencyThrottle.tryAcquire()) {
+		if (prepare(op) && concurrencyThrottle.tryAcquire()) {
 			val opType = op.type();
 			if (NOOP.equals(opType)) {
 				submitNoop(op);
@@ -534,6 +568,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 					throw new AssertionError("Unexpected stream data type: " + streamDataType);
 				}
 			}
+			scheduledOpCount.increment();
 			return true;
 		} else {
 			return false;
@@ -541,7 +576,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	}
 
 	@Override
-	protected final int submit(final List<O> ops, final int from, final int to)
+	public final int put(final List<O> ops, final int from, final int to)
 					throws IllegalStateException {
 		if(createBatchMode) {
 			val op = ops.get(from);
@@ -557,9 +592,9 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	}
 
 	@Override
-	protected final int submit(final List<O> ops)
+	public final int put(final List<O> ops)
 					throws IllegalStateException {
-		return submit(ops, 0, ops.size());
+		return put(ops, 0, ops.size());
 	}
 
 	void submitNoop(final O op) {
@@ -603,7 +638,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 
 	int submitEach(final List<O> ops, final int from, final int to) {
 		for (var i = from; i < to; i++) {
-			if (!submit(ops.get(i))) {
+			if (!put(ops.get(i))) {
 				return i - from;
 			}
 		}
@@ -649,18 +684,21 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 					if(null == routingKeyFunc) {
 						for(var i = from; i < to; i++) {
 							evtOp = ops.get(i);
+							prepare(evtOp);
 							evtOp.startRequest();
 							txn.writeEvent(evtOp.item());
 						}
 					} else {
 						for(var i = from; i < to; i++) {
 							evtOp = ops.get(i);
+							prepare(evtOp);
 							evtItem = evtOp.item();
 							routingKey = routingKeyFunc.apply(evtItem);
 							evtOp.startRequest();
 							txn.writeEvent(routingKey, evtItem);
 						}
 					}
+					scheduledOpCount.add(to - from);
 					txn.commit();
 					completeOperations(ops, from, to, SUCC);
 					submitCount = to - from;
@@ -964,6 +1002,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 
 	void completeOperations(final List<O> ops, final int from, final int to, final Status status) {
 		concurrencyThrottle.release();
+		completedOpCount.add(to - from);
 		I item;
 		O op;
 		try {
@@ -983,6 +1022,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 
 	boolean completeOperation(final O op, final Status status) {
 		concurrencyThrottle.release();
+		completedOpCount.increment();
 		op.status(status);
 		return handleCompleted(op);
 	}
