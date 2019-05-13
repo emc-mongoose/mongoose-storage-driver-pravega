@@ -6,6 +6,6 @@ import io.pravega.client.stream.impl.Controller;
 import java.util.function.Function;
 
 public interface ByteStreamClientFactoryCreateFunction
-extends Function<Controller, ByteStreamClientFactory> {
+				extends Function<Controller, ByteStreamClientFactory> {
 
 }

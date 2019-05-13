@@ -9,11 +9,10 @@ import java.nio.ByteBuffer;
 import java.nio.channels.WritableByteChannel;
 
 public class ByteStreamWriteChannel
-implements WritableByteChannel {
+				implements WritableByteChannel {
 
 	public static ByteStreamWriteChannel newOrReuseInstance(
-		final ByteStreamClientFactory clientFactory, final String streamName, final ByteStreamWriteChannel chan
-	) {
+					final ByteStreamClientFactory clientFactory, final String streamName, final ByteStreamWriteChannel chan) {
 		val chan_ = chan == null ? new ByteStreamWriteChannel() : chan;
 		chan_.out = clientFactory.createByteStreamWriter(streamName);
 		return chan_;
@@ -23,9 +22,9 @@ implements WritableByteChannel {
 
 	@Override
 	public final int write(final ByteBuffer src)
-	throws IOException {
+					throws IOException {
 		val n = src.remaining();
-		if(n > 0) {
+		if (n > 0) {
 			out.write(src);
 		}
 		return n;
@@ -38,8 +37,8 @@ implements WritableByteChannel {
 
 	@Override
 	public final void close()
-	throws IOException {
-		if(out != null) {
+					throws IOException {
+		if (out != null) {
 			out.flush();
 			out = null;
 		}

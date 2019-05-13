@@ -5,7 +5,7 @@ import lombok.Value;
 
 @Value
 public class RoutingKeyFunctionImpl<I extends DataItem>
-implements RoutingKeyFunction<I> {
+				implements RoutingKeyFunction<I> {
 
 	long period;
 
