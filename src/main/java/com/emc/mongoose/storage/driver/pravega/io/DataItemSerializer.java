@@ -11,8 +11,8 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
 
-public final class DataItemSerializer
-				implements Serializer<DataItem>, Serializable {
+public final class DataItemSerializer<I extends DataItem>
+				implements Serializer<I>, Serializable {
 
 	private final boolean useDirectMem;
 
@@ -31,7 +31,7 @@ public final class DataItemSerializer
 	 * @throws OutOfMemoryError if useDirectMem is disabled and not enough memory to allocate the buffer
 	 */
 	@Override
-	public final ByteBuffer serialize(final DataItem dataItem)
+	public final ByteBuffer serialize(final I dataItem)
 					throws OutOfMemoryError, IllegalArgumentException {
 		try {
 			final var dataItemSize = dataItem.size();
@@ -60,7 +60,7 @@ public final class DataItemSerializer
 	 * @throws AssertionError
 	 */
 	@Override
-	public final DataItem deserialize(final ByteBuffer serializedValue) {
+	public final I deserialize(final ByteBuffer serializedValue) {
 		throw new AssertionError("Not implemented");
 	}
 }

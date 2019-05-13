@@ -18,11 +18,4 @@ public interface ScopeCreateFunction
 	 */
 	@Override
 	StreamCreateFunction apply(final String scopeName);
-
-	/**
-	 The supplementary function to create the cache of the streams for the given scope
-	 */
-	static Map<String, StreamConfiguration> createStreamCache(final String scopeName) {
-		return new ConcurrentHashMap<>();
-	}
 }

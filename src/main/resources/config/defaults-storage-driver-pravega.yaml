@@ -4,6 +4,7 @@ storage:
     control:
       timeoutMillis: 10000
     event:
+      batch: false
       key:
         enabled: false
         count: 0

@@ -19,9 +19,11 @@
 &nbsp;&nbsp;3.4. [Specific Cases](#33-specific-cases)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;3.4.1. [Manual Scaling](#341-manual-scaling)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;3.4.2. [Multiple Destination Streams](#342-multiple-destination-streams)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;3.4.3. [End-to-end Latency](#343-end-to-end-latency)<br/>
 4. [Design](#4-design)<br/>
 &nbsp;&nbsp;4.1. [Event Stream Operations](#41-event-stream-operations)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;4.1.1. [Create](#411-create)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;4.1.1.1. [Transactional](#4111-transactional)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;4.1.2. [Read](#412-read)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;4.1.3. [Update](#413-update)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;4.1.4. [Delete](#414-delete)<br/>
@@ -47,18 +49,22 @@ source commit number.
 
 # 2. Features
 
-* Authentication: TBD
-* SSL/TLS: TBD
+* Authentication: not implemented yet
+* SSL/TLS: not implemented yet
 * Item Types:
-    * `data` -> "event"
-    * `path` -> "stream"
+    * `data`: corresponds to an ***event*** either ***byte stream*** depending on the configuration 
+    * `path`: not supported
+    * `token`: not supported
 * Supported load operations:
     * `create` (events)
     * `read` (streams)
     * `delete` (streams)
 * Storage-specific:
+    * [Scaling policies](#341-manual-scaling)
     * Stream sealing
     * Routing keys
+    * Byte streams
+    * [Transactional events write](#4111-transactional) (batch mode)
 
 # 3. Usage
 
@@ -131,7 +137,7 @@ docker run \
 | storage-driver-event-key-enabled | boolean         | false         | Specifies if Mongoose should generate its own routing key during the events creation
 | storage-driver-event-key-count   | integer         | 0             | Specifies a max count of unique routing keys to use during the events creation (may be considered as a routing key period). 0 value means to use unique routing key for each new event
 | storage-driver-event-timeoutMillis | integer         | 100           | The event read timeout in milliseconds
-| storage-driver-scaling-type       | one of: "fixed", "event_rate", "byte_rate" | fixed | The scaling policy type to use. [See the Pravega documentation](http://pravega.io/docs/latest/terminology/) for details
+| storage-driver-scaling-type       | enum | "fixed" | The scaling policy type to use (fixed/event_rate/kbyte_rate). [See the Pravega documentation](http://pravega.io/docs/latest/terminology/) for details
 | storage-driver-scaling-rate       | integer         | 0             | The scaling policy target rate. May be meausred in events per second either kilobytes per second depending on the scaling policy type
 | storage-driver-scaling-factor     | integer         | 0             | The scaling policy factor. From the Pravega javadoc: *the maximum number of splits of a segment for a scale-up event.*
 | storage-driver-scaling-segments   | integer         | 1             | From the Pravega javadoc: *the minimum number of segments that a stream can have independent of the number of scale down events.*
@@ -159,12 +165,42 @@ feature may be used to specify multiple destination streams to write the events.
 the events into 1000 destination streams (in the random order):
 
 ```bash
-java -jar mongoose-<MONGOOSE_VERSION>.jar \
-    --storage-driver-type=pravega \
-    --storage-net-node-port=9090 \
+docker run \
+    --network host \
+    emcmongoose/mongoose-storage-driver-pravega \
+    --storage-namespace=scope1 \
     --item-data-size=1000 \
     --item-output-path=stream-%p\{1000\;1\}
 ```
+
+### 3.4.3. End-to-end Latency
+
+The end-to-end latency is a time span between the CREATE and READ operations executed for the same item. The end-to-end 
+latency may be measured using Mongoose's 
+[Pipeline Load extension](https://github.com/emc-mongoose/mongoose-load-step-pipeline) which is included into this 
+extension's docker image. To do this, it's necessary to produce the raw operations trace data.
+
+Scenario example:
+<https://github.com/emc-mongoose/mongoose-storage-driver-pravega/blob/master/src/test/robot/api/storage/data/e2e_latency.js>
+
+Command line example:
+```bash
+docker run \
+    --network host \
+    --volume "$(pwd)"/src/test/robot/api/storage/data:/root \
+    --volume /tmp/log:/root/.mongoose/<BASE_VERSION>/log \
+    emcmongoose/mongoose-storage-driver-pravega \
+    --storage-namespace=scope1 \
+    --item-output-path=stream1 \
+    --run-scenario=/root/e2e_latency.js \
+    --load-step-id=e2e_latency \
+    --item-data-size=10KB \
+    --load-op-limit-count=100000 \
+    --output-metrics-trace-persist
+```
+
+Once the raw operations trace data is obtained, it may be used to produce the end-to-end latency data using the tool:
+<https://github.com/emc-mongoose/e2e-latency-generator>
 
 # 4. Design
 
@@ -174,7 +210,7 @@ Mongoose and Pravega are using quite different concepts. So it's necessary to de
 
 | Pravega | Mongoose |
 |---------|----------|
-| [Stream](http://pravega.io/docs/latest/pravega-concepts/#streams) | *Path Item* |
+| [Stream](http://pravega.io/docs/latest/pravega-concepts/#streams) | *Item Path* or *Byte Stream* |
 | Scope | Storage Namespace
 | [Event](http://pravega.io/docs/latest/pravega-concepts/#events) | *Data Item* |
 | Stream Segment | N/A |
@@ -194,6 +230,28 @@ Steps:
 6. Check if the `EventStreamWriter` exists using the cache, create new one if it doesn't.
 7. Submit the event writing, use a routing key if configured.
 8. Submit the load operation completion handler.
+
+#### 4.1.1.1. Transactional
+
+Using the [transactions](http://pravega.io/docs/latest/transactions/#pravega-transactions) to create the events allows 
+to write the events in the batch mode. The maximum count of the events per transaction is defined by the 
+`load-batch-size` configuration option value.
+
+Example:
+```bash
+docker run \
+    --network host \
+    emcmongoose/mongoose-storage-driver-pravega \
+    --storage-namespace=scope1 \
+    --storage-driver-event-batch \
+    --load-step-limit-count=100000 \
+    --load-batch-size=1024 \
+    --item-output-path=eventsStream1 \
+    --item-data-size=10KB
+```
+
+**Note**:
+> The transactional events create concurrency is limited currently by 1 due to the [issue #1](#43-open-issues).
 
 ### 4.1.2. Read
 
@@ -230,15 +288,53 @@ is set to `bytes`. This means that the whole streams are being accounted as *ite
 
 ### 4.2.1. Create
 
-Creates the [byte streams](https://github.com/pravega/pravega/wiki/PDP-30-ByteStream-API).
+Creates the [byte streams](https://github.com/pravega/pravega/wiki/PDP-30-ByteStream-API). The created byte stream is 
+filled with content up to the size determined by the `item-data-size` option. The create operation will fail with the 
+[status code](https://github.com/emc-mongoose/mongoose-base/tree/master/doc/interfaces/output#232-files) #7 if the 
+stream existed before. 
+
+**Example**:
+```bash
+docker run \
+    --network host \
+    emcmongoose/mongoose-storage-driver-pravega \
+    --storage-driver-stream-data=bytes \
+    --storage-namespace=scope1 \
+    --storage-driver-limit-concurrency=100
+```
 
 ### 4.2.2. Read
 
 Reads the [byte streams](https://github.com/pravega/pravega/wiki/PDP-30-ByteStream-API).
 
+**Example**:
+```bash
+docker run \
+    --network host \
+    emcmongoose/mongoose-storage-driver-pravega \
+    --item-input-file=streams.csv \
+    --read \
+    --storage-driver-stream-data=bytes \
+    --storage-driver-limit-concurrency=10 \
+    --storage-namespace=scope1
+```
+
+It's also possible to perform the byte streams read w/o the input stream items file:
+```bash
+docker run \
+    --network host \
+    emcmongoose/mongoose-storage-driver-pravega \
+    --item-input-path=scope1 \
+    --read \
+    --storage-driver-stream-data=bytes \
+    --storage-driver-limit-concurrency=10 \
+    --storage-namespace=scope1
+```
+All streams in the specified scope are listed and analyzed for the current size before the reading.
+
 ### 4.2.3. Update
 
-Not supported
+Not implemented yet
 
 ### 4.2.4. Delete
 
@@ -247,7 +343,9 @@ the deletion too.
 
 ## 4.3. Open Issues
 
-* <https://github.com/pravega/pravega/issues/3587>
+| Issue | Description |
+|-------|-------------|
+| 1 | [Pravega #3697](https://github.com/pravega/pravega/issues/3697): Missing asynchronous read event and byte stream write methods
 
 # 5. Development
 
@@ -284,6 +382,10 @@ TEST=create_stream ./gradlew robotest
 ### 5.2.1. Manual
 
 1. Build the storage driver
+```bash
+./gradlew pravegaClientJars
+./gradlew jar
+```
 2. Copy the storage driver's jar file into the mongoose's `ext` directory:
 ```bash
 cp -f build/libs/mongoose-storage-driver-pravega-*.jar ~/.mongoose/<MONGOOSE_BASE_VERSION>/ext/
@@ -291,9 +393,13 @@ cp -f build/libs/mongoose-storage-driver-pravega-*.jar ~/.mongoose/<MONGOOSE_BAS
 Note that the Pravega storage driver depends on the 
 [Coop Storage Driver](http://repo.maven.apache.org/maven2/com/github/emc-mongoose/mongoose-storage-driver-coop/) 
 extension so it should be also put into the `ext` directory
-3. Run the Pravega standalone node:
+3. Build and install the corresponding Pravega version:
 ```bash
-docker run --network host pravega/pravega:<PRAVEGA_VERSION> standalone
+./gradlew pravegaExtract
+```
+4. Run the Pravega standalone node:
+```bash
+build/pravega_/bin/pravega-standalone
 ```
 4. Run Mongoose's default scenario with some specific command-line arguments:
 ```bash
