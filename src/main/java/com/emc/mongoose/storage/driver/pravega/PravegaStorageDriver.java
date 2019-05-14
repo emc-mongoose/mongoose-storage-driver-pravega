@@ -329,9 +329,8 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		this.concurrencyThrottle = new Semaphore(concurrencyLimit, true);
 		val queueSizeLimit = driverConfig.intVal("limit-queue-input");
 		this.blockingIoExecutor = new ThreadPoolExecutor(
-			1, concurrencyLimit, 1, SECONDS, new ArrayBlockingQueue<>(queueSizeLimit),
-			new LogContextThreadFactory("blocking-io-executor-" + stepId, true)
-		);
+						1, concurrencyLimit, 1, SECONDS, new ArrayBlockingQueue<>(queueSizeLimit),
+						new LogContextThreadFactory("blocking-io-executor-" + stepId, true));
 	}
 
 	String nextEndpointAddr() {
@@ -876,10 +875,8 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 													completeOperation(streamOp, RESP_FAIL_UNKNOWN);
 												} else {
 													blockingIoExecutor.execute(
-														() -> handleByteStreamWrite(
-															controller, clientConfig, streamName, streamOp
-														)
-													);
+																	() -> handleByteStreamWrite(
+																					controller, clientConfig, streamName, streamOp));
 												}
 												return createdFlag;
 											});
@@ -1144,7 +1141,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	}
 
 	@Override
-	protected void doStop()  {
+	protected void doStop() {
 		Loggers.MSG.debug("{}: interrupting...", toString());
 		try {
 			if (blockingIoExecutor.awaitTermination(1, TimeUnit.SECONDS)) {
