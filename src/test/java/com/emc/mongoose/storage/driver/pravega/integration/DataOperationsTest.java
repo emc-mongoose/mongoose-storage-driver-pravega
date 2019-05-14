@@ -133,7 +133,7 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
 		String scope = "goose";
 		prepare(createTask);
 		createTask.status(Operation.Status.ACTIVE);
-		submit(createTask);
+		put(createTask);
 
 		DataOperation<DataItem> result = get();
 		while (result == null) {
@@ -181,7 +181,7 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
 		String scope = "goose";
 		prepare(createTask);
 		createTask.status(Operation.Status.ACTIVE);
-		submit(createTask);
+		put(createTask);
 		DataOperation<DataItem> result = get();
 		while (result == null) {
 			result = get();
@@ -193,7 +193,7 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
 		final DataOperation<DataItem> createTask2 = new DataOperationImpl<>(0, OpType.READ, dataItem2, null, streamName, credential, null, 0, null);
 		prepare(createTask2);
 		createTask2.status(Operation.Status.ACTIVE);
-		boolean results = submit(createTask2);
+		boolean results = put(createTask2);
 		DataOperation<DataItem> result2 = get();
 		while (result2 == null) {
 			result2 = get();

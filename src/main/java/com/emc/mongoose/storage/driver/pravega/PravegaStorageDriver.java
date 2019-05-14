@@ -18,6 +18,7 @@ import static com.emc.mongoose.storage.driver.pravega.io.StreamDataType.EVENTS;
 import static com.emc.mongoose.storage.driver.pravega.io.StreamScaleUtil.scaleToFixedSegmentCount;
 import static com.github.akurilov.commons.lang.Exceptions.throwUnchecked;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static java.util.concurrent.TimeUnit.SECONDS;
 
 import com.emc.mongoose.base.config.IllegalConfigurationException;
 import com.emc.mongoose.base.data.DataInput;
@@ -91,6 +92,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.LongAdder;
@@ -132,6 +135,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	protected final Semaphore concurrencyThrottle;
 	private final LongAdder scheduledOpCount = new LongAdder();
 	private final LongAdder completedOpCount = new LongAdder();
+	private final ThreadPoolExecutor blockingIoExecutor;
 
 	@Value
 	final class ScopeCreateFunctionImpl
@@ -321,7 +325,13 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		this.executor = Executors.newScheduledThreadPool(
 						ioWorkerCount,
 						new LogContextThreadFactory(toString(), true));
-		this.concurrencyThrottle = new Semaphore(concurrencyLimit > 0 ? concurrencyLimit : Integer.MAX_VALUE, true);
+		val concurrencyLimit = this.concurrencyLimit > 0 ? this.concurrencyLimit : Integer.MAX_VALUE;
+		this.concurrencyThrottle = new Semaphore(concurrencyLimit, true);
+		val queueSizeLimit = driverConfig.intVal("limit-queue-input");
+		this.blockingIoExecutor = new ThreadPoolExecutor(
+			1, concurrencyLimit, 1, SECONDS, new ArrayBlockingQueue<>(queueSizeLimit),
+			new LogContextThreadFactory("blocking-io-executor-" + stepId, true)
+		);
 	}
 
 	String nextEndpointAddr() {
@@ -573,7 +583,8 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 			val op = ops.get(from);
 			val opType = op.type();
 			if (CREATE.equals(opType)) {
-				return submitBatchEventCreate(ops, from, to);
+				blockingIoExecutor.execute(() -> createEvents(ops, from, to));
+				return to - from;
 			} else {
 				return submitEach(ops, from, to);
 			}
@@ -600,7 +611,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 			submitEventCreateOperation(op, nodeAddr);
 			break;
 		case READ:
-			submitEventReadOperation(op, nodeAddr);
+			readEvent(op, nodeAddr);
 			break;
 		default:
 			throw new AssertionError("Unsupported event operation type: " + type);
@@ -636,8 +647,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		return to - from;
 	}
 
-	int submitBatchEventCreate(final List<O> ops, final int from, final int to) {
-		var submitCount = 0;
+	void createEvents(final List<O> ops, final int from, final int to) {
 		if (from < to && concurrencyThrottle.tryAcquire()) {
 			try {
 				val anyEvtOp = ops.get(from);
@@ -690,7 +700,6 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 					scheduledOpCount.add(to - from);
 					txn.commit();
 					completeOperations(ops, from, to, SUCC);
-					submitCount = to - from;
 				} catch (final TxnFailedException e) {
 					LogUtil.exception(
 									Level.DEBUG, e, "{}: transaction failure, aborting {} events write", stepId, to - from);
@@ -705,7 +714,6 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				completeOperations(ops, from, to, FAIL_UNKNOWN);
 			}
 		}
-		return submitCount;
 	}
 
 	void submitEventCreateOperation(final O evtOp, final String nodeAddr) {
@@ -776,7 +784,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		}
 	}
 
-	void submitEventReadOperation(final O evtOp, final String nodeAddr) {
+	void readEvent(final O evtOp, final String nodeAddr) {
 		try {
 			val endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
 			val streamName = extractStreamName(evtOp.dstPath());
@@ -867,7 +875,11 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 																	stepId, streamName, scopeName);
 													completeOperation(streamOp, RESP_FAIL_UNKNOWN);
 												} else {
-													handleByteStreamWrite(controller, clientConfig, streamName, streamOp);
+													blockingIoExecutor.execute(
+														() -> handleByteStreamWrite(
+															controller, clientConfig, streamName, streamOp
+														)
+													);
 												}
 												return createdFlag;
 											});
@@ -1121,6 +1133,36 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 			LogUtil.exception(Level.WARN, e, "{}: failure", streamOp);
 			completeOperation(streamOp, FAIL_UNKNOWN);
 		}
+	}
+
+	@Override
+	protected void doShutdown() {
+		// prevent enqueuing new load operations
+		blockingIoExecutor.shutdown();
+		// drop all pending load operations
+		blockingIoExecutor.getQueue().clear();
+	}
+
+	@Override
+	protected void doStop()  {
+		Loggers.MSG.debug("{}: interrupting...", toString());
+		try {
+			if (blockingIoExecutor.awaitTermination(1, TimeUnit.SECONDS)) {
+				Loggers.MSG.debug("{}: interrupting finished in 1 seconds", toString());
+			} else {
+				Loggers.ERR.debug("{}: interrupting did not finish in 1 second, forcing", toString());
+			}
+		} catch (final InterruptedException e) {
+			blockingIoExecutor.shutdownNow();
+			throwUnchecked(e);
+		} finally {
+			Loggers.MSG.debug("{}: interrupted", toString());
+		}
+	}
+
+	@Override
+	public boolean await(final long timeout, final TimeUnit timeUnit) throws InterruptedException {
+		return blockingIoExecutor.awaitTermination(timeout, timeUnit);
 	}
 
 	@Override
