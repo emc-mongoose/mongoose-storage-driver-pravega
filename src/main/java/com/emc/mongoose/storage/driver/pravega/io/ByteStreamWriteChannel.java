@@ -11,14 +11,11 @@ import java.nio.channels.WritableByteChannel;
 public class ByteStreamWriteChannel
 				implements WritableByteChannel {
 
-	public static ByteStreamWriteChannel newOrReuseInstance(
-					final ByteStreamClientFactory clientFactory, final String streamName, final ByteStreamWriteChannel chan) {
-		val chan_ = chan == null ? new ByteStreamWriteChannel() : chan;
-		chan_.out = clientFactory.createByteStreamWriter(streamName);
-		return chan_;
-	}
+	private final ByteStreamWriter out;
 
-	private volatile ByteStreamWriter out = null;
+	public ByteStreamWriteChannel(final ByteStreamClientFactory clientFactory, final String streamName) {
+		out = clientFactory.createByteStreamWriter(streamName);
+	}
 
 	@Override
 	public final int write(final ByteBuffer src)
@@ -32,15 +29,12 @@ public class ByteStreamWriteChannel
 
 	@Override
 	public final boolean isOpen() {
-		return out != null;
+		return true;
 	}
 
 	@Override
 	public final void close()
 					throws IOException {
-		if (out != null) {
-			out.flush();
-			out = null;
-		}
+		out.close();
 	}
 }

@@ -272,8 +272,6 @@ extends PreemptStorageDriverBase<I, O> {
 	// * byte stream client cache
 	private final Map<ConnectionFactory, ByteStreamClientFactoryCreateFunction> byteStreamClientCreateFuncCache = new ConcurrentHashMap<>();
 	private final Map<Controller, ByteStreamClientFactory> byteStreamClientFactoryCache = new ConcurrentHashMap<>();
-	// * byte stream writer cache
-	private final Map<ByteStreamClientFactory, Queue<ByteStreamWriteChannel>> byteStreamWriteChanPoolCache = new ConcurrentHashMap<>();
 	// * byte stream reader cache
 	private final Map<ByteStreamClientFactory, ByteStreamReaderCreateFunction> byteStreamReaderCreateFuncCache = new ConcurrentHashMap<>();
 	private final Map<String, Queue<ByteStreamReader>> byteStreamReaderPoolCache = new ConcurrentHashMap<>();
@@ -980,12 +978,9 @@ extends PreemptStorageDriverBase<I, O> {
 				val clientFactoryCreateFunc = byteStreamClientCreateFuncCache.computeIfAbsent(
 								connFactory, ByteStreamClientFactoryCreateFunctionImpl::new);
 				val clientFactory = byteStreamClientFactoryCache.computeIfAbsent(controller, clientFactoryCreateFunc);
-				val byteStreamWriteChanPool = byteStreamWriteChanPoolCache.computeIfAbsent(
-								clientFactory, this::createInstancePool);
 				var countBytesDone = 0L;
 				var n = 0L;
-				val byteStreamWriteChan = ByteStreamWriteChannel.newOrReuseInstance(
-								clientFactory, streamName, byteStreamWriteChanPool.poll());
+				val byteStreamWriteChan = new ByteStreamWriteChannel(clientFactory, streamName);
 				try {
 					while (remainingBytes > 0) {
 						n = streamItem.writeToSocketChannel(byteStreamWriteChan, remainingBytes);
@@ -998,7 +993,6 @@ extends PreemptStorageDriverBase<I, O> {
 				} finally {
 					streamOp.finishResponse();
 					byteStreamWriteChan.close();
-					byteStreamWriteChanPool.offer(byteStreamWriteChan);
 					streamOp.countBytesDone(countBytesDone);
 					streamItem.size(countBytesDone);
 				}
@@ -1081,16 +1075,6 @@ extends PreemptStorageDriverBase<I, O> {
 		byteStreamClientCreateFuncCache.clear();
 		closeAllWithTimeout(byteStreamClientFactoryCache.values());
 		byteStreamClientFactoryCache.clear();
-		val allByteStreamWriteChans = new ArrayList<AutoCloseable>();
-		byteStreamWriteChanPoolCache
-						.values()
-						.forEach(
-										pool -> {
-											allByteStreamWriteChans.addAll(pool);
-											pool.clear();
-										});
-		byteStreamWriteChanPoolCache.clear();
-		closeAllWithTimeout(allByteStreamWriteChans);
 		byteStreamReaderCreateFuncCache.clear();
 		val allByteStreamReaders = new ArrayList<AutoCloseable>();
 		byteStreamReaderPoolCache
