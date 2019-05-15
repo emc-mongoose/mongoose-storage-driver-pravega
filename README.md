@@ -20,6 +20,7 @@
 &nbsp;&nbsp;&nbsp;&nbsp;3.4.1. [Manual Scaling](#341-manual-scaling)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;3.4.2. [Multiple Destination Streams](#342-multiple-destination-streams)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;3.4.3. [End-to-end Latency](#343-end-to-end-latency)<br/>
+&nbsp;&nbsp;3.5. [Concurrency](#35-concurrency)<br/>
 4. [Design](#4-design)<br/>
 &nbsp;&nbsp;4.1. [Event Stream Operations](#41-event-stream-operations)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;4.1.1. [Create](#411-create)<br/>
@@ -44,8 +45,7 @@
 
 # 1. Introduction
 
-The storage driver extends the Mongoose's Abstract Coop Storage Driver. It's being built against the specified Pravega
-source commit number.
+TODO
 
 # 2. Features
 
@@ -202,6 +202,27 @@ docker run \
 Once the raw operations trace data is obtained, it may be used to produce the end-to-end latency data using the tool:
 <https://github.com/emc-mongoose/e2e-latency-generator>
 
+## 3.5. Concurrency
+
+The Mongoose Pravega extension uses thread-per-task approach to perform the I/O as far as the most of the Pravega client
+API calls are blocking. This means that the following options combination if should be used in the most cases to achieve 
+the concurrency level of N:
+```bash
+docker run \
+    <DOCKER_OPTIONS> \
+    emcmongoose/mongoose-storage-driver-pravega \
+    --storage-namespace=scope1 \
+    --storage-driver-limit-concurrency=<N> \
+    --storage-driver-threads=<N> \
+    <OTHER_OPTIONS>
+```
+However, for some cases it is useful to set the `storage-driver-limit-concurrency` to 1000 (but not more due to ulimit 
+for the Pravega instance) to get the higher rates. These cases are:
+* events create
+* byte streams read
+This is because the corresponding calls are not pure blocking. The actual concurrency metrics is not correct in these 
+cases.
+
 # 4. Design
 
 Mongoose and Pravega are using quite different concepts. So it's necessary to determine how
@@ -250,14 +271,10 @@ docker run \
     --item-data-size=10KB
 ```
 
-**Note**:
-> The transactional events create concurrency is limited currently by 1 due to the [issue #1](#43-open-issues).
-
 ### 4.1.2. Read
 
 **Notes**:
 > * The Pravega storage doesn't support reading the stream events in the random order.
-> * Works synchronously
 
 There is also another option, called `storage-driver-read-timeoutMillis`. Pravega documentation says it only works when
 there is no available event in the stream. `readNextEvent()` will block for the specified time in ms. So, in theory 0
@@ -300,7 +317,8 @@ docker run \
     emcmongoose/mongoose-storage-driver-pravega \
     --storage-driver-stream-data=bytes \
     --storage-namespace=scope1 \
-    --storage-driver-limit-concurrency=100
+    --storage-driver-limit-concurrency=100 \
+    --storage-driver-threads=100
 ```
 
 ### 4.2.2. Read
@@ -316,6 +334,7 @@ docker run \
     --read \
     --storage-driver-stream-data=bytes \
     --storage-driver-limit-concurrency=10 \
+    --storage-driver-threads=10 \
     --storage-namespace=scope1
 ```
 
@@ -328,6 +347,7 @@ docker run \
     --read \
     --storage-driver-stream-data=bytes \
     --storage-driver-limit-concurrency=10 \
+    --storage-driver-threads=10 \
     --storage-namespace=scope1
 ```
 All streams in the specified scope are listed and analyzed for the current size before the reading.

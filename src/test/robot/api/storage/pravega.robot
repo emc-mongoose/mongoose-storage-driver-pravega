@@ -25,7 +25,8 @@ Create Event Stream Test
     ${args} =  Catenate  SEPARATOR= \\\n\t
     ...  --load-step-id=${step_id}
     ...  --load-op-limit-count=${count_limit}
-    ...  --storage-driver-limit-concurrency=10
+    ...  --storage-driver-limit-concurrency=1000
+    ...  --storage-driver-threads=10
     ...  --storage-namespace=scope1
     ...  --storage-net-node-addrs=${node_addr}
     &{env_params} =  Create Dictionary
@@ -43,6 +44,7 @@ Create Byte Streams Test
     ...  --load-step-id=${step_id}
     ...  --load-op-limit-count=${count_limit}
     ...  --storage-driver-limit-concurrency=10
+    ...  --storage-driver-threads=10
     ...  --storage-driver-stream-data=bytes
     ...  --storage-namespace=scope2
     ...  --storage-net-node-addrs=${node_addr}
@@ -60,7 +62,8 @@ Read Byte Streams Test
     ${args} =  Catenate  SEPARATOR= \\\n\t
     ...  --load-step-id=${step_id}
     ...  --load-op-limit-count=${count_limit}
-    ...  --storage-driver-limit-concurrency=10
+    ...  --storage-driver-limit-concurrency=1000
+    ...  --storage-driver-threads=10
     ...  --storage-driver-stream-data=bytes
     ...  --storage-namespace=scope3
     ...  --storage-net-node-addrs=${node_addr}
@@ -79,7 +82,8 @@ Read All Byte Streams Test
     ${args} =  Catenate  SEPARATOR= \\\n\t
     ...  --load-step-id=${step_id}
     ...  --load-op-limit-count=${count_limit}
-    ...  --storage-driver-limit-concurrency=10
+    ...  --storage-driver-limit-concurrency=1000
+    ...  --storage-driver-threads=10
     ...  --storage-net-node-addrs=${node_addr}
     ...  --run-scenario=${MONGOOSE_CONTAINER_DATA_DIR}/read_all_byte_streams.js
     &{env_params} =  Create Dictionary  SCOPE_NAME=scope4
@@ -96,6 +100,8 @@ Batch Create Event Stream Test
     ${args} =  Catenate  SEPARATOR= \\\n\t
     ...  --storage-namespace=scope5
     ...  --storage-driver-event-batch
+    ...  --storage-driver-limit-concurrency=10
+    ...  --storage-driver-threads=10
     ...  --storage-net-node-addrs=${node_addr}
     ...  --load-op-limit-count=${count_limit}
     ...  --load-step-id=${step_id}
@@ -115,6 +121,8 @@ Events Pipeline Test
     ${args} =  Catenate  SEPARATOR= \\\n\t
     ...  --storage-net-node-addrs=${node_addr}
     ...  --storage-namespace=scope7 \
+    ...  --storage-driver-limit-concurrency=10
+    ...  --storage-driver-threads=10
     ...  --item-output-path=stream7 \
     ...  --run-scenario=${MONGOOSE_CONTAINER_DATA_DIR}/create_read_pipeline.js \
     ...  --load-step-id=${step_id} \
