@@ -25,9 +25,6 @@ plugins {
 repositories {
 	jcenter()
 	mavenCentral()
-	maven {
-		url "https://oss.sonatype.org/service/local/repositories/releases/content/"
-	}
 }
 description = "Mongoose is a high-load storage performance testing tool"
 group = "com.github.emc-mongoose"

@@ -90,6 +90,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
@@ -105,6 +106,7 @@ extends PreemptStorageDriverBase<I, O> {
 
 	private static final int INSTANCE_POOL_SIZE = 1000;
 
+	protected final Semaphore concurrencyThrottle;
 	protected final String uriSchema;
 	protected final String scopeName;
 	protected final String[] endpointAddrs;
@@ -276,7 +278,8 @@ extends PreemptStorageDriverBase<I, O> {
 	private final Map<ByteStreamClientFactory, ByteStreamReaderCreateFunction> byteStreamReaderCreateFuncCache = new ConcurrentHashMap<>();
 	private final Map<String, Queue<ByteStreamReader>> byteStreamReaderPoolCache = new ConcurrentHashMap<>();
 	// * batch event writers
-	private final Map<EventStreamClientFactory, Queue<TransactionalEventStreamWriter<I>>> batchEvtWriterPoolCache = new ConcurrentHashMap<>();
+	private final ThreadLocal<Map<EventStreamClientFactory, TransactionalEventStreamWriter<I>>>
+		threadLocalBatchEvtWriterCache = ThreadLocal.withInitial(ConcurrentHashMap::new);
 
 	public PravegaStorageDriver(
 					final String stepId,
@@ -286,6 +289,7 @@ extends PreemptStorageDriverBase<I, O> {
 					final int batchSize)
 					throws IllegalConfigurationException, IllegalArgumentException {
 		super(stepId, dataInput, storageConfig, verifyFlag);
+		this.concurrencyThrottle = new Semaphore(concurrencyLimit > 0 ? concurrencyLimit : Integer.MAX_VALUE, true);
 		val driverConfig = storageConfig.configVal("driver");
 		this.controlApiTimeoutMillis = driverConfig.longVal("control-timeoutMillis");
 		val scalingConfig = driverConfig.configVal("scaling");
@@ -532,7 +536,7 @@ extends PreemptStorageDriverBase<I, O> {
 	}
 
 	@Override
-	public final void execute(final List<O> ops, final int from, final int to)
+	protected final void execute(final List<O> ops, final int from, final int to)
 					throws IllegalStateException {
 		// currently the only case for this method is the batch event create, see isBatch(...) method for the details
 		createEvents(ops, from, to);
@@ -599,12 +603,13 @@ extends PreemptStorageDriverBase<I, O> {
 				// create the client factory if necessary
 				val clientFactory = clientFactoryCache.computeIfAbsent(scopeName, clientFactoryCreateFunc);
 				// create the batch event stream writer if necessary
-				val batchEvtWriterPool = batchEvtWriterPoolCache.computeIfAbsent(clientFactory, this::createInstancePool);
-				var batchEvtWriter_ = batchEvtWriterPool.poll();
-				if (null == batchEvtWriter_) {
-					batchEvtWriter_ = clientFactory.createTransactionalEventWriter(streamName, evtSerializer, evtWriterConfig);
-				}
-				val batchEvtWriter = batchEvtWriter_;
+				val batchEvtWriterCache = threadLocalBatchEvtWriterCache.get();
+				val batchEvtWriter = batchEvtWriterCache.computeIfAbsent(
+					clientFactory,
+					clientFactory_ -> clientFactory_.createTransactionalEventWriter(
+						streamName, evtSerializer, evtWriterConfig
+					)
+				);
 				val txn = batchEvtWriter.beginTxn();
 				O evtOp;
 				I evtItem;
@@ -634,8 +639,6 @@ extends PreemptStorageDriverBase<I, O> {
 									Level.DEBUG, e, "{}: transaction failure, aborting {} events write", stepId, to - from);
 					completeOperations(ops, from, to, RESP_FAIL_UNKNOWN);
 					txn.abort();
-				} finally {
-					batchEvtWriterPool.offer(batchEvtWriter);
 				}
 			} catch (final Throwable e) {
 				LogUtil.exception(
@@ -663,12 +666,6 @@ extends PreemptStorageDriverBase<I, O> {
 				clientConfig, EventStreamClientFactoryCreateFunctionImpl::new);
 			// create the client factory if necessary
 			val clientFactory = clientFactoryCache.computeIfAbsent(scopeName, clientFactoryCreateFunc);
-			// create the event stream writer if necessary
-			/*val evtWriterPool = threadLocalEvtWriterCache.computeIfAbsent(streamName, this::createInstancePool);
-			var evtWriter_ = evtWriterPool.poll();
-			if(null == evtWriter_) {
-				evtWriter_ = clientFactory.createEventWriter(streamName, evtSerializer, evtWriterConfig);
-			}*/
 			val evtWriterCache = threadLocalEvtWriterCache.get();
 			val evtWriter = evtWriterCache.computeIfAbsent(
 				streamName,
@@ -676,6 +673,7 @@ extends PreemptStorageDriverBase<I, O> {
 			);
 			val evtItem = evtOp.item();
 			final CompletableFuture<Void> writeEvtFuture;
+			concurrencyThrottle.acquire();
 			if (null == routingKeyFunc) {
 				evtOp.startRequest();
 				writeEvtFuture = evtWriter.writeEvent(evtItem);
@@ -695,6 +693,7 @@ extends PreemptStorageDriverBase<I, O> {
 			writeEvtFuture
 				.handle(
 					(returned, thrown) -> {
+						concurrencyThrottle.release();
 						if (null == thrown) {
 							evtOp.startResponse();
 							evtOp.finishResponse();
@@ -708,12 +707,14 @@ extends PreemptStorageDriverBase<I, O> {
 					}
 				);
 		} catch (final NullPointerException e) {
+			concurrencyThrottle.release();
 			if (!isStarted()) { // occurs on manual interruption which is normal so should be handled
 				completeOperation(evtOp, INTERRUPTED);
 			} else {
 				completeFailedOperation(evtOp, e);
 			}
 		} catch (final Throwable thrown) {
+			concurrencyThrottle.release();
 			throwUncheckedIfInterrupted(thrown);
 			completeFailedOperation(evtOp, thrown);
 		}
