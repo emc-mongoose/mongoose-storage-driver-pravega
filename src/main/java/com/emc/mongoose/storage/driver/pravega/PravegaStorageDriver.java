@@ -534,10 +534,10 @@ extends PreemptStorageDriverBase<I, O> {
 	}
 
 	@Override
-	protected final void execute(final List<O> ops, final int from, final int to)
+	protected final void execute(final List<O> ops)
 					throws IllegalStateException {
 		// currently the only case for this method is the batch event create, see isBatch(...) method for the details
-		createEvents(ops, from, to);
+		createEvents(ops);
 	}
 
 	void noop(final O op) {
@@ -579,10 +579,11 @@ extends PreemptStorageDriverBase<I, O> {
 		}
 	}
 
-	void createEvents(final List<O> ops, final int from, final int to) {
-		if (from < to) {
+	void createEvents(final List<O> ops) {
+		val opsCount = ops.size();
+		if (opsCount > 0) {
 			try {
-				val anyEvtOp = ops.get(from);
+				val anyEvtOp = ops.get(0);
 				val nodeAddr = anyEvtOp.nodeAddr();
 				// prepare
 				val endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
@@ -614,14 +615,14 @@ extends PreemptStorageDriverBase<I, O> {
 				var routingKey = (String) null;
 				try {
 					if (null == routingKeyFunc) {
-						for (var i = from; i < to; i++) {
+						for (var i = 0; i < opsCount; i++) {
 							evtOp = ops.get(i);
 							prepare(evtOp);
 							evtOp.startRequest();
 							txn.writeEvent(evtOp.item());
 						}
 					} else {
-						for (var i = from; i < to; i++) {
+						for (var i = 0; i < opsCount; i++) {
 							evtOp = ops.get(i);
 							prepare(evtOp);
 							evtItem = evtOp.item();
@@ -631,17 +632,17 @@ extends PreemptStorageDriverBase<I, O> {
 						}
 					}
 					txn.commit();
-					completeOperations(ops, from, to, SUCC);
+					completeOperations(ops, SUCC);
 				} catch (final TxnFailedException e) {
 					LogUtil.exception(
-									Level.DEBUG, e, "{}: transaction failure, aborting {} events write", stepId, to - from);
-					completeOperations(ops, from, to, RESP_FAIL_UNKNOWN);
+									Level.DEBUG, e, "{}: transaction failure, aborting {} events write", stepId, opsCount);
+					completeOperations(ops, RESP_FAIL_UNKNOWN);
 					txn.abort();
 				}
 			} catch (final Throwable e) {
 				LogUtil.exception(
-								Level.DEBUG, e, "{}: unexpected failure while trying to write {} events", stepId, to - from);
-				completeOperations(ops, from, to, FAIL_UNKNOWN);
+								Level.DEBUG, e, "{}: unexpected failure while trying to write {} events", stepId, opsCount);
+				completeOperations(ops, FAIL_UNKNOWN);
 			}
 		}
 	}
@@ -914,11 +915,11 @@ extends PreemptStorageDriverBase<I, O> {
 		}
 	}
 
-	void completeOperations(final List<O> ops, final int from, final int to, final Status status) {
+	void completeOperations(final List<O> ops, final Status status) {
 		I item;
 		O op;
 		try {
-			for (var i = from; i < to; i++) {
+			for (var i = 0; i < ops.size(); i++) {
 				op = ops.get(i);
 				op.status(status);
 				item = op.item();
