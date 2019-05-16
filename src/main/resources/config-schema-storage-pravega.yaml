@@ -4,7 +4,7 @@ storage:
     control:
       timeoutMillis: long
     event:
-      batch: boolean
+      transaction: boolean
       key:
         enabled: boolean
         count: long

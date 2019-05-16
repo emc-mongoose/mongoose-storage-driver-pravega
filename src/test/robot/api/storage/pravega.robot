@@ -91,7 +91,7 @@ Read All Byte Streams Test
     Log  ${std_out}
     Validate Metrics Total Log File  ${step_id}  READ  ${count_limit}  0  104857600
 
-Batch Create Event Stream Test
+Create Event Transaction Stream Test
     [Tags]  batch_create_event_stream
     ${node_addr} =  Get Environment Variable  SERVICE_HOST  127.0.0.1
     ${step_id} =  Set Variable  batch_create_event_stream
@@ -99,7 +99,7 @@ Batch Create Event Stream Test
     Remove Directory  ${LOG_DIR}/${step_id}  recursive=True
     ${args} =  Catenate  SEPARATOR= \\\n\t
     ...  --storage-namespace=scope5
-    ...  --storage-driver-event-batch
+    ...  --storage-driver-event-transaction
     ...  --storage-driver-limit-concurrency=10
     ...  --storage-driver-threads=10
     ...  --storage-net-node-addrs=${node_addr}

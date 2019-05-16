@@ -17,6 +17,7 @@ import static com.emc.mongoose.storage.driver.pravega.io.StreamDataType.BYTES;
 import static com.emc.mongoose.storage.driver.pravega.io.StreamDataType.EVENTS;
 import static com.emc.mongoose.storage.driver.pravega.io.StreamScaleUtil.scaleToFixedSegmentCount;
 import static com.github.akurilov.commons.lang.Exceptions.throwUnchecked;
+import static java.util.Arrays.asList;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 import com.emc.mongoose.base.config.IllegalConfigurationException;
@@ -80,6 +81,7 @@ import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
@@ -112,7 +114,7 @@ extends PreemptStorageDriverBase<I, O> {
 	protected final String[] endpointAddrs;
 	protected final int nodePort;
 	protected final long controlApiTimeoutMillis;
-	protected final boolean createBatchMode;
+	protected final boolean transactionMode;
 	protected final long readTimeoutMillis;
 	protected final Serializer<I> evtSerializer = new DataItemSerializer<>(false);
 	protected final Serializer<ByteBuffer> evtDeserializer = new ByteBufferSerializer();
@@ -309,9 +311,9 @@ extends PreemptStorageDriverBase<I, O> {
 		this.readTimeoutMillis = eventConfig.longVal("timeoutMillis");
 		this.streamDataType = StreamDataType.valueOf(driverConfig.stringVal("stream-data").toUpperCase());
 		if (EVENTS.equals(streamDataType)) {
-			this.createBatchMode = eventConfig.boolVal("batch");
+			this.transactionMode = eventConfig.boolVal("transaction");
 		} else {
-			this.createBatchMode = false;
+			this.transactionMode = false;
 		}
 		this.endpointAddrs = endpointAddrList.toArray(new String[endpointAddrList.size()]);
 		this.requestAuthTokenFunc = null; // do not use
@@ -509,7 +511,7 @@ extends PreemptStorageDriverBase<I, O> {
 
 	@Override
 	protected boolean isBatch(final List<O> ops, final int from, final int to) {
-		return createBatchMode && CREATE.equals(ops.get(from).type());
+		return CREATE.equals(ops.get(from).type());
 	}
 
 	@Override
@@ -536,8 +538,11 @@ extends PreemptStorageDriverBase<I, O> {
 	@Override
 	protected final void execute(final List<O> ops)
 					throws IllegalStateException {
-		// currently the only case for this method is the batch event create, see isBatch(...) method for the details
-		createEvents(ops);
+		if(transactionMode) {
+			createEventsTransaction(ops);
+		} else if(EVENTS.equals(streamDataType)) {
+			createEvents(ops);
+		}
 	}
 
 	void noop(final O op) {
@@ -549,7 +554,7 @@ extends PreemptStorageDriverBase<I, O> {
 		val type = op.type();
 		switch (type) {
 		case CREATE:
-			createEvent(op, nodeAddr);
+			createEvents(List.of(op));
 			break;
 		case READ:
 			readEvent(op, nodeAddr);
@@ -579,7 +584,7 @@ extends PreemptStorageDriverBase<I, O> {
 		}
 	}
 
-	void createEvents(final List<O> ops) {
+	void createEventsTransaction(final List<O> ops) {
 		val opsCount = ops.size();
 		if (opsCount > 0) {
 			try {
@@ -647,75 +652,93 @@ extends PreemptStorageDriverBase<I, O> {
 		}
 	}
 
-	void createEvent(final O evtOp, final String nodeAddr) {
-		try {
-			// prepare
-			val endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
-			val clientConfig = clientConfigCache.computeIfAbsent(endpointUri, this::createClientConfig);
-			val controller = controllerCache.computeIfAbsent(clientConfig, this::createController);
-			val scopeCreateFunc = scopeCreateFuncCache.computeIfAbsent(controller, ScopeCreateFunctionImpl::new);
-			// create the scope if necessary
-			val streamCreateFunc = streamCreateFuncCache.computeIfAbsent(scopeName, scopeCreateFunc);
-			val streamName = extractStreamName(evtOp.dstPath());
-			scopeStreamsCache
-				.computeIfAbsent(scopeName, this::createInstanceCache)
-				.computeIfAbsent(streamName, streamCreateFunc);
-			// create the client factory create function if necessary
-			val clientFactoryCreateFunc = clientFactoryCreateFuncCache.computeIfAbsent(
-				clientConfig, EventStreamClientFactoryCreateFunctionImpl::new);
-			// create the client factory if necessary
-			val clientFactory = clientFactoryCache.computeIfAbsent(scopeName, clientFactoryCreateFunc);
-			val evtWriterCache = threadLocalEvtWriterCache.get();
-			val evtWriter = evtWriterCache.computeIfAbsent(
-				streamName,
-				(streamName_) -> clientFactory.createEventWriter(streamName_, evtSerializer, evtWriterConfig)
-			);
-			val evtItem = evtOp.item();
-			final CompletableFuture<Void> writeEvtFuture;
-			concurrencyThrottle.acquire();
-			if (null == routingKeyFunc) {
-				evtOp.startRequest();
-				writeEvtFuture = evtWriter.writeEvent(evtItem);
-				try {
-					evtOp.finishRequest();
-				} catch(final IllegalStateException ignored) {
-				}
-			} else {
-				val routingKey = routingKeyFunc.apply(evtItem);
-				evtOp.startRequest();
-				writeEvtFuture = evtWriter.writeEvent(routingKey, evtItem);
-				try {
-					evtOp.finishRequest();
-				} catch(final IllegalStateException ignored) {
-				}
-			}
-			writeEvtFuture
-				.handle(
-					(returned, thrown) -> {
-						concurrencyThrottle.release();
-						if (null == thrown) {
-							evtOp.startResponse();
-							evtOp.finishResponse();
-							try {
-								evtOp.countBytesDone(evtItem.size());
-							} catch (final IOException ignored) {}
-							return completeOperation(evtOp, SUCC);
-						} else {
-							return completeFailedOperation(evtOp, thrown);
-						}
-					}
+	void createEvents(final List<O> ops) {
+		val opsCount = ops.size();
+		if (opsCount > 0) {
+			try {
+				val anyEvtOp = ops.get(0);
+				val nodeAddr = anyEvtOp.nodeAddr();
+				// prepare
+				val endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
+				val clientConfig = clientConfigCache.computeIfAbsent(endpointUri, this::createClientConfig);
+				val controller = controllerCache.computeIfAbsent(clientConfig, this::createController);
+				val scopeCreateFunc = scopeCreateFuncCache.computeIfAbsent(controller, ScopeCreateFunctionImpl::new);
+				// create the scope if necessary
+				val streamCreateFunc = streamCreateFuncCache.computeIfAbsent(scopeName, scopeCreateFunc);
+				val streamName = extractStreamName(anyEvtOp.dstPath());
+				scopeStreamsCache
+					.computeIfAbsent(scopeName, this::createInstanceCache)
+					.computeIfAbsent(streamName, streamCreateFunc);
+				// create the client factory create function if necessary
+				val clientFactoryCreateFunc = clientFactoryCreateFuncCache.computeIfAbsent(clientConfig,
+					EventStreamClientFactoryCreateFunctionImpl::new);
+				// create the client factory if necessary
+				val clientFactory = clientFactoryCache.computeIfAbsent(scopeName, clientFactoryCreateFunc);
+				val evtWriterCache = threadLocalEvtWriterCache.get();
+				val evtWriter = evtWriterCache.computeIfAbsent(
+					streamName,
+					(streamName_) -> clientFactory.createEventWriter(streamName_, evtSerializer, evtWriterConfig)
 				);
-		} catch (final NullPointerException e) {
-			concurrencyThrottle.release();
-			if (!isStarted()) { // occurs on manual interruption which is normal so should be handled
-				completeOperation(evtOp, INTERRUPTED);
-			} else {
-				completeFailedOperation(evtOp, e);
+				var routingKey = (String) null;
+				if (null == routingKeyFunc) {
+					for (var i = 0; i < opsCount; i++) {
+						val evtOp = ops.get(i);
+						prepare(evtOp);
+						evtOp.startRequest();
+						evtWriter
+							.writeEvent(evtOp.item())
+							.handle(
+								(returned, thrown) -> {
+									if (null == thrown) {
+										evtOp.startResponse();
+										evtOp.finishResponse();
+										try {
+											evtOp.countBytesDone(evtOp.item().size());
+										} catch (final IOException ignored) {}
+										return completeOperation(evtOp, SUCC);
+									} else {
+										return completeFailedOperation(evtOp, thrown);
+									}
+								}
+							);
+						try {
+							evtOp.finishRequest();
+						} catch (final IllegalStateException ignored) {}
+					}
+				} else {
+					for (var i = 0; i < opsCount; i++) {
+						val evtOp = ops.get(i);
+						prepare(evtOp);
+						val evtItem = evtOp.item();
+						routingKey = routingKeyFunc.apply(evtItem);
+						evtOp.startRequest();
+						evtWriter
+							.writeEvent(routingKey, evtItem)
+							.handle(
+								(returned, thrown) -> {
+									if (null == thrown) {
+										evtOp.startResponse();
+										evtOp.finishResponse();
+										try {
+											evtOp.countBytesDone(evtItem.size());
+										} catch (final IOException ignored) {}
+										return completeOperation(evtOp, SUCC);
+									} else {
+										return completeFailedOperation(evtOp, thrown);
+									}
+								}
+							);
+						try {
+							evtOp.finishRequest();
+						} catch (final IllegalStateException ignored) {}
+					}
+				}
+				evtWriter.flush();
+			} catch (final Throwable e) {
+				LogUtil.exception(
+					Level.DEBUG, e, "{}: unexpected failure while trying to write {} events", stepId, opsCount);
+				completeOperations(ops, FAIL_UNKNOWN);
 			}
-		} catch (final Throwable thrown) {
-			concurrencyThrottle.release();
-			throwUncheckedIfInterrupted(thrown);
-			completeFailedOperation(evtOp, thrown);
 		}
 	}
 
