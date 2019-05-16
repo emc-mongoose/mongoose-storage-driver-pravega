@@ -17,7 +17,6 @@ import static com.emc.mongoose.storage.driver.pravega.io.StreamDataType.BYTES;
 import static com.emc.mongoose.storage.driver.pravega.io.StreamDataType.EVENTS;
 import static com.emc.mongoose.storage.driver.pravega.io.StreamScaleUtil.scaleToFixedSegmentCount;
 import static com.github.akurilov.commons.lang.Exceptions.throwUnchecked;
-import static java.util.Arrays.asList;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 import com.emc.mongoose.base.config.IllegalConfigurationException;
@@ -81,12 +80,10 @@ import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -104,7 +101,7 @@ import lombok.val;
 import org.apache.logging.log4j.Level;
 
 public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>>
-extends PreemptStorageDriverBase<I, O> {
+				extends PreemptStorageDriverBase<I, O> {
 
 	private static final int INSTANCE_POOL_SIZE = 1000;
 
@@ -115,10 +112,14 @@ extends PreemptStorageDriverBase<I, O> {
 	protected final int nodePort;
 	protected final long controlApiTimeoutMillis;
 	protected final boolean transactionMode;
-	protected final long readTimeoutMillis;
+	protected final long evtOpTimeoutMillis;
 	protected final Serializer<I> evtSerializer = new DataItemSerializer<>(false);
 	protected final Serializer<ByteBuffer> evtDeserializer = new ByteBufferSerializer();
-	protected final EventWriterConfig evtWriterConfig = EventWriterConfig.builder().build();
+	protected final EventWriterConfig evtWriterConfig = EventWriterConfig
+		.builder()
+		.maxBackoffMillis(1)
+		.retryAttempts(1)
+		.build();
 	protected final ReaderConfig evtReaderConfig = ReaderConfig.builder().build();
 	protected final String evtReaderGroupName = Long.toString(System.nanoTime());
 	protected final ThreadLocal<ReaderGroupConfig.ReaderGroupConfigBuilder> evtReaderGroupConfigBuilder = ThreadLocal.withInitial(ReaderGroupConfig::builder);
@@ -257,8 +258,7 @@ extends PreemptStorageDriverBase<I, O> {
 	private final Map<ClientConfig, EventStreamClientFactoryCreateFunction> clientFactoryCreateFuncCache = new ConcurrentHashMap<>();
 	private final Map<String, EventStreamClientFactory> clientFactoryCache = new ConcurrentHashMap<>();
 	// * event stream writers
-	private final ThreadLocal<Map<String, EventStreamWriter<I>>>
-		threadLocalEvtWriterCache = ThreadLocal.withInitial(ConcurrentHashMap::new);
+	private final ThreadLocal<Map<String, EventStreamWriter<I>>> threadLocalEvtWriterCache = ThreadLocal.withInitial(ConcurrentHashMap::new);
 	// * reader group
 	private final Map<String, ReaderGroupConfig> evtReaderGroupConfigCache = new ConcurrentHashMap<>();
 	private final Map<URI, ReaderGroupManagerCreateFunction> evtReaderGroupManagerCreateFuncCache = new ConcurrentHashMap<>();
@@ -278,8 +278,7 @@ extends PreemptStorageDriverBase<I, O> {
 	private final Map<ByteStreamClientFactory, ByteStreamReaderCreateFunction> byteStreamReaderCreateFuncCache = new ConcurrentHashMap<>();
 	private final Map<String, Queue<ByteStreamReader>> byteStreamReaderPoolCache = new ConcurrentHashMap<>();
 	// * batch event writers
-	private final ThreadLocal<Map<EventStreamClientFactory, TransactionalEventStreamWriter<I>>>
-		threadLocalBatchEvtWriterCache = ThreadLocal.withInitial(ConcurrentHashMap::new);
+	private final ThreadLocal<Map<EventStreamClientFactory, TransactionalEventStreamWriter<I>>> threadLocalTxnEvtWriterCache = ThreadLocal.withInitial(ConcurrentHashMap::new);
 
 	public PravegaStorageDriver(
 					final String stepId,
@@ -308,7 +307,7 @@ extends PreemptStorageDriverBase<I, O> {
 		val createRoutingKeys = createRoutingKeysConfig.boolVal("enabled");
 		val createRoutingKeysPeriod = createRoutingKeysConfig.longVal("count");
 		this.routingKeyFunc = createRoutingKeys ? new RoutingKeyFunctionImpl<>(createRoutingKeysPeriod) : null;
-		this.readTimeoutMillis = eventConfig.longVal("timeoutMillis");
+		this.evtOpTimeoutMillis = eventConfig.longVal("timeoutMillis");
 		this.streamDataType = StreamDataType.valueOf(driverConfig.stringVal("stream-data").toUpperCase());
 		if (EVENTS.equals(streamDataType)) {
 			this.transactionMode = eventConfig.boolVal("transaction");
@@ -319,7 +318,7 @@ extends PreemptStorageDriverBase<I, O> {
 		this.requestAuthTokenFunc = null; // do not use
 		this.requestNewPathFunc = null; // do not use
 		this.bgExecutor = Executors.newScheduledThreadPool(
-						ioWorkerCount,
+						Runtime.getRuntime().availableProcessors(),
 						new LogContextThreadFactory(toString(), true));
 	}
 
@@ -538,9 +537,9 @@ extends PreemptStorageDriverBase<I, O> {
 	@Override
 	protected final void execute(final List<O> ops)
 					throws IllegalStateException {
-		if(transactionMode) {
+		if (transactionMode) {
 			createEventsTransaction(ops);
-		} else if(EVENTS.equals(streamDataType)) {
+		} else if (EVENTS.equals(streamDataType)) {
 			createEvents(ops);
 		}
 	}
@@ -607,13 +606,11 @@ extends PreemptStorageDriverBase<I, O> {
 				// create the client factory if necessary
 				val clientFactory = clientFactoryCache.computeIfAbsent(scopeName, clientFactoryCreateFunc);
 				// create the batch event stream writer if necessary
-				val batchEvtWriterCache = threadLocalBatchEvtWriterCache.get();
-				val batchEvtWriter = batchEvtWriterCache.computeIfAbsent(
-					clientFactory,
-					clientFactory_ -> clientFactory_.createTransactionalEventWriter(
-						streamName, evtSerializer, evtWriterConfig
-					)
-				);
+				val txnEvtWriterCache = threadLocalTxnEvtWriterCache.get();
+				val batchEvtWriter = txnEvtWriterCache.computeIfAbsent(
+								clientFactory,
+								clientFactory_ -> clientFactory_.createTransactionalEventWriter(
+												streamName, evtSerializer, evtWriterConfig));
 				val txn = batchEvtWriter.beginTxn();
 				O evtOp;
 				I evtItem;
@@ -667,11 +664,11 @@ extends PreemptStorageDriverBase<I, O> {
 				val streamCreateFunc = streamCreateFuncCache.computeIfAbsent(scopeName, scopeCreateFunc);
 				val streamName = extractStreamName(anyEvtOp.dstPath());
 				scopeStreamsCache
-					.computeIfAbsent(scopeName, this::createInstanceCache)
-					.computeIfAbsent(streamName, streamCreateFunc);
+								.computeIfAbsent(scopeName, this::createInstanceCache)
+								.computeIfAbsent(streamName, streamCreateFunc);
 				// create the client factory create function if necessary
 				val clientFactoryCreateFunc = clientFactoryCreateFuncCache.computeIfAbsent(clientConfig,
-					EventStreamClientFactoryCreateFunctionImpl::new);
+								EventStreamClientFactoryCreateFunctionImpl::new);
 				// create the client factory if necessary
 				val clientFactory = clientFactoryCache.computeIfAbsent(scopeName, clientFactoryCreateFunc);
 				val evtWriterCache = threadLocalEvtWriterCache.get();
@@ -684,26 +681,7 @@ extends PreemptStorageDriverBase<I, O> {
 					for (var i = 0; i < opsCount; i++) {
 						val evtOp = ops.get(i);
 						prepare(evtOp);
-						evtOp.startRequest();
-						evtWriter
-							.writeEvent(evtOp.item())
-							.handle(
-								(returned, thrown) -> {
-									if (null == thrown) {
-										evtOp.startResponse();
-										evtOp.finishResponse();
-										try {
-											evtOp.countBytesDone(evtOp.item().size());
-										} catch (final IOException ignored) {}
-										return completeOperation(evtOp, SUCC);
-									} else {
-										return completeFailedOperation(evtOp, thrown);
-									}
-								}
-							);
-						try {
-							evtOp.finishRequest();
-						} catch (final IllegalStateException ignored) {}
+						writeEventSync(evtWriter, evtOp);
 					}
 				} else {
 					for (var i = 0; i < opsCount; i++) {
@@ -713,33 +691,57 @@ extends PreemptStorageDriverBase<I, O> {
 						routingKey = routingKeyFunc.apply(evtItem);
 						evtOp.startRequest();
 						evtWriter
-							.writeEvent(routingKey, evtItem)
-							.handle(
-								(returned, thrown) -> {
-									if (null == thrown) {
-										evtOp.startResponse();
-										evtOp.finishResponse();
-										try {
-											evtOp.countBytesDone(evtItem.size());
-										} catch (final IOException ignored) {}
-										return completeOperation(evtOp, SUCC);
-									} else {
-										return completeFailedOperation(evtOp, thrown);
-									}
-								}
-							);
+										.writeEvent(routingKey, evtItem)
+										.handle(
+														(returned, thrown) -> {
+															if (null == thrown) {
+																evtOp.startResponse();
+																evtOp.finishResponse();
+																try {
+																	evtOp.countBytesDone(evtItem.size());
+																} catch (final IOException ignored) {}
+																return completeOperation(evtOp, SUCC);
+															} else {
+																return completeFailedOperation(evtOp, thrown);
+															}
+														});
 						try {
 							evtOp.finishRequest();
 						} catch (final IllegalStateException ignored) {}
 					}
 				}
-				evtWriter.flush();
 			} catch (final Throwable e) {
 				LogUtil.exception(
-					Level.DEBUG, e, "{}: unexpected failure while trying to write {} events", stepId, opsCount);
+								Level.DEBUG, e, "{}: unexpected failure while trying to write {} events", stepId, opsCount);
 				completeOperations(ops, FAIL_UNKNOWN);
 			}
 		}
+	}
+
+	void writeEventSync(final EventStreamWriter<I> evtWriter, final O evtOp) {
+		evtOp.startRequest();
+		val future = evtWriter.writeEvent(evtOp.item());
+		future
+			.handle(
+				(returned, thrown) -> {
+					if (null == thrown) {
+						evtOp.startResponse();
+						evtOp.finishResponse();
+						try {
+							evtOp.countBytesDone(evtOp.item().size());
+						} catch (final IOException ignored) {}
+						completeOperation(evtOp, SUCC);
+					} else {
+						completeFailedOperation(evtOp, thrown);
+					}
+					future.complete(null);
+					return null;
+				}
+			)
+			.get(evtOpTimeoutMillis, MILLISECONDS);
+		try {
+			evtOp.finishRequest();
+		} catch (final IllegalStateException ignored) {}
 	}
 
 	void readEvent(final O evtOp, final String nodeAddr) {
@@ -766,7 +768,7 @@ extends PreemptStorageDriverBase<I, O> {
 			val evtReader = eventStreamReaderCache.computeIfAbsent(evtReaderGroupName, readerCreateFunc);
 			evtOp.startRequest();
 			evtOp.finishRequest();
-			val evtRead = evtReader.readNextEvent(readTimeoutMillis);
+			val evtRead = evtReader.readNextEvent(evtOpTimeoutMillis);
 			evtOp.startResponse();
 			evtOp.finishResponse();
 			if (null == evtRead) {

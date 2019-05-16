@@ -161,7 +161,7 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
 										ReaderConfig.builder().build())) {
 			System.out.format("Reading all the events from %s/%s%n", scope, streamName);
 			EventRead<ByteBuffer> event = null;
-			event = reader.readNextEvent(readTimeoutMillis);
+			event = reader.readNextEvent(evtOpTimeoutMillis);
 			if (event.getEvent() != null) {
 				assertEquals(
 								"we didn't read the same size we had put into stream",
