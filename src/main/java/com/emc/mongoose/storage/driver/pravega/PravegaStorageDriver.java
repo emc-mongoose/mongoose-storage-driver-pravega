@@ -116,10 +116,10 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	protected final Serializer<I> evtSerializer = new DataItemSerializer<>(false);
 	protected final Serializer<ByteBuffer> evtDeserializer = new ByteBufferSerializer();
 	protected final EventWriterConfig evtWriterConfig = EventWriterConfig
-		.builder()
-		.maxBackoffMillis(1)
-		.retryAttempts(1)
-		.build();
+					.builder()
+					.maxBackoffMillis(1)
+					.retryAttempts(1)
+					.build();
 	protected final ReaderConfig evtReaderConfig = ReaderConfig.builder().build();
 	protected final String evtReaderGroupName = Long.toString(System.nanoTime());
 	protected final ThreadLocal<ReaderGroupConfig.ReaderGroupConfigBuilder> evtReaderGroupConfigBuilder = ThreadLocal.withInitial(ReaderGroupConfig::builder);
@@ -673,9 +673,8 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				val clientFactory = clientFactoryCache.computeIfAbsent(scopeName, clientFactoryCreateFunc);
 				val evtWriterCache = threadLocalEvtWriterCache.get();
 				val evtWriter = evtWriterCache.computeIfAbsent(
-					streamName,
-					(streamName_) -> clientFactory.createEventWriter(streamName_, evtSerializer, evtWriterConfig)
-				);
+								streamName,
+								(streamName_) -> clientFactory.createEventWriter(streamName_, evtSerializer, evtWriterConfig));
 				var routingKey = (String) null;
 				if (null == routingKeyFunc) {
 					for (var i = 0; i < opsCount; i++) {
@@ -722,23 +721,22 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		evtOp.startRequest();
 		val future = evtWriter.writeEvent(evtOp.item());
 		future
-			.handle(
-				(returned, thrown) -> {
-					if (null == thrown) {
-						evtOp.startResponse();
-						evtOp.finishResponse();
-						try {
-							evtOp.countBytesDone(evtOp.item().size());
-						} catch (final IOException ignored) {}
-						completeOperation(evtOp, SUCC);
-					} else {
-						completeFailedOperation(evtOp, thrown);
-					}
-					future.complete(null);
-					return null;
-				}
-			)
-			.get(evtOpTimeoutMillis, MILLISECONDS);
+						.handle(
+										(returned, thrown) -> {
+											if (null == thrown) {
+												evtOp.startResponse();
+												evtOp.finishResponse();
+												try {
+													evtOp.countBytesDone(evtOp.item().size());
+												} catch (final IOException ignored) {}
+												completeOperation(evtOp, SUCC);
+											} else {
+												completeFailedOperation(evtOp, thrown);
+											}
+											future.complete(null);
+											return null;
+										})
+						.get(evtOpTimeoutMillis, MILLISECONDS);
 		try {
 			evtOp.finishRequest();
 		} catch (final IllegalStateException ignored) {}
