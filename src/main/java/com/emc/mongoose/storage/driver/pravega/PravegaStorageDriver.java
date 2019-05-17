@@ -56,7 +56,6 @@ import io.pravega.client.byteStream.ByteStreamReader;
 import io.pravega.client.byteStream.impl.ByteStreamClientImpl;
 import io.pravega.client.netty.impl.ConnectionFactory;
 import io.pravega.client.netty.impl.ConnectionFactoryImpl;
-import io.pravega.client.netty.impl.ConnectionPoolImpl;
 import io.pravega.client.stream.EventStreamReader;
 import io.pravega.client.stream.EventStreamWriter;
 import io.pravega.client.stream.EventWriterConfig;
@@ -84,6 +83,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -120,7 +120,10 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 					.maxBackoffMillis(1)
 					.retryAttempts(1)
 					.build();
-	protected final ReaderConfig evtReaderConfig = ReaderConfig.builder().build();
+	protected final ReaderConfig evtReaderConfig = ReaderConfig
+		.builder()
+		.initialAllocationDelay(0)
+		.build();
 	protected final String evtReaderGroupName = Long.toString(System.nanoTime());
 	protected final ThreadLocal<ReaderGroupConfig.ReaderGroupConfigBuilder> evtReaderGroupConfigBuilder = ThreadLocal.withInitial(ReaderGroupConfig::builder);
 	protected final ScalingPolicy scalingPolicy;
@@ -258,7 +261,8 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	private final Map<ClientConfig, EventStreamClientFactoryCreateFunction> clientFactoryCreateFuncCache = new ConcurrentHashMap<>();
 	private final Map<String, EventStreamClientFactory> clientFactoryCache = new ConcurrentHashMap<>();
 	// * event stream writers
-	private final ThreadLocal<Map<String, EventStreamWriter<I>>> threadLocalEvtWriterCache = ThreadLocal.withInitial(ConcurrentHashMap::new);
+	private final ThreadLocal<Map<String, EventStreamWriter<I>>>
+		threadLocalEvtWriterCache = ThreadLocal.withInitial(ConcurrentHashMap::new);
 	// * reader group
 	private final Map<String, ReaderGroupConfig> evtReaderGroupConfigCache = new ConcurrentHashMap<>();
 	private final Map<URI, ReaderGroupManagerCreateFunction> evtReaderGroupManagerCreateFuncCache = new ConcurrentHashMap<>();
@@ -354,7 +358,8 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 
 	Controller createController(final ClientConfig clientConfig) {
 		val controllerConfig = ControllerImplConfig
-						.builder().clientConfig(clientConfig).maxBackoffMillis(MAX_BACKOFF_MILLIS).build();
+						.builder().clientConfig(clientConfig)
+				.maxBackoffMillis(MAX_BACKOFF_MILLIS).build();
 		return new ControllerImpl(controllerConfig, bgExecutor);
 	}
 
@@ -645,6 +650,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				LogUtil.exception(
 								Level.DEBUG, e, "{}: unexpected failure while trying to write {} events", stepId, opsCount);
 				completeOperations(ops, FAIL_UNKNOWN);
+				throwUncheckedIfInterrupted(e);
 			}
 		}
 	}
@@ -664,46 +670,43 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				val streamCreateFunc = streamCreateFuncCache.computeIfAbsent(scopeName, scopeCreateFunc);
 				val streamName = extractStreamName(anyEvtOp.dstPath());
 				scopeStreamsCache
-								.computeIfAbsent(scopeName, this::createInstanceCache)
-								.computeIfAbsent(streamName, streamCreateFunc);
+					.computeIfAbsent(scopeName, this::createInstanceCache)
+					.computeIfAbsent(streamName, streamCreateFunc);
 				// create the client factory create function if necessary
-				val clientFactoryCreateFunc = clientFactoryCreateFuncCache.computeIfAbsent(clientConfig,
-								EventStreamClientFactoryCreateFunctionImpl::new);
+				val clientFactoryCreateFunc = clientFactoryCreateFuncCache.computeIfAbsent(
+					clientConfig,
+					EventStreamClientFactoryCreateFunctionImpl::new
+				);
 				// create the client factory if necessary
 				val clientFactory = clientFactoryCache.computeIfAbsent(scopeName, clientFactoryCreateFunc);
 				val evtWriterCache = threadLocalEvtWriterCache.get();
 				val evtWriter = evtWriterCache.computeIfAbsent(
-								streamName,
-								(streamName_) -> clientFactory.createEventWriter(streamName_, evtSerializer, evtWriterConfig));
-				var routingKey = (String) null;
-				if (null == routingKeyFunc) {
-					for (var i = 0; i < opsCount; i++) {
+					streamName,
+					(streamName_) -> clientFactory.createEventWriter(streamName, evtSerializer, evtWriterConfig)
+				);
+				if(null == routingKeyFunc) {
+					for(var i = 0; i < opsCount; i++) {
 						val evtOp = ops.get(i);
 						prepare(evtOp);
-						writeEventSync(evtWriter, evtOp);
+						concurrencyThrottle.acquire();
+						evtOp.startRequest();
+						val evtWriteFuture = evtWriter.writeEvent(evtOp.item());
+						evtWriteFuture.handle((result, thrown) -> handleEventWrite(evtOp, thrown, evtWriteFuture));
+						try {
+							evtOp.finishRequest();
+						} catch (final IllegalStateException ignored) {
+						}
 					}
 				} else {
-					for (var i = 0; i < opsCount; i++) {
+					for(var i = 0; i < opsCount; i++) {
 						val evtOp = ops.get(i);
 						prepare(evtOp);
 						val evtItem = evtOp.item();
-						routingKey = routingKeyFunc.apply(evtItem);
+						val routingKey = routingKeyFunc.apply(evtItem);
+						concurrencyThrottle.acquire();
 						evtOp.startRequest();
-						evtWriter
-										.writeEvent(routingKey, evtItem)
-										.handle(
-														(returned, thrown) -> {
-															if (null == thrown) {
-																evtOp.startResponse();
-																evtOp.finishResponse();
-																try {
-																	evtOp.countBytesDone(evtItem.size());
-																} catch (final IOException ignored) {}
-																return completeOperation(evtOp, SUCC);
-															} else {
-																return completeFailedOperation(evtOp, thrown);
-															}
-														});
+						val evtWriteFuture = evtWriter.writeEvent(routingKey, evtItem);
+						evtWriteFuture.handle((result, thrown) -> handleEventWrite(evtOp, thrown, evtWriteFuture));
 						try {
 							evtOp.finishRequest();
 						} catch (final IllegalStateException ignored) {}
@@ -713,33 +716,25 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				LogUtil.exception(
 								Level.DEBUG, e, "{}: unexpected failure while trying to write {} events", stepId, opsCount);
 				completeOperations(ops, FAIL_UNKNOWN);
+				throwUncheckedIfInterrupted(e);
 			}
 		}
 	}
 
-	void writeEventSync(final EventStreamWriter<I> evtWriter, final O evtOp) {
-		evtOp.startRequest();
-		val future = evtWriter.writeEvent(evtOp.item());
-		future
-						.handle(
-										(returned, thrown) -> {
-											if (null == thrown) {
-												evtOp.startResponse();
-												evtOp.finishResponse();
-												try {
-													evtOp.countBytesDone(evtOp.item().size());
-												} catch (final IOException ignored) {}
-												completeOperation(evtOp, SUCC);
-											} else {
-												completeFailedOperation(evtOp, thrown);
-											}
-											future.complete(null);
-											return null;
-										})
-						.get(evtOpTimeoutMillis, MILLISECONDS);
-		try {
-			evtOp.finishRequest();
-		} catch (final IllegalStateException ignored) {}
+	boolean handleEventWrite(
+		final O evtOp, final Throwable thrown, final CompletableFuture<Void> evtWriteFuture
+	) {
+		concurrencyThrottle.release();
+		if (null == thrown) {
+			evtOp.startResponse();
+			evtOp.finishResponse();
+			try {
+				evtOp.countBytesDone(evtOp.item().size());
+			} catch (final IOException ignored) {}
+			return completeOperation(evtOp, SUCC);
+		} else {
+			return completeFailedOperation(evtOp, thrown);
+		}
 	}
 
 	void readEvent(final O evtOp, final String nodeAddr) {
