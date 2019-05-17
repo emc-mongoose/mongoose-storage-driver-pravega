@@ -121,9 +121,9 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 					.retryAttempts(1)
 					.build();
 	protected final ReaderConfig evtReaderConfig = ReaderConfig
-		.builder()
-		.initialAllocationDelay(0)
-		.build();
+					.builder()
+					.initialAllocationDelay(0)
+					.build();
 	protected final String evtReaderGroupName = Long.toString(System.nanoTime());
 	protected final ThreadLocal<ReaderGroupConfig.ReaderGroupConfigBuilder> evtReaderGroupConfigBuilder = ThreadLocal.withInitial(ReaderGroupConfig::builder);
 	protected final ScalingPolicy scalingPolicy;
@@ -261,8 +261,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	private final Map<ClientConfig, EventStreamClientFactoryCreateFunction> clientFactoryCreateFuncCache = new ConcurrentHashMap<>();
 	private final Map<String, EventStreamClientFactory> clientFactoryCache = new ConcurrentHashMap<>();
 	// * event stream writers
-	private final ThreadLocal<Map<String, EventStreamWriter<I>>>
-		threadLocalEvtWriterCache = ThreadLocal.withInitial(ConcurrentHashMap::new);
+	private final ThreadLocal<Map<String, EventStreamWriter<I>>> threadLocalEvtWriterCache = ThreadLocal.withInitial(ConcurrentHashMap::new);
 	// * reader group
 	private final Map<String, ReaderGroupConfig> evtReaderGroupConfigCache = new ConcurrentHashMap<>();
 	private final Map<URI, ReaderGroupManagerCreateFunction> evtReaderGroupManagerCreateFuncCache = new ConcurrentHashMap<>();
@@ -359,7 +358,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	Controller createController(final ClientConfig clientConfig) {
 		val controllerConfig = ControllerImplConfig
 						.builder().clientConfig(clientConfig)
-				.maxBackoffMillis(MAX_BACKOFF_MILLIS).build();
+						.maxBackoffMillis(MAX_BACKOFF_MILLIS).build();
 		return new ControllerImpl(controllerConfig, bgExecutor);
 	}
 
@@ -670,22 +669,20 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				val streamCreateFunc = streamCreateFuncCache.computeIfAbsent(scopeName, scopeCreateFunc);
 				val streamName = extractStreamName(anyEvtOp.dstPath());
 				scopeStreamsCache
-					.computeIfAbsent(scopeName, this::createInstanceCache)
-					.computeIfAbsent(streamName, streamCreateFunc);
+								.computeIfAbsent(scopeName, this::createInstanceCache)
+								.computeIfAbsent(streamName, streamCreateFunc);
 				// create the client factory create function if necessary
 				val clientFactoryCreateFunc = clientFactoryCreateFuncCache.computeIfAbsent(
-					clientConfig,
-					EventStreamClientFactoryCreateFunctionImpl::new
-				);
+								clientConfig,
+								EventStreamClientFactoryCreateFunctionImpl::new);
 				// create the client factory if necessary
 				val clientFactory = clientFactoryCache.computeIfAbsent(scopeName, clientFactoryCreateFunc);
 				val evtWriterCache = threadLocalEvtWriterCache.get();
 				val evtWriter = evtWriterCache.computeIfAbsent(
-					streamName,
-					(streamName_) -> clientFactory.createEventWriter(streamName, evtSerializer, evtWriterConfig)
-				);
-				if(null == routingKeyFunc) {
-					for(var i = 0; i < opsCount; i++) {
+								streamName,
+								(streamName_) -> clientFactory.createEventWriter(streamName, evtSerializer, evtWriterConfig));
+				if (null == routingKeyFunc) {
+					for (var i = 0; i < opsCount; i++) {
 						val evtOp = ops.get(i);
 						prepare(evtOp);
 						concurrencyThrottle.acquire();
@@ -694,11 +691,10 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 						evtWriteFuture.handle((result, thrown) -> handleEventWrite(evtOp, thrown, evtWriteFuture));
 						try {
 							evtOp.finishRequest();
-						} catch (final IllegalStateException ignored) {
-						}
+						} catch (final IllegalStateException ignored) {}
 					}
 				} else {
-					for(var i = 0; i < opsCount; i++) {
+					for (var i = 0; i < opsCount; i++) {
 						val evtOp = ops.get(i);
 						prepare(evtOp);
 						val evtItem = evtOp.item();
@@ -722,8 +718,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	}
 
 	boolean handleEventWrite(
-		final O evtOp, final Throwable thrown, final CompletableFuture<Void> evtWriteFuture
-	) {
+					final O evtOp, final Throwable thrown, final CompletableFuture<Void> evtWriteFuture) {
 		concurrencyThrottle.release();
 		if (null == thrown) {
 			evtOp.startResponse();
