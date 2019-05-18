@@ -46,6 +46,7 @@ import com.emc.mongoose.storage.driver.pravega.io.ByteStreamWriteChannel;
 import com.emc.mongoose.storage.driver.pravega.io.DataItemSerializer;
 import com.emc.mongoose.storage.driver.pravega.io.StreamDataType;
 import com.emc.mongoose.storage.driver.preempt.PreemptStorageDriverBase;
+import com.github.akurilov.commons.concurrent.ContextAwareThreadFactory;
 import com.github.akurilov.commons.system.DirectMemUtil;
 import com.github.akurilov.confuse.Config;
 import io.pravega.client.ByteStreamClientFactory;
@@ -56,6 +57,7 @@ import io.pravega.client.byteStream.ByteStreamReader;
 import io.pravega.client.byteStream.impl.ByteStreamClientImpl;
 import io.pravega.client.netty.impl.ConnectionFactory;
 import io.pravega.client.netty.impl.ConnectionFactoryImpl;
+import io.pravega.client.netty.impl.ConnectionPoolImpl;
 import io.pravega.client.stream.EventStreamReader;
 import io.pravega.client.stream.EventStreamWriter;
 import io.pravega.client.stream.EventWriterConfig;
@@ -90,6 +92,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
@@ -99,6 +102,7 @@ import io.pravega.common.util.AsyncIterator;
 import lombok.Value;
 import lombok.val;
 import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.ThreadContext;
 
 public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>>
 				extends PreemptStorageDriverBase<I, O> {
@@ -513,6 +517,57 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		return true;
 	}
 
+	final class IoWorkerThreadFactory
+	extends ContextAwareThreadFactory {
+
+		public IoWorkerThreadFactory() {
+			super("io_worker_" + stepId, true, ThreadContext.getContext());
+		}
+
+		@Override
+		public final Thread newThread(final Runnable task) {
+			return new IoWorkerThread(
+				task, threadNamePrefix + "#" + threadNumber.incrementAndGet(), daemonFlag, exceptionHandler,
+				threadContext
+			);
+		}
+
+		final class IoWorkerThread
+		extends LogContextThreadFactory.ContextAwareThread {
+
+			public IoWorkerThread(
+				final Runnable task, final String name, final boolean daemonFlag,
+				final UncaughtExceptionHandler exceptionHandler, final Map<String, String> threadContext
+			) {
+				super(task, name, daemonFlag, exceptionHandler, threadContext);
+			}
+
+			@Override
+			public final void interrupt() {
+				val evtWriterCache = threadLocalEvtWriterCache.get();
+				evtWriterCache.values().parallelStream().forEach(EventStreamWriter::close);
+				evtWriterCache.clear();
+				val txnEvtWriterCache = threadLocalTxnEvtWriterCache.get();
+				txnEvtWriterCache
+					.entrySet()
+					.parallelStream()
+					.forEach(
+						e -> {
+							e.getKey().close();
+							e.getValue().close();
+						}
+					);
+				txnEvtWriterCache.clear();
+				super.interrupt();
+			}
+		}
+	}
+
+	@Override
+	protected ThreadFactory ioWorkerThreadFactory() {
+		return new IoWorkerThreadFactory();
+	}
+
 	@Override
 	protected boolean isBatch(final List<O> ops, final int from, final int to) {
 		return CREATE.equals(ops.get(from).type());
@@ -547,6 +602,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		} else if (EVENTS.equals(streamDataType)) {
 			createEvents(ops);
 		}
+		ops.clear();
 	}
 
 	void noop(final O op) {
