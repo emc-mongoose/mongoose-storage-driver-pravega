@@ -57,7 +57,7 @@ ext {
 	modulesDepsFilePath = "${project.buildDir}${File.separator}modules.deps"
 	buildLibsPath = "build${File.separator}libs"
 	pravegaSrcDir = "${project.buildDir}${File.separator}pravega"
-	pravegaCommit = "ce3ba81"
+	pravegaCommit = "195f247"
 	pravegaDstDir = "${project.buildDir}${File.separator}pravega_"
 	pravegaClientJarDir = "${pravegaSrcDir}${File.separator}client${File.separator}${buildLibsPath}"
 	pravegaCommonJarDir = "${pravegaSrcDir}${File.separator}common${File.separator}${buildLibsPath}"

@@ -31,8 +31,6 @@ import com.emc.mongoose.base.logging.LogUtil;
 import com.emc.mongoose.base.logging.Loggers;
 import com.emc.mongoose.base.storage.Credential;
 import com.emc.mongoose.storage.driver.pravega.cache.ByteStreamClientFactoryCreateFunction;
-import com.emc.mongoose.storage.driver.pravega.cache.ByteStreamReaderCreateFunction;
-import com.emc.mongoose.storage.driver.pravega.cache.ByteStreamReaderCreateFunctionImpl;
 import com.emc.mongoose.storage.driver.pravega.cache.EventStreamClientFactoryCreateFunction;
 import com.emc.mongoose.storage.driver.pravega.cache.EventStreamClientFactoryCreateFunctionImpl;
 import com.emc.mongoose.storage.driver.pravega.cache.ReaderCreateFunction;
@@ -83,8 +81,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.Queue;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
@@ -282,8 +278,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	private final Map<ConnectionFactory, ByteStreamClientFactoryCreateFunction> byteStreamClientCreateFuncCache = new ConcurrentHashMap<>();
 	private final Map<Controller, ByteStreamClientFactory> byteStreamClientFactoryCache = new ConcurrentHashMap<>();
 	// * byte stream reader cache
-	private final Map<ByteStreamClientFactory, ByteStreamReaderCreateFunction> byteStreamReaderCreateFuncCache = new ConcurrentHashMap<>();
-	private final Map<String, Queue<ByteStreamReader>> byteStreamReaderPoolCache = new ConcurrentHashMap<>();
+	private final ThreadLocal<Map<String, ByteStreamReader>> threadLocalByteStreamReaderCache = ThreadLocal.withInitial(ConcurrentHashMap::new);
 	// * batch event writers
 	private final ThreadLocal<Map<EventStreamClientFactory, TransactionalEventStreamWriter<I>>> threadLocalTxnEvtWriterCache = ThreadLocal.withInitial(ConcurrentHashMap::new);
 
@@ -369,10 +364,6 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	ConnectionFactory createConnectionFactory(final ClientConfig clientConfig) {
 		val connPool = new ConnectionPoolImpl(clientConfig);
 		return new ConnectionFactoryImpl(clientConfig, connPool, bgExecutor);
-	}
-
-	<T> Queue<T> createInstancePool(final Object ignored) {
-		return new ArrayBlockingQueue<>(INSTANCE_POOL_SIZE);
 	}
 
 	<K, V> Map<K, V> createInstanceCache(final Object ignored) {
@@ -472,16 +463,11 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		val connFactory = connFactoryCache.computeIfAbsent(clientConfig, this::createConnectionFactory);
 		val clientFactoryCreateFunc = byteStreamClientCreateFuncCache.computeIfAbsent(
 						connFactory, ByteStreamClientFactoryCreateFunctionImpl::new);
-		val byteStreamReaderPool = byteStreamReaderPoolCache.computeIfAbsent(
-						streamName, this::createInstancePool);
-		var byteStreamReader_ = byteStreamReaderPool.poll();
-		if (null == byteStreamReader_) {
-			val clientFactory = byteStreamClientFactoryCache.computeIfAbsent(controller, clientFactoryCreateFunc);
-			val byteStreamReaderCreateFunc = byteStreamReaderCreateFuncCache.computeIfAbsent(
-							clientFactory, ByteStreamReaderCreateFunctionImpl::new);
-			byteStreamReader_ = byteStreamReaderCreateFunc.apply(streamName);
-		}
-		val byteStreamReader = byteStreamReader_;
+		val clientFactory = byteStreamClientFactoryCache.computeIfAbsent(controller, clientFactoryCreateFunc);
+		val byteStreamReaderCache = threadLocalByteStreamReaderCache.get();
+		val byteStreamReader = byteStreamReaderCache.computeIfAbsent(
+			streamName, clientFactory::createByteStreamReader
+		);
 		val byteStreamSize = byteStreamReader.fetchTailOffset();
 		val offset = Long.parseLong(streamName, idRadix);
 		return itemFactory.getItem(SLASH + scopeName + SLASH + streamName, offset, byteStreamSize);
@@ -557,6 +543,9 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 						}
 					);
 				txnEvtWriterCache.clear();
+				val byteStreamReaderCache = threadLocalByteStreamReaderCache.get();
+				byteStreamReaderCache.values().parallelStream().forEach(ByteStreamReader::close);
+				byteStreamReaderCache.clear();
 				super.interrupt();
 			}
 		}
@@ -910,16 +899,12 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				val connFactory = connFactoryCache.computeIfAbsent(clientConfig, this::createConnectionFactory);
 				val clientFactoryCreateFunc = byteStreamClientCreateFuncCache.computeIfAbsent(
 								connFactory, ByteStreamClientFactoryCreateFunctionImpl::new);
-				val byteStreamReaderPool = byteStreamReaderPoolCache.computeIfAbsent(
-								streamName, this::createInstancePool);
-				var byteStreamReader_ = byteStreamReaderPool.poll();
-				if (null == byteStreamReader_) {
-					val clientFactory = byteStreamClientFactoryCache.computeIfAbsent(controller, clientFactoryCreateFunc);
-					val byteStreamReaderCreateFunc = byteStreamReaderCreateFuncCache.computeIfAbsent(
-									clientFactory, ByteStreamReaderCreateFunctionImpl::new);
-					byteStreamReader_ = byteStreamReaderCreateFunc.apply(streamName);
-				}
-				val byteStreamReader = byteStreamReader_;
+				val byteStreamReaderCache = threadLocalByteStreamReaderCache.get();
+				val clientFactory = byteStreamClientFactoryCache.computeIfAbsent(controller, clientFactoryCreateFunc);
+				val byteStreamReader = byteStreamReaderCache.computeIfAbsent(
+					streamName, clientFactory::createByteStreamReader
+				);
+				byteStreamReader.reset();
 				streamOp.startRequest();
 				byteStreamReader
 								.onDataAvailable()
@@ -928,7 +913,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 													streamOp.startResponse();
 													streamOp.startDataResponse();
 													return handleByteStreamRead(
-																	streamOp, byteStreamReaderPool, byteStreamReader, availableByteCount, thrown);
+																	streamOp, byteStreamReader, availableByteCount, thrown);
 												});
 				try {
 					streamOp.finishRequest();
@@ -1079,7 +1064,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	}
 
 	int handleByteStreamRead(
-					final O streamOp, final Queue<ByteStreamReader> readerPool, final ByteStreamReader reader,
+					final O streamOp, final ByteStreamReader reader,
 					final int availableByteCount, final Throwable thrown) {
 		if (thrown == null) {
 			val buff = DirectMemUtil.getThreadLocalReusableBuff(availableByteCount);
@@ -1093,26 +1078,25 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 						reader
 										.onDataAvailable()
 										.handle(
-														(availableByteCount_, thrown_) -> handleByteStreamRead(streamOp, readerPool, reader, availableByteCount_, thrown_));
+														(availableByteCount_, thrown_) -> handleByteStreamRead(streamOp, reader, availableByteCount_, thrown_));
 					} else {
-						completeByteStreamRead(streamOp, readerPool, reader, null);
+						completeByteStreamRead(streamOp, reader, null);
 					}
 				} else { // end of byte stream
-					completeByteStreamRead(streamOp, readerPool, reader, null);
+					completeByteStreamRead(streamOp, reader, null);
 				}
 			} catch (final Throwable e) {
-				completeByteStreamRead(streamOp, readerPool, reader, e);
+				completeByteStreamRead(streamOp, reader, e);
 			}
 		} else {
-			completeByteStreamRead(streamOp, readerPool, reader, thrown);
+			completeByteStreamRead(streamOp, reader, thrown);
 		}
 		return availableByteCount;
 	}
 
 	void completeByteStreamRead(
-					final O streamOp, final Queue<ByteStreamReader> readerPool, final ByteStreamReader reader, final Throwable e) {
+					final O streamOp, final ByteStreamReader reader, final Throwable e) {
 		streamOp.finishResponse();
-		readerPool.offer(reader);
 		if (null == e) {
 			completeOperation(streamOp, SUCC);
 		} else if (e instanceof IOException) {
@@ -1145,17 +1129,6 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		byteStreamClientCreateFuncCache.clear();
 		closeAllWithTimeout(byteStreamClientFactoryCache.values());
 		byteStreamClientFactoryCache.clear();
-		byteStreamReaderCreateFuncCache.clear();
-		val allByteStreamReaders = new ArrayList<AutoCloseable>();
-		byteStreamReaderPoolCache
-						.values()
-						.forEach(
-										pool -> {
-											allByteStreamReaders.addAll(pool);
-											pool.clear();
-										});
-		byteStreamReaderPoolCache.clear();
-		//
 		scopeCreateFuncCache.clear();
 		streamCreateFuncCache.clear();
 		scopeStreamsCache.values().forEach(Map::clear);
@@ -1163,15 +1136,10 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		clientFactoryCreateFuncCache.clear();
 		closeAllWithTimeout(clientFactoryCache.values());
 		clientFactoryCache.clear();
-		//
-		closeAllWithTimeout(allByteStreamReaders);
 		clientConfigCache.clear();
-		//
 		closeAllWithTimeout(controllerCache.values());
 		controllerCache.clear();
-		//
 		endpointCache.clear();
-		//
 		bgExecutor.shutdownNow();
 	}
 
