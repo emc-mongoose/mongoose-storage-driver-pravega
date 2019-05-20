@@ -179,7 +179,9 @@ concurrency for the asynchronous operations, aka the *top gear of the "burst mod
 The count of the threads running/submitting the load operations execution. The meaningful values are usually only few
 times more than the count of the available CPU threads.
 
-### 4.2.2. Batch Mode Notes
+### 4.2.2. Batch Mode
+
+Mongoose uses the batch mode to work with the Pravega events as far as they are usually small.
 
 Assuming
 * Q<sub>output</sub>: `storage-driver-limit-queue-output`
