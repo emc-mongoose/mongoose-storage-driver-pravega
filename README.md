@@ -198,7 +198,7 @@ storage driver plugin which enqueues the task for each batch. The default input 
 (`storage-driver-limit-queue-input`) is 1,000,000. This yields the 32,768,000,000 instances of the load operations in
 the runtime and require ~ 6 terabytes of the heap memory. To avoid this behavior, override the defaults:
 
-Q<sub>input</sub> * S<sub>batch</sub> &le 1,000,000
+Q<sub>input</sub> * S<sub>batch</sub> &le; 1,000,000
 
 # 5. Usage
 
