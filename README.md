@@ -167,12 +167,38 @@ docker run \
 
 ## 4.2. Tuning
 
+### 4.2.1. Concurrency
+
+There are two configuration options controlling the load operations concurrency level.
+
+* `storage-driver-limit-concurrency`
+Limits the count of the active load operations at any moment of the time. The best practice is to set it to 0 (unlimited
+concurrency for the asynchronous operations, aka the *top gear of the "burst mode"*).
+
+* `storage-driver-threads`
+The count of the threads running/submitting the load operations execution. The meaningful values are usually only few
+times more than the count of the available CPU threads.
+
+### 4.2.2. Batch Mode Notes
+
+Assuming
+* Q<sub>output</sub>: `storage-driver-limit-queue-output`
+* Q<sub>input</sub>: `storage-driver-limit-queue-input`
+* S<sub>batch</sub>: `load-batch-size`
+
+the following equation should always be true:
 Q<sub>output</sub> &ge; Q<sub>input</sub> * S<sub>batch</sub>
 
-load-batch-size=100
-storage-driver-limit-concurrency=0
-storage-driver-limit-queue-input=10000
-storage-driver-threads=100
+otherwise, there may be the load operation results handling failures.
+
+### 4.2.3. Heap Memory Consumption
+
+The default Mongoose's `load-batch-size` configuration value is 32,768. The Pravega extension inherits the preemptive
+storage driver plugin which enqueues the task for each batch. The default input queue size
+(`storage-driver-limit-queue-input`) is 1,000,000. This yields the 32,768,000,000 instances of the load operations in
+the runtime and require ~ 6 terabytes of the heap memory. To avoid this behavior, override the defaults:
+
+Q<sub>input</sub> * S<sub>batch</sub> &le 1,000,000
 
 # 5. Usage
 
