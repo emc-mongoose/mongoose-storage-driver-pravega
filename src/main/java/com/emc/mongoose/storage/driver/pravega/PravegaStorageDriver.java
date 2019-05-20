@@ -592,7 +592,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		}
 		try {
 			ops.clear();
-		} catch(final UnsupportedOperationException e) {
+		} catch (final UnsupportedOperationException e) {
 			LogUtil.exception(Level.WARN, e, "Failed to clear the ops buffer");
 		}
 	}
