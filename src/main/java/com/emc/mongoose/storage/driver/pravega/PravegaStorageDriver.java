@@ -5,10 +5,8 @@ import static com.emc.mongoose.base.item.op.OpType.CREATE;
 import static com.emc.mongoose.base.item.op.OpType.NOOP;
 import static com.emc.mongoose.base.item.op.Operation.SLASH;
 import static com.emc.mongoose.base.item.op.Operation.Status.FAIL_IO;
-import static com.emc.mongoose.base.item.op.Operation.Status.FAIL_TIMEOUT;
 import static com.emc.mongoose.base.item.op.Operation.Status.FAIL_UNKNOWN;
 import static com.emc.mongoose.base.item.op.Operation.Status.INTERRUPTED;
-import static com.emc.mongoose.base.item.op.Operation.Status.RESP_FAIL_CORRUPT;
 import static com.emc.mongoose.base.item.op.Operation.Status.RESP_FAIL_UNKNOWN;
 import static com.emc.mongoose.base.item.op.Operation.Status.SUCC;
 import static com.emc.mongoose.storage.driver.pravega.PravegaConstants.DRIVER_NAME;
@@ -35,7 +33,6 @@ import com.emc.mongoose.storage.driver.pravega.cache.EventStreamClientFactoryCre
 import com.emc.mongoose.storage.driver.pravega.cache.EventStreamClientFactoryCreateFunctionImpl;
 import com.emc.mongoose.storage.driver.pravega.cache.ReaderCreateFunction;
 import com.emc.mongoose.storage.driver.pravega.cache.ReaderGroupManagerCreateFunction;
-import com.emc.mongoose.storage.driver.pravega.cache.ReaderGroupManagerCreateFunctionImpl;
 import com.emc.mongoose.storage.driver.pravega.cache.ScopeCreateFunction;
 import com.emc.mongoose.storage.driver.pravega.cache.ScopeCreateFunctionForStreamConfig;
 import com.emc.mongoose.storage.driver.pravega.cache.StreamCreateFunction;
@@ -579,19 +576,19 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	protected final void execute(final List<O> ops)
 					throws IllegalStateException {
 		val type = ops.get(0).type(); // any
-		switch(type) {
-			case CREATE:
-				if (transactionMode) {
-					createEventsTransaction(ops);
-				} else {
-					createEvents(ops);
-				}
-				break;
-			case READ:
-				readEvents(ops);
-				break;
-			default:
-				throw new AssertionError("Unsupported event operation type: " + type);
+		switch (type) {
+		case CREATE:
+			if (transactionMode) {
+				createEventsTransaction(ops);
+			} else {
+				createEvents(ops);
+			}
+			break;
+		case READ:
+			readEvents(ops);
+			break;
+		default:
+			throw new AssertionError("Unsupported event operation type: " + type);
 		}
 		ops.clear();
 	}
