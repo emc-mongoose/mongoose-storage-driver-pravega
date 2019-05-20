@@ -466,8 +466,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		val clientFactory = byteStreamClientFactoryCache.computeIfAbsent(controller, clientFactoryCreateFunc);
 		val byteStreamReaderCache = threadLocalByteStreamReaderCache.get();
 		val byteStreamReader = byteStreamReaderCache.computeIfAbsent(
-			streamName, clientFactory::createByteStreamReader
-		);
+						streamName, clientFactory::createByteStreamReader);
 		val byteStreamSize = byteStreamReader.fetchTailOffset();
 		val offset = Long.parseLong(streamName, idRadix);
 		return itemFactory.getItem(SLASH + scopeName + SLASH + streamName, offset, byteStreamSize);
@@ -503,7 +502,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	}
 
 	final class IoWorkerThreadFactory
-	extends ContextAwareThreadFactory {
+					extends ContextAwareThreadFactory {
 
 		public IoWorkerThreadFactory() {
 			super("io_worker_" + stepId, true, ThreadContext.getContext());
@@ -512,18 +511,16 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		@Override
 		public final Thread newThread(final Runnable task) {
 			return new IoWorkerThread(
-				task, threadNamePrefix + "#" + threadNumber.incrementAndGet(), daemonFlag, exceptionHandler,
-				threadContext
-			);
+							task, threadNamePrefix + "#" + threadNumber.incrementAndGet(), daemonFlag, exceptionHandler,
+							threadContext);
 		}
 
 		final class IoWorkerThread
-		extends LogContextThreadFactory.ContextAwareThread {
+						extends LogContextThreadFactory.ContextAwareThread {
 
 			public IoWorkerThread(
-				final Runnable task, final String name, final boolean daemonFlag,
-				final UncaughtExceptionHandler exceptionHandler, final Map<String, String> threadContext
-			) {
+							final Runnable task, final String name, final boolean daemonFlag,
+							final UncaughtExceptionHandler exceptionHandler, final Map<String, String> threadContext) {
 				super(task, name, daemonFlag, exceptionHandler, threadContext);
 			}
 
@@ -534,14 +531,13 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				evtWriterCache.clear();
 				val txnEvtWriterCache = threadLocalTxnEvtWriterCache.get();
 				txnEvtWriterCache
-					.entrySet()
-					.parallelStream()
-					.forEach(
-						e -> {
-							e.getKey().close();
-							e.getValue().close();
-						}
-					);
+								.entrySet()
+								.parallelStream()
+								.forEach(
+												e -> {
+													e.getKey().close();
+													e.getValue().close();
+												});
 				txnEvtWriterCache.clear();
 				val byteStreamReaderCache = threadLocalByteStreamReaderCache.get();
 				byteStreamReaderCache.values().parallelStream().forEach(ByteStreamReader::close);
@@ -902,8 +898,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				val byteStreamReaderCache = threadLocalByteStreamReaderCache.get();
 				val clientFactory = byteStreamClientFactoryCache.computeIfAbsent(controller, clientFactoryCreateFunc);
 				val byteStreamReader = byteStreamReaderCache.computeIfAbsent(
-					streamName, clientFactory::createByteStreamReader
-				);
+								streamName, clientFactory::createByteStreamReader);
 				byteStreamReader.reset();
 				streamOp.startRequest();
 				byteStreamReader

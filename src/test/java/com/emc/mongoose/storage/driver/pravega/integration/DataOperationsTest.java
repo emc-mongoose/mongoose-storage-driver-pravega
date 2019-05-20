@@ -87,7 +87,7 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
 			config.val("storage-auth-secret", null);
 
 			config.val("storage-driver-control-timeoutMillis", 10_000);
-			config.val("storage-driver-event-batch", false);
+			config.val("storage-driver-event-transaction", false);
 			config.val("storage-driver-event-key-enabled", true);
 			config.val("storage-driver-event-key-count", 0);
 			config.val("storage-driver-event-timeoutMillis", 100);
