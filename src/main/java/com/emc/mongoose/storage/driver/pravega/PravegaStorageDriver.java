@@ -103,8 +103,6 @@ import org.apache.logging.log4j.ThreadContext;
 public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>>
 				extends PreemptStorageDriverBase<I, O> {
 
-	private static final int INSTANCE_POOL_SIZE = 1000;
-
 	protected final Semaphore concurrencyThrottle;
 	protected final String uriSchema;
 	protected final String scopeName;
@@ -554,7 +552,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 
 	@Override
 	protected boolean isBatch(final List<O> ops, final int from, final int to) {
-		return CREATE.equals(ops.get(from).type());
+		return EVENTS.equals(streamDataType);
 	}
 
 	@Override
@@ -567,8 +565,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 			final String nodeAddr = op.nodeAddr();
 			switch (streamDataType) {
 			case EVENTS:
-				eventOperation(op, nodeAddr);
-				break;
+				throw new AssertionError("Event operations should be executed in the batch mode");
 			case BYTES:
 				byteStreamOperation(op, nodeAddr);
 				break;
@@ -581,10 +578,20 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	@Override
 	protected final void execute(final List<O> ops)
 					throws IllegalStateException {
-		if (transactionMode) {
-			createEventsTransaction(ops);
-		} else if (EVENTS.equals(streamDataType)) {
-			createEvents(ops);
+		val type = ops.get(0).type(); // any
+		switch(type) {
+			case CREATE:
+				if (transactionMode) {
+					createEventsTransaction(ops);
+				} else {
+					createEvents(ops);
+				}
+				break;
+			case READ:
+				readEvents(ops);
+				break;
+			default:
+				throw new AssertionError("Unsupported event operation type: " + type);
 		}
 		ops.clear();
 	}
@@ -592,20 +599,6 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	void noop(final O op) {
 		op.startRequest();
 		completeOperation(op, SUCC);
-	}
-
-	void eventOperation(final O op, final String nodeAddr) {
-		val type = op.type();
-		switch (type) {
-		case CREATE:
-			createEvents(List.of(op));
-			break;
-		case READ:
-			readEvent(op, nodeAddr);
-			break;
-		default:
-			throw new AssertionError("Unsupported event operation type: " + type);
-		}
 	}
 
 	void byteStreamOperation(final O op, final String nodeAddr) {
@@ -773,66 +766,8 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		}
 	}
 
-	void readEvent(final O evtOp, final String nodeAddr) {
-		try {
-			val endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
-			val streamName = extractStreamName(evtOp.dstPath());
-			val readerGroupConfigBuilder = evtReaderGroupConfigBuilder.get();
-			val readerGroupConfig = evtReaderGroupConfigCache.computeIfAbsent(
-							scopeName + SLASH + streamName, key -> readerGroupConfigBuilder.stream(key).build());
-			val readerGroupManagerCreateFunc = evtReaderGroupManagerCreateFuncCache.computeIfAbsent(
-							endpointUri, ReaderGroupManagerCreateFunctionImpl::new);
-			evtReaderGroupManagerCache.computeIfAbsent(
-							scopeName, key -> {
-								val readerGroupManager = readerGroupManagerCreateFunc.apply(key);
-								readerGroupManager.createReaderGroup(evtReaderGroupName, readerGroupConfig);
-								return readerGroupManager;
-							});
-			val clientConfig = clientConfigCache.computeIfAbsent(endpointUri, this::createClientConfig);
-			val clientFactoryCreateFunc = clientFactoryCreateFuncCache.computeIfAbsent(
-							clientConfig, EventStreamClientFactoryCreateFunctionImpl::new);
-			val clientFactory = clientFactoryCache.computeIfAbsent(scopeName, clientFactoryCreateFunc);
-			val readerCreateFunc = eventStreamReaderCreateFuncCache.computeIfAbsent(
-							clientFactory, ReaderCreateFunctionImpl::new);
-			val evtReader = eventStreamReaderCache.computeIfAbsent(evtReaderGroupName, readerCreateFunc);
-			evtOp.startRequest();
-			evtOp.finishRequest();
-			val evtRead = evtReader.readNextEvent(evtOpTimeoutMillis);
-			evtOp.startResponse();
-			evtOp.finishResponse();
-			if (null == evtRead) {
-				Loggers.MSG.info(
-								"{}: no more events in the stream \"{}\" @ the scope \"{}\"", stepId, streamName, scopeName);
-				completeOperation(evtOp, FAIL_TIMEOUT);
-			} else {
-				val evtData = evtRead.getEvent();
-				if (null == evtData) {
-					val streamPos = evtRead.getPosition();
-					lastFailedStreamPosLock.lock();
-					try {
-						if (streamPos.equals(lastFailedStreamPos)) {
-							Loggers.MSG.info("{}: no more events @ position {}", stepId, streamPos);
-							completeOperation(evtOp, FAIL_TIMEOUT);
-						} else {
-							lastFailedStreamPos = streamPos;
-							Loggers.ERR.warn("{}: corrupted event @ position {}", stepId, streamPos);
-							completeOperation(evtOp, RESP_FAIL_CORRUPT);
-						}
-					} finally {
-						lastFailedStreamPosLock.unlock();
-					}
-				} else {
-					val bytesDone = evtData.remaining();
-					val evtItem = evtOp.item();
-					evtItem.size(bytesDone);
-					evtOp.countBytesDone(evtItem.size());
-					completeOperation(evtOp, SUCC);
-				}
-			}
-		} catch (final Throwable thrown) {
-			throwUncheckedIfInterrupted(thrown);
-			completeFailedOperation(evtOp, thrown);
-		}
+	void readEvents(final List<O> evtOps) {
+		// TODO
 	}
 
 	void createByteStream(final O streamOp, final String nodeAddr) {

@@ -112,28 +112,28 @@ Create Event Transaction Stream Test
     Log  ${std_out}
     Validate Metrics Total Log File  ${step_id}  CREATE  ${count_limit}  0  12300000
 
-Events Pipeline Test
-    [Tags]  events_pipeline
-    ${node_addr} =  Get Environment Variable  SERVICE_HOST  127.0.0.1
-    ${step_id} =  Set Variable  e2e_latency
-    ${count_limit} =  Set Variable  10000
-    Remove Directory  ${LOG_DIR}/${step_id}  recursive=True
-    ${args} =  Catenate  SEPARATOR= \\\n\t
-    ...  --storage-net-node-addrs=${node_addr}
-    ...  --storage-namespace=scope7 \
-    ...  --storage-driver-limit-concurrency=10
-    ...  --storage-driver-threads=10
-    ...  --item-output-path=stream7 \
-    ...  --run-scenario=${MONGOOSE_CONTAINER_DATA_DIR}/create_read_pipeline.js \
-    ...  --load-step-id=${step_id} \
-    ...  --item-data-size=10KB \
-    ...  --load-op-limit-count=${count_limit} \
-    ...  --output-metrics-trace-persist
-    &{env_params} =  Create Dictionary
-    ${std_out} =  Execute Mongoose Scenario  ${DATA_DIR}  ${env_params}  ${args}
-    Log  ${std_out}
-    Validate Create Read Pipeline Op Trace Log File  file_name=${LOG_DIR}/${step_id}/op.trace.csv
-    ...  err_count_limit=10  read_count_limit=${count_limit}
+#Events Pipeline Test
+#    [Tags]  events_pipeline
+#    ${node_addr} =  Get Environment Variable  SERVICE_HOST  127.0.0.1
+#    ${step_id} =  Set Variable  e2e_latency
+#    ${count_limit} =  Set Variable  10000
+#    Remove Directory  ${LOG_DIR}/${step_id}  recursive=True
+#    ${args} =  Catenate  SEPARATOR= \\\n\t
+#    ...  --storage-net-node-addrs=${node_addr}
+#    ...  --storage-namespace=scope7 \
+#    ...  --storage-driver-limit-concurrency=10
+#    ...  --storage-driver-threads=10
+#    ...  --item-output-path=stream7 \
+#    ...  --run-scenario=${MONGOOSE_CONTAINER_DATA_DIR}/create_read_pipeline.js \
+#    ...  --load-step-id=${step_id} \
+#    ...  --item-data-size=10KB \
+#    ...  --load-op-limit-count=${count_limit} \
+#    ...  --output-metrics-trace-persist
+#    &{env_params} =  Create Dictionary
+#    ${std_out} =  Execute Mongoose Scenario  ${DATA_DIR}  ${env_params}  ${args}
+#    Log  ${std_out}
+#    Validate Create Read Pipeline Op Trace Log File  file_name=${LOG_DIR}/${step_id}/op.trace.csv
+#    ...  err_count_limit=10  read_count_limit=${count_limit}
 
 *** Keyword ***
 
