@@ -16,8 +16,8 @@
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3.2.2.1. [Additional Node](#3221-additional-node)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3.2.2.2. [Entry Node](#3222-entry-node)<br/>
 4. [Configuration](#4-configuration)<br/>
-nbsp;&nbsp;4.1. [Specific Options](#41-specific-options)<br/>
-nbsp;&nbsp;4.2. [Tuning](#42-tuning)<br/>
+&nbsp;&nbsp;4.1. [Specific Options](#41-specific-options)<br/>
+&nbsp;&nbsp;4.2. [Tuning](#42-tuning)<br/>
 5. [Usage](#5-usage)<br/>
 &nbsp;&nbsp;5.1. [Event Stream Operations](#51-event-stream-operations)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;5.1.1. [Create](#511-create)<br/>
@@ -52,7 +52,7 @@ Mongoose and Pravega are using quite different concepts. So it's necessary to de
 
 | Pravega | Mongoose |
 |---------|----------|
-| [Stream](http://pravega.io/docs/latest/pravega-concepts/#streams) | *Item Path* or *Byte Stream* |
+| [Stream](http://pravega.io/docs/latest/pravega-concepts/#streams) | *Item Path* or *Data Item* |
 | Scope | Storage Namespace
 | [Event](http://pravega.io/docs/latest/pravega-concepts/#events) | *Data Item* |
 | Stream Segment | N/A |
@@ -67,8 +67,8 @@ Mongoose and Pravega are using quite different concepts. So it's necessary to de
     * `path`: not supported
     * `token`: not supported
 * Supported load operations:
-    * `create` (events)
-    * `read` (streams)
+    * `create` (events, byte streams)
+    * `read` (events, byte streams)
     * `delete` (streams)
 * Storage-specific:
     * [Scaling policies](#515-manual-scaling)
@@ -167,7 +167,7 @@ docker run \
 
 ## 4.2. Tuning
 
-Q<sup>output</sup> = Q<sup>input</sup> * S<sup>batch</sup>
+Q<sub>output</sub> &ge; Q<sub>input</sub> * S<sub>batch</sub>
 
 load-batch-size=100
 storage-driver-limit-concurrency=0
