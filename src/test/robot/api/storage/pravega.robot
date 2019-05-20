@@ -92,7 +92,7 @@ Read All Byte Streams Test
     Validate Metrics Total Log File  ${step_id}  READ  ${count_limit}  0  104857600
 
 Create Event Transaction Stream Test
-    [Tags]  batch_create_event_stream
+    [Tags]  create_event_transaction_stream
     ${node_addr} =  Get Environment Variable  SERVICE_HOST  127.0.0.1
     ${step_id} =  Set Variable  batch_create_event_stream
     ${count_limit} =  Set Variable  100000
