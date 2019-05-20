@@ -562,7 +562,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 			final String nodeAddr = op.nodeAddr();
 			switch (streamDataType) {
 			case EVENTS:
-				throw new AssertionError("Event operations should be executed in the batch mode");
+				execute(List.of(op));
 			case BYTES:
 				byteStreamOperation(op, nodeAddr);
 				break;
@@ -590,7 +590,11 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		default:
 			throw new AssertionError("Unsupported event operation type: " + type);
 		}
-		ops.clear();
+		try {
+			ops.clear();
+		} catch(final UnsupportedOperationException e) {
+			LogUtil.exception(Level.WARN, e, "Failed to clear the ops buffer");
+		}
 	}
 
 	void noop(final O op) {

@@ -18,6 +18,9 @@
 4. [Configuration](#4-configuration)<br/>
 &nbsp;&nbsp;4.1. [Specific Options](#41-specific-options)<br/>
 &nbsp;&nbsp;4.2. [Tuning](#42-tuning)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;4.2.1. [Concurrency](#421-concurrency)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;4.2.2. [Batch Mode](#422-batch-mode)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;4.2.3. [Heap Memory Consumption](#423-heap-memory-consumption)<br/>
 5. [Usage](#5-usage)<br/>
 &nbsp;&nbsp;5.1. [Event Stream Operations](#51-event-stream-operations)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;5.1.1. [Create](#511-create)<br/>
