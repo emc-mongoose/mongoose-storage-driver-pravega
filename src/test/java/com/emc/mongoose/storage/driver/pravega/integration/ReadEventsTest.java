@@ -38,35 +38,33 @@ public class ReadEventsTest {
 
 	@Before
 	public void setUp()
-	throws Exception {
+					throws Exception {
 		dataInput = DataInput.instance(null, "7a42d9c483244167", new SizeInBytes(1024 * 1024 - 8), 16);
 		val config = DataOperationsTest.getConfig();
 		driver = new PravegaStorageDriver(
-			getClass().getSimpleName(), dataInput, config.configVal("storage"), false, 32768
-		);
+						getClass().getSimpleName(), dataInput, config.configVal("storage"), false, 32768);
 		driver.start();
 		evtItems = new ArrayList<>(EVENT_COUNT);
-		for(var i = 0; i < EVENT_COUNT; i ++) {
+		for (var i = 0; i < EVENT_COUNT; i++) {
 			evtItems.add(new DataItemImpl(Integer.toString(i), i, MIB));
 		}
 		val createOps = evtItems
-			.stream()
-			.map(
-				evtItem -> new DataOperationImpl<>(
-					0, CREATE, evtItem, SLASH + STREAM_NAME, SLASH + STREAM_NAME, Credential.NONE, null, 0
-				)
-			)
-			.collect(Collectors.toList());
-		for(var i = 0; i < EVENT_COUNT; i += driver.put(createOps, i, EVENT_COUNT));
+						.stream()
+						.map(
+										evtItem -> new DataOperationImpl<>(
+														0, CREATE, evtItem, SLASH + STREAM_NAME, SLASH + STREAM_NAME, Credential.NONE, null, 0))
+						.collect(Collectors.toList());
+		for (var i = 0; i < EVENT_COUNT; i += driver.put(createOps, i, EVENT_COUNT))
+			;
 		val createResults = new ArrayList<DataOperation<DataItem>>(EVENT_COUNT);
 		var n = 0;
-		for(var i = 0; i < EVENT_COUNT; i += driver.get(createResults, EVENT_COUNT - i)) {
-			if(n < i) {
+		for (var i = 0; i < EVENT_COUNT; i += driver.get(createResults, EVENT_COUNT - i)) {
+			if (n < i) {
 				System.out.println((i + 1) + " events been written...");
 				n = i;
 			}
 		}
-		for(var i = 0; i < EVENT_COUNT; i ++) {
+		for (var i = 0; i < EVENT_COUNT; i++) {
 			val createResult = createResults.get(i);
 			assertEquals(SUCC, createResult.status());
 			assertEquals(MIB, createResult.countBytesDone());
@@ -75,32 +73,31 @@ public class ReadEventsTest {
 
 	@After
 	public void tearDown()
-	throws Exception {
+					throws Exception {
 		driver.close();
 		dataInput.close();
 	}
 
 	@Test
 	public void testReadEvents1()
-	throws Exception {
+					throws Exception {
 		val readOps = evtItems
-			.stream()
-			.map(
-				evtItem -> new DataOperationImpl<>(
-					0, READ, evtItem, SLASH + STREAM_NAME, SLASH + STREAM_NAME, Credential.NONE, null, 0
-				)
-			)
-			.collect(Collectors.toList());
-		for(var i = 0; i < EVENT_COUNT; i += driver.put(readOps, i, EVENT_COUNT));
+						.stream()
+						.map(
+										evtItem -> new DataOperationImpl<>(
+														0, READ, evtItem, SLASH + STREAM_NAME, SLASH + STREAM_NAME, Credential.NONE, null, 0))
+						.collect(Collectors.toList());
+		for (var i = 0; i < EVENT_COUNT; i += driver.put(readOps, i, EVENT_COUNT))
+			;
 		val readResults = new ArrayList<DataOperation<DataItem>>(EVENT_COUNT);
 		var n = 0;
-		for(var i = 0; i < EVENT_COUNT; i += driver.get(readResults, EVENT_COUNT - i)) {
-			if(n < i) {
+		for (var i = 0; i < EVENT_COUNT; i += driver.get(readResults, EVENT_COUNT - i)) {
+			if (n < i) {
 				System.out.println((i + 1) + " events been read...");
 				n = i;
 			}
 		}
-		for(var i = 0; i < EVENT_COUNT; i ++) {
+		for (var i = 0; i < EVENT_COUNT; i++) {
 			val readResult = readResults.get(i);
 			assertEquals("Event #" + i + " read failed", SUCC, readResult.status());
 			assertEquals(MIB, readResult.countBytesDone());
@@ -109,25 +106,24 @@ public class ReadEventsTest {
 
 	@Test
 	public void testReadEvents2()
-	throws Exception {
+					throws Exception {
 		val readOps = evtItems
-			.stream()
-			.map(
-				evtItem -> new DataOperationImpl<>(
-					0, READ, evtItem, SLASH + STREAM_NAME, SLASH + STREAM_NAME, Credential.NONE, null, 0
-				)
-			)
-			.collect(Collectors.toList());
-		for(var i = 0; i < EVENT_COUNT; i += driver.put(readOps, i, EVENT_COUNT));
+						.stream()
+						.map(
+										evtItem -> new DataOperationImpl<>(
+														0, READ, evtItem, SLASH + STREAM_NAME, SLASH + STREAM_NAME, Credential.NONE, null, 0))
+						.collect(Collectors.toList());
+		for (var i = 0; i < EVENT_COUNT; i += driver.put(readOps, i, EVENT_COUNT))
+			;
 		val readResults = new ArrayList<DataOperation<DataItem>>(EVENT_COUNT);
 		var n = 0;
-		for(var i = 0; i < EVENT_COUNT; i += driver.get(readResults, EVENT_COUNT - i)) {
-			if(n < i) {
+		for (var i = 0; i < EVENT_COUNT; i += driver.get(readResults, EVENT_COUNT - i)) {
+			if (n < i) {
 				System.out.println((i + 1) + " events been read...");
 				n = i;
 			}
 		}
-		for(var i = 0; i < EVENT_COUNT; i ++) {
+		for (var i = 0; i < EVENT_COUNT; i++) {
 			val readResult = readResults.get(i);
 			assertEquals("Event #" + i + " read failed", SUCC, readResult.status());
 			assertEquals(MIB, readResult.countBytesDone());

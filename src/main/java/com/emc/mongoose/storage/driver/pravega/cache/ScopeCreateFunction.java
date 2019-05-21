@@ -1,9 +1,5 @@
 package com.emc.mongoose.storage.driver.pravega.cache;
 
-import io.pravega.client.stream.StreamConfiguration;
-
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
 /**

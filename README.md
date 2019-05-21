@@ -8,44 +8,58 @@
 
 1. [Introduction](#1-introduction)<br/>
 2. [Features](#2-features)<br/>
-3. [Usage](#3-usage)<br/>
+3. [Deployment](#3-deployment)<br/>
 &nbsp;&nbsp;3.1. [Basic](#31-basic)<br/>
 &nbsp;&nbsp;3.2. [Docker](#32-docker)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;3.2.1. [Standalone](#321-standalone)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;3.2.2. [Distributed](#322-distributed)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3.2.2.1. [Additional Node](#3221-additional-node)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3.2.2.2. [Entry Node](#3222-entry-node)<br/>
-&nbsp;&nbsp;3.3. [Specific Configuration Options](#33-specific-configuration-options)<br/>
-&nbsp;&nbsp;3.4. [Specific Cases](#33-specific-cases)<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;3.4.1. [Manual Scaling](#341-manual-scaling)<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;3.4.2. [Multiple Destination Streams](#342-multiple-destination-streams)<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;3.4.3. [End-to-end Latency](#343-end-to-end-latency)<br/>
-4. [Design](#4-design)<br/>
-&nbsp;&nbsp;4.1. [Event Stream Operations](#41-event-stream-operations)<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;4.1.1. [Create](#411-create)<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;4.1.1.1. [Transactional](#4111-transactional)<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;4.1.2. [Read](#412-read)<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;4.1.3. [Update](#413-update)<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;4.1.4. [Delete](#414-delete)<br/>
-&nbsp;&nbsp;4.2. [Byte Stream Operations](#42-byte-stream-operations)<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;4.2.1. [Create](#421-create)<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;4.2.2. [Read](#422-read)<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;4.2.3. [Update](#423-update)<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;4.2.4. [Delete](#424-delete)<br/>
-&nbsp;&nbsp;4.3. [Open Issues](#43-open-issues)<br/>
-5. [Development](#5-development)<br/>
-&nbsp;&nbsp;5.1. [Build](#51-build)<br/>
-&nbsp;&nbsp;5.2. [Test](#52-test)<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;5.2.1. [Automated](#521-automated)<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;5.2.1.1. [Unit](#5211-unit)<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;5.2.1.2. [Integration](#5212-integration)<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;5.2.1.3. [Functional](#5213-functional)<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;5.2.2. [Manual](#522-manual)<br/>
+4. [Configuration](#4-configuration)<br/>
+&nbsp;&nbsp;4.1. [Specific Options](#41-specific-options)<br/>
+&nbsp;&nbsp;4.2. [Tuning](#42-tuning)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;4.2.1. [Concurrency](#421-concurrency)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;4.2.2. [Batch Mode](#422-batch-mode)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;4.2.3. [Heap Memory Consumption](#423-heap-memory-consumption)<br/>
+5. [Usage](#5-usage)<br/>
+&nbsp;&nbsp;5.1. [Event Stream Operations](#51-event-stream-operations)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;5.1.1. [Create](#511-create)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;5.1.1.1. [Transactional](#5111-transactional)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;5.1.2. [Read](#512-read)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;5.1.3. [Update](#513-update)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;5.1.4. [Delete](#514-delete)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;5.1.5. [End-to-end Latency](#515-end-to-end-latency)<br/>
+&nbsp;&nbsp;5.2. [Byte Stream Operations](#52-byte-stream-operations)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;5.2.1. [Create](#521-create)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;5.2.2. [Read](#522-read)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;5.2.3. [Update](#523-update)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;5.2.4. [Delete](#524-delete)<br/>
+&nbsp;&nbsp;5.3. [Misc](#53-misc)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;5.3.1. [Manual Scaling](#531-manual-scaling)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;5.3.2. [Multiple Destination Streams](#532-multiple-destination-streams)<br/>
+6. [Open Issues](#6-open-issues)<br/>
+7. [Development](#7-development)<br/>
+&nbsp;&nbsp;7.1. [Build](#71-build)<br/>
+&nbsp;&nbsp;7.2. [Test](#72-test)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;7.2.1. [Automated](#721-automated)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;7.2.1.1. [Unit](#7211-unit)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;7.2.1.2. [Integration](#7212-integration)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;7.2.1.3. [Functional](#7213-functional)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;7.2.2. [Manual](#722-manual)<br/>
 
 # 1. Introduction
 
-The storage driver extends the Mongoose's Abstract Coop Storage Driver. It's being built against the specified Pravega
-source commit number.
+Mongoose and Pravega are using quite different concepts. So it's necessary to determine how
+[Pravega-specific terms](http://pravega.io/docs/latest/terminology/) are mapped to the
+[Mongoose abstractions]((https://gitlab.com/emcmongoose/mongoose/tree/master/doc/design/architecture#1-basic-terms)).
+
+| Pravega | Mongoose |
+|---------|----------|
+| [Stream](http://pravega.io/docs/latest/pravega-concepts/#streams) | *Item Path* or *Data Item* |
+| Scope | Storage Namespace
+| [Event](http://pravega.io/docs/latest/pravega-concepts/#events) | *Data Item* |
+| Stream Segment | N/A |
+
 
 # 2. Features
 
@@ -56,28 +70,28 @@ source commit number.
     * `path`: not supported
     * `token`: not supported
 * Supported load operations:
-    * `create` (events)
-    * `read` (streams)
+    * `create` (events, byte streams)
+    * `read` (events, byte streams)
     * `delete` (streams)
 * Storage-specific:
-    * [Scaling policies](#341-manual-scaling)
+    * [Scaling policies](#515-manual-scaling)
     * Stream sealing
     * Routing keys
     * Byte streams
-    * [Transactional events write](#4111-transactional) (batch mode)
+    * [Transactional events write](#5111-transactional) (batch mode)
 
-# 3. Usage
-
-Java 11+ is required to build/run.
+# 3. Deployment
 
 ## 3.1. Basic
+
+Java 11+ is required to build/run.
 
 1. Get the latest `mongoose-base` jar from the 
 [maven repo](http://repo.maven.apache.org/maven2/com/github/emc-mongoose/mongoose-base/)
 and put it to your working directory. Note the particular version, which is referred as *BASE_VERSION* below.
 
-2. Get the latest `mongoose-storage-driver-coop` jar from the
-[maven repo](http://repo.maven.apache.org/maven2/com/github/emc-mongoose/mongoose-storage-driver-coop/)
+2. Get the latest `mongoose-storage-driver-preempt` jar from the
+[maven repo](http://repo.maven.apache.org/maven2/com/github/emc-mongoose/mongoose-storage-driver-preempt/)
 and put it to the `~/.mongoose/<BASE_VERSION>/ext` directory.
 
 3. Get the latest `mongoose-storage-driver-pravega` jar from the
@@ -90,6 +104,8 @@ java -jar mongoose-base-<BASE_VERSION>.jar \
     --storage-namespace=scope1 \
     --storage-net-node-addrs=<NODE_IP_ADDRS> \
     --storage-net-node-port=9090 \
+    --load-batch-size=100 \
+    --storage-driver-limit-queue-input=10000 \
     ...
 ```
 
@@ -103,6 +119,8 @@ docker run \
     emcmongoose/mongoose-storage-driver-pravega \
     --storage-namespace=scope1 \
     --storage-net-node-addrs=<NODE_IP_ADDRS> \
+    --load-batch-size=100 \
+    --storage-driver-limit-queue-input=10000 \
     ...
 ```
 
@@ -126,10 +144,15 @@ docker run \
     emcmongoose/mongoose-storage-driver-pravega \
     --load-step-node-addrs=<ADDR1,ADDR2,...> \
     --storage-net-node-addrs=<NODE_IP_ADDRS> \
+    --storage-namespace=scope1 \
+    --load-batch-size=100 \
+    --storage-driver-limit-queue-input=10000 \
     ...
 ```
 
-## 3.3. Specific Configuration Options
+# 4. Configuration
+
+## 4.1. Specific Options
 
 | Name                              | Type            | Default Value | Description                                      |
 |:----------------------------------|:----------------|:--------------|:-------------------------------------------------|
@@ -145,35 +168,108 @@ docker run \
 | storage-net-node-addrs            | list of strings | 127.0.0.1     | The list of the Pravega storage nodes to use for the load
 | storage-net-node-port             | integer         | 9090          | The default port of the Pravega storage nodes, should be explicitly set to 9090 (the value used by Pravega by default)
 
-## 3.4. Specific Cases
+## 4.2. Tuning
 
-### 3.4.1. Manual Scaling
+### 4.2.1. Concurrency
 
-It's required to make a manual destination stream scaling while the event writing load is in progress in order to see
-if the rate changes. The additional load step may be used to perform such scaling. In order to not perform any
-additional load it should be explicitly configured to do a minimal work:
-* load operations count limit: 1
-* concurrency limit: 1
-* payload size: 1 bytes
+There are two configuration options controlling the load operations concurrency level.
 
-For more details see the corresponding [scenario content](https://github.com/emc-mongoose/mongoose-storage-driver-pravega/blob/master/src/main/resources/example/scenario/js/pravega/manual_scaling.js).
+* `storage-driver-limit-concurrency`
+Limits the count of the active load operations at any moment of the time. The best practice is to set it to 0 (unlimited
+concurrency for the asynchronous operations, aka the *top gear of the "burst mode"*).
 
-### 3.4.2. Multiple Destination Streams
+* `storage-driver-threads`
+The count of the threads running/submitting the load operations execution. The meaningful values are usually only few
+times more than the count of the available CPU threads.
 
-The configuration [expression language](https://github.com/emc-mongoose/mongoose-base/tree/master/src/main/java/com/emc/mongoose/base/config/el#52-variable-items-output-path)
-feature may be used to specify multiple destination streams to write the events. The example of the command to write
-the events into 1000 destination streams (in the random order):
+### 4.2.2. Batch Mode
 
+Mongoose uses the batch mode to work with the Pravega events as far as they are usually small.
+
+Assuming
+* Q<sub>output</sub>: `storage-driver-limit-queue-output`
+* Q<sub>input</sub>: `storage-driver-limit-queue-input`
+* S<sub>batch</sub>: `load-batch-size`
+
+the following equation should always be true:
+Q<sub>output</sub> &ge; Q<sub>input</sub> * S<sub>batch</sub>
+
+otherwise, there may be the load operation results handling failures.
+
+### 4.2.3. Heap Memory Consumption
+
+The default Mongoose's `load-batch-size` configuration value is 32,768. The Pravega extension inherits the preemptive
+storage driver plugin which enqueues the task for each batch. The default input queue size
+(`storage-driver-limit-queue-input`) is 1,000,000. This yields the 32,768,000,000 instances of the load operations in
+the runtime and require ~ 6 terabytes of the heap memory. To avoid this behavior, override the defaults:
+
+Q<sub>input</sub> * S<sub>batch</sub> &le; 1,000,000
+
+# 5. Usage
+
+## 5.1. Event Stream Operations
+
+Mongoose should perform the load operations on the *events* when the configuration option `item-type` is set to `data`.
+
+### 5.1.1. Create
+
+Steps:
+1. Get the endpoint URI from the cache.
+2. Check if the corresponding `StreamManager` exists using the cache, create a new one if it doesn't.
+3. Check if the destination scope exists using the cache, create a new one if it doesn't.
+4. Check if the destination stream exists using the cache, create a new one if it doesn't.
+5. Check if the corresponding `ClientFactory` exists using the cache, create a new one if it doesn't.
+6. Check if the `EventStreamWriter` exists using the cache, create new one if it doesn't.
+7. Submit the event writing, use a routing key if configured.
+8. Submit the load operation completion handler.
+
+#### 5.1.1.1. Transactional
+
+Using the [transactions](http://pravega.io/docs/latest/transactions/#pravega-transactions) to create the events allows
+to write the events in the batch mode. The maximum count of the events per transaction is defined by the
+`load-batch-size` configuration option value.
+
+Example:
 ```bash
 docker run \
     --network host \
     emcmongoose/mongoose-storage-driver-pravega \
     --storage-namespace=scope1 \
-    --item-data-size=1000 \
-    --item-output-path=stream-%p\{1000\;1\}
+    --storage-driver-event-batch \
+    --load-step-limit-count=100000 \
+    --load-batch-size=1024 \
+    --item-output-path=eventsStream1 \
+    --item-data-size=10KB
 ```
 
-### 3.4.3. End-to-end Latency
+### 5.1.2. Read
+
+**Notes**:
+> * The Pravega storage doesn't support reading the stream events in the random order.
+
+There is also another option, called `storage-driver-read-timeoutMillis`. Pravega documentation says it only works when
+there is no available event in the stream. `readNextEvent()` will block for the specified time in ms. So, in theory 0
+and 1 should work just fine. They do not. In practice, this value should be somewhere between 100 and 2000 ms (2000 is
+Pravega default value).
+
+Steps:
+1. Get the endpoint URI from the cache.
+2. Check if the corresponding `StreamManager` exists using the cache, create a new one if it doesn't.
+3. Check if the corresponding `ClientFactory` exists using the cache, create a new one if it doesn't.
+4. Check if the corresponding `EventStreamReader<ByteBuffer>` exists using the cache, create a new one if it doesn't.
+5. Read the next event, verify the returned byte buffer content if configured so, discard it otherwise.
+6. Invoke the load operation completion handler.
+
+### 5.1.3. Update
+
+Not supported. A stream append may be performed using the `create` load operation type and a same stream previously used
+to write the events.
+
+### 5.1.4. Delete
+
+Not supported.
+
+### 5.1.5. End-to-end Latency
 
 The end-to-end latency is a time span between the CREATE and READ operations executed for the same item. The end-to-end 
 latency may be measured using Mongoose's 
@@ -202,96 +298,17 @@ docker run \
 Once the raw operations trace data is obtained, it may be used to produce the end-to-end latency data using the tool:
 <https://github.com/emc-mongoose/e2e-latency-generator>
 
-# 4. Design
+## 5.2. Byte Stream Operations
 
-Mongoose and Pravega are using quite different concepts. So it's necessary to determine how
-[Pravega-specific terms](http://pravega.io/docs/latest/terminology/) are mapped to the
-[Mongoose abstractions]((https://gitlab.com/emcmongoose/mongoose/tree/master/doc/design/architecture#1-basic-terms)).
-
-| Pravega | Mongoose |
-|---------|----------|
-| [Stream](http://pravega.io/docs/latest/pravega-concepts/#streams) | *Item Path* or *Byte Stream* |
-| Scope | Storage Namespace
-| [Event](http://pravega.io/docs/latest/pravega-concepts/#events) | *Data Item* |
-| Stream Segment | N/A |
-
-## 4.1. Event Stream Operations
-
-Mongoose should perform the load operations on the *events* when the configuration option `item-type` is set to `data`.
-
-### 4.1.1. Create
-
-Steps:
-1. Get the endpoint URI from the cache.
-2. Check if the corresponding `StreamManager` exists using the cache, create a new one if it doesn't.
-3. Check if the destination scope exists using the cache, create a new one if it doesn't.
-4. Check if the destination stream exists using the cache, create a new one if it doesn't.
-5. Check if the corresponding `ClientFactory` exists using the cache, create a new one if it doesn't.
-6. Check if the `EventStreamWriter` exists using the cache, create new one if it doesn't.
-7. Submit the event writing, use a routing key if configured.
-8. Submit the load operation completion handler.
-
-#### 4.1.1.1. Transactional
-
-Using the [transactions](http://pravega.io/docs/latest/transactions/#pravega-transactions) to create the events allows 
-to write the events in the batch mode. The maximum count of the events per transaction is defined by the 
-`load-batch-size` configuration option value.
-
-Example:
-```bash
-docker run \
-    --network host \
-    emcmongoose/mongoose-storage-driver-pravega \
-    --storage-namespace=scope1 \
-    --storage-driver-event-batch \
-    --load-step-limit-count=100000 \
-    --load-batch-size=1024 \
-    --item-output-path=eventsStream1 \
-    --item-data-size=10KB
-```
-
-**Note**:
-> The transactional events create concurrency is limited currently by 1 due to the [issue #1](#43-open-issues).
-
-### 4.1.2. Read
-
-**Notes**:
-> * The Pravega storage doesn't support reading the stream events in the random order.
-> * Works synchronously
-
-There is also another option, called `storage-driver-read-timeoutMillis`. Pravega documentation says it only works when
-there is no available event in the stream. `readNextEvent()` will block for the specified time in ms. So, in theory 0
-and 1 should work just fine. They do not. In practice, this value should be somewhere between 100 and 2000 ms (2000 is
-Pravega default value).
-
-Steps:
-1. Get the endpoint URI from the cache.
-2. Check if the corresponding `StreamManager` exists using the cache, create a new one if it doesn't.
-3. Check if the corresponding `ClientFactory` exists using the cache, create a new one if it doesn't.
-4. Check if the corresponding `EventStreamReader<ByteBuffer>` exists using the cache, create a new one if it doesn't.
-5. Read the next event, verify the returned byte buffer content if configured so, discard it otherwise.
-6. Invoke the load operation completion handler.
-
-### 4.1.3. Update
-
-Not supported. A stream append may be performed using the `create` load operation type and a same stream previously used
-to write the events.
-
-### 4.1.4. Delete
-
-Not supported.
-
-## 4.2. Byte Stream Operations
-
-Mongoose should perform the load operations on the *streams* when the configuration option `storage-driver-stream-data` 
+Mongoose should perform the load operations on the *streams* when the configuration option `storage-driver-stream-data`
 is set to `bytes`. This means that the whole streams are being accounted as *items*.
 
-### 4.2.1. Create
+### 5.2.1. Create
 
-Creates the [byte streams](https://github.com/pravega/pravega/wiki/PDP-30-ByteStream-API). The created byte stream is 
-filled with content up to the size determined by the `item-data-size` option. The create operation will fail with the 
-[status code](https://github.com/emc-mongoose/mongoose-base/tree/master/doc/interfaces/output#232-files) #7 if the 
-stream existed before. 
+Creates the [byte streams](https://github.com/pravega/pravega/wiki/PDP-30-ByteStream-API). The created byte stream is
+filled with content up to the size determined by the `item-data-size` option. The create operation will fail with the
+[status code](https://github.com/emc-mongoose/mongoose-base/tree/master/doc/interfaces/output#232-files) #7 if the
+stream existed before.
 
 **Example**:
 ```bash
@@ -300,10 +317,11 @@ docker run \
     emcmongoose/mongoose-storage-driver-pravega \
     --storage-driver-stream-data=bytes \
     --storage-namespace=scope1 \
-    --storage-driver-limit-concurrency=100
+    --storage-driver-limit-concurrency=100 \
+    --storage-driver-threads=100
 ```
 
-### 4.2.2. Read
+### 5.2.2. Read
 
 Reads the [byte streams](https://github.com/pravega/pravega/wiki/PDP-30-ByteStream-API).
 
@@ -316,6 +334,7 @@ docker run \
     --read \
     --storage-driver-stream-data=bytes \
     --storage-driver-limit-concurrency=10 \
+    --storage-driver-threads=10 \
     --storage-namespace=scope1
 ```
 
@@ -328,64 +347,95 @@ docker run \
     --read \
     --storage-driver-stream-data=bytes \
     --storage-driver-limit-concurrency=10 \
+    --storage-driver-threads=10 \
     --storage-namespace=scope1
 ```
 All streams in the specified scope are listed and analyzed for the current size before the reading.
 
-### 4.2.3. Update
+### 5.2.3. Update
 
 Not implemented yet
 
-### 4.2.4. Delete
+### 5.2.4. Delete
 
 Before the deletion, the stream must be sealed because of Pravega concepts. So the sealing of the stream is done during
 the deletion too.
 
-## 4.3. Open Issues
+## 5.3. Misc
+
+### 5.3.1. Manual Scaling
+
+It's required to make a manual destination stream scaling while the event writing load is in progress in order to see
+if the rate changes. The additional load step may be used to perform such scaling. In order to not perform any
+additional load it should be explicitly configured to do a minimal work:
+* load operations count limit: 1
+* concurrency limit: 1
+* payload size: 1 bytes
+
+For more details see the corresponding [scenario content](https://github.com/emc-mongoose/mongoose-storage-driver-pravega/blob/master/src/main/resources/example/scenario/js/pravega/manual_scaling.js).
+
+### 5.3.2. Multiple Destination Streams
+
+The configuration [expression language](https://github.com/emc-mongoose/mongoose-base/tree/master/src/main/java/com/emc/mongoose/base/config/el#52-variable-items-output-path)
+feature may be used to specify multiple destination streams to write the events. The example of the command to write
+the events into 1000 destination streams (in the random order):
+
+```bash
+docker run \
+    --network host \
+    emcmongoose/mongoose-storage-driver-pravega \
+    --storage-namespace=scope1 \
+    --item-data-size=1000 \
+    --item-output-path=stream-%p\{1000\;1\}
+```
+
+# 6. Open Issues
 
 | Issue | Description |
 |-------|-------------|
-| 1 | [Pravega #3697](https://github.com/pravega/pravega/issues/3697): Missing asynchronous read event and byte stream write methods
 
-# 5. Development
+# 7. Development
 
-## 5.1. Build
+## 7.1. Build
+
+Note the Pravega commit # which should be used to build the corresponding Mongoose plugin.
+Specify the required Pravega commit # in the `build.gradle` file. Then run:
 
 ```bash
-./gradlew clean jar
+./gradlew clean pravegaClientJars
+./gradlew jar
 ```
 
-## 5.2. Test
+## 7.2. Test
 
-### 5.2.1. Automated
+### 7.2.1. Automated
 
-#### 5.2.1.1. Unit
+#### 7.2.1.1. Unit
 
 ```bash
 ./gradlew clean test
 ```
 
-#### 5.2.1.2. Integration
+#### 7.2.1.2. Integration
 ```bash
 docker run -d --name=storage --network=host pravega/pravega:<PRAVEGA_VERSION> standalone
 ./gradlew integrationTest
 ```
 
-#### 5.2.1.3. Functional
+#### 7.2.1.3. Functional
 ```bash
 ./gradlew jar
 export SUITE=api.storage
-TEST=create_events ./gradlew robotest
-TEST=create_stream ./gradlew robotest
+TEST=create_event_stream ./gradlew robotest
+TEST=create_byte_streams ./gradlew robotest
+TEST=read_byte_streams ./gradlew robotest
+TEST=read_all_byte_streams ./gradlew robotest
+TEST=create_event_transactional_stream ./gradlew robotest
 ```
 
-### 5.2.1. Manual
+### 7.2.1. Manual
 
-1. Build the storage driver
-```bash
-./gradlew pravegaClientJars
-./gradlew jar
-```
+1. [Build the storage driver](#71-build)
 2. Copy the storage driver's jar file into the mongoose's `ext` directory:
 ```bash
 cp -f build/libs/mongoose-storage-driver-pravega-*.jar ~/.mongoose/<MONGOOSE_BASE_VERSION>/ext/
