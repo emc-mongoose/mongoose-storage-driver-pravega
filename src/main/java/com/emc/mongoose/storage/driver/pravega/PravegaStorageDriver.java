@@ -835,7 +835,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				val clientFactory = byteStreamClientFactoryCache.computeIfAbsent(controller, clientFactoryCreateFunc);
 				val byteStreamReader = byteStreamReaderCache.computeIfAbsent(
 								streamName, clientFactory::createByteStreamReader);
-				byteStreamReader.reset();
+				byteStreamReader.seekToOffset(0);
 				streamOp.startRequest();
 				byteStreamReader
 								.onDataAvailable()
