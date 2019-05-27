@@ -284,7 +284,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 					final boolean verifyFlag,
 					final int batchSize)
 					throws IllegalConfigurationException, IllegalArgumentException {
-		super(stepId, dataInput, storageConfig, verifyFlag);
+		super(stepId, dataInput, storageConfig, verifyFlag, batchSize);
 		this.concurrencyThrottle = new Semaphore(concurrencyLimit > 0 ? concurrencyLimit : Integer.MAX_VALUE, true);
 		val driverConfig = storageConfig.configVal("driver");
 		this.controlApiTimeoutMillis = driverConfig.longVal("control-timeoutMillis");
