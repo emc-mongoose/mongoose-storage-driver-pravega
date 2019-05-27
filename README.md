@@ -19,8 +19,7 @@
 &nbsp;&nbsp;4.1. [Specific Options](#41-specific-options)<br/>
 &nbsp;&nbsp;4.2. [Tuning](#42-tuning)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;4.2.1. [Concurrency](#421-concurrency)<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;4.2.2. [Batch Mode](#422-batch-mode)<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;4.2.3. [Heap Memory Consumption](#423-heap-memory-consumption)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;4.2.2. [Base Storage Driver Usage Warnings](#422-base-storage-driver-usage-warnings)<br/>
 5. [Usage](#5-usage)<br/>
 &nbsp;&nbsp;5.1. [Event Stream Operations](#51-event-stream-operations)<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;5.1.1. [Create](#511-create)<br/>
@@ -182,28 +181,9 @@ concurrency for the asynchronous operations, aka the *top gear of the "burst mod
 The count of the threads running/submitting the load operations execution. The meaningful values are usually only few
 times more than the count of the available CPU threads.
 
-### 4.2.2. Batch Mode
+### 4.2.2. Base Storage Driver Usage Warnings
 
-Mongoose uses the batch mode to work with the Pravega events as far as they are usually small.
-
-Assuming
-* Q<sub>output</sub>: `storage-driver-limit-queue-output`
-* Q<sub>input</sub>: `storage-driver-limit-queue-input`
-* S<sub>batch</sub>: `load-batch-size`
-
-the following equation should always be true:
-Q<sub>output</sub> &ge; Q<sub>input</sub> * S<sub>batch</sub>
-
-otherwise, there may be the load operation results handling failures.
-
-### 4.2.3. Heap Memory Consumption
-
-The default Mongoose's `load-batch-size` configuration value is 32,768. The Pravega extension inherits the preemptive
-storage driver plugin which enqueues the task for each batch. The default input queue size
-(`storage-driver-limit-queue-input`) is 1,000,000. This yields the 32,768,000,000 instances of the load operations in
-the runtime and require ~ 6 terabytes of the heap memory. To avoid this behavior, override the defaults:
-
-Q<sub>input</sub> * S<sub>batch</sub> &le; 1,000,000
+See the [design notes](https://github.com/emc-mongoose/mongoose-storage-driver-preempt#design)
 
 # 5. Usage
 
