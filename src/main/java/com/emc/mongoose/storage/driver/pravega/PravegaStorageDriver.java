@@ -1,7 +1,6 @@
 package com.emc.mongoose.storage.driver.pravega;
 
 import static com.emc.mongoose.base.Exceptions.throwUncheckedIfInterrupted;
-import static com.emc.mongoose.base.item.op.OpType.CREATE;
 import static com.emc.mongoose.base.item.op.OpType.NOOP;
 import static com.emc.mongoose.base.item.op.Operation.SLASH;
 import static com.emc.mongoose.base.item.op.Operation.Status.FAIL_IO;
@@ -562,7 +561,10 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 			final String nodeAddr = op.nodeAddr();
 			switch (streamDataType) {
 			case EVENTS:
-				execute(List.of(op));
+				// do not use Collections.singletonList neither List.of as far as these methods return unmodifiable
+				val ops = new ArrayList<O>();
+				ops.add(op);
+				execute(ops);
 			case BYTES:
 				byteStreamOperation(op, nodeAddr);
 				break;
