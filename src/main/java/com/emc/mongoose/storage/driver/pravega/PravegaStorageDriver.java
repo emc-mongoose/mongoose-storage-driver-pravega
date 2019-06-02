@@ -565,6 +565,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				val ops = new ArrayList<O>();
 				ops.add(op);
 				execute(ops);
+				break;
 			case BYTES:
 				byteStreamOperation(op, nodeAddr);
 				break;
