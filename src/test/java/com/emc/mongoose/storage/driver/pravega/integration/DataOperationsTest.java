@@ -172,7 +172,8 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
 		}
 	}
 
-	@Test @Ignore
+	@Test
+	@Ignore
 	public final void testReadEvent() throws Exception {
 		final DataItem dataItem = new DataItemImpl(0, MIB, 0);
 		dataItem.name("0000");
