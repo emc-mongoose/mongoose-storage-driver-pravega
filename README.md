@@ -155,7 +155,7 @@ docker run \
 
 | Name                              | Type            | Default Value | Description                                      |
 |:----------------------------------|:----------------|:--------------|:-------------------------------------------------|
-| storage-driver-control-enabled    | boolean         | true          | Allow control API calls (create/delete/etc scope/stream/etc)
+| storage-driver-control-scope      | boolean         | true          | Allow to try to create scope
 | storage-driver-control-timeoutMillis | integer      | 30000         | The timeout for any Pravega Controller API call
 | storage-driver-event-key-enabled | boolean         | false         | Specifies if Mongoose should generate its own routing key during the events creation
 | storage-driver-event-key-count   | integer         | 0             | Specifies a max count of unique routing keys to use during the events creation (may be considered as a routing key period). 0 value means to use unique routing key for each new event

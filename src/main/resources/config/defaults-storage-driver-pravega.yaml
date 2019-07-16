@@ -2,7 +2,7 @@
 storage:
   driver:
     control:
-      enabled: true
+      scope: true
       timeoutMillis: 10000
     event:
       transaction: false
@@ -36,3 +36,6 @@ storage:
         - 127.0.0.1
       port: 9090
       connAttemptsLimit: 0
+aliasing:
+- name: "storage-scope"
+  target: "storage-namespace"

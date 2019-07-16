@@ -2,7 +2,7 @@
 storage:
   driver:
     control:
-      enabled: boolean
+      scope: boolean
       timeoutMillis: long
     event:
       transaction: boolean
