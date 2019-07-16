@@ -29,6 +29,7 @@ repositories {
 			url findProperty("repositoryUrl")
 		}
 	} else {
+		jcenter()
 		maven {
 			url "https://repository.apache.org/snapshots"
 		}
@@ -38,7 +39,6 @@ repositories {
 		maven {
 			url "https://oss.jfrog.org/jfrog-dependencies"
 		}
-		jcenter()
 	}
 }
 description = "Mongoose is a high-load storage performance testing tool"

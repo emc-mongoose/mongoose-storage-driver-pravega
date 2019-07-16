@@ -5,8 +5,9 @@ ADD src ./src/
 ADD gradle ./gradle/
 ADD build.gradle ./build.gradle
 ADD gradlew ./gradlew
+ADD gradle.properties ./gradle.properties
 ADD settings.gradle ./settings.gradle
-RUN ./gradlew clean pravegaClientJars && ./gradlew jar
+RUN ./gradlew clean jar
 
 FROM emcmongoose/mongoose-base:${BASE_VERSION}
 ARG BASE_VERSION
