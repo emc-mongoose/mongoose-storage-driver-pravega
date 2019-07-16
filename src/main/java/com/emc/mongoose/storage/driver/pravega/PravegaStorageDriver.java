@@ -1,5 +1,6 @@
 package com.emc.mongoose.storage.driver.pravega;
 
+import static com.emc.mongoose.base.Constants.DIR_EXT;
 import static com.emc.mongoose.base.Exceptions.throwUncheckedIfInterrupted;
 import static com.emc.mongoose.base.item.op.OpType.NOOP;
 import static com.emc.mongoose.base.item.op.Operation.SLASH;
@@ -20,6 +21,8 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 import com.emc.mongoose.base.config.IllegalConfigurationException;
 import com.emc.mongoose.base.data.DataInput;
+import com.emc.mongoose.base.env.CoreResourcesToInstall;
+import com.emc.mongoose.base.env.Extension;
 import com.emc.mongoose.base.item.DataItem;
 import com.emc.mongoose.base.item.ItemFactory;
 import com.emc.mongoose.base.item.op.OpType;
@@ -76,10 +79,8 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
+import java.nio.file.Paths;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -92,6 +93,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import io.pravega.client.stream.impl.Credentials;
 import io.pravega.common.util.AsyncIterator;
 import lombok.Value;
 import lombok.val;
@@ -131,6 +133,8 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	private volatile Position lastFailedStreamPos = null;
 	private final Lock lastFailedStreamPosLock = new ReentrantLock();
 	private volatile AsyncIterator<Stream> streamIterator = null;
+	private final Optional<Credentials> optExtCred;
+	private final boolean controlApiEnabled;
 
 	@Value
 	final class ScopeCreateFunctionImpl
@@ -140,18 +144,21 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 
 		@Override
 		public final StreamCreateFunction apply(final String scopeName) {
-			try {
-				if (controller.createScope(scopeName).get(controlApiTimeoutMillis, MILLISECONDS)) {
-					Loggers.MSG.trace("Scope \"{}\" was created", scopeName);
-				} else {
-					Loggers.MSG.info(
-									"Scope \"{}\" was not created, may be already existing before", scopeName);
+			if(controlApiEnabled) {
+				try {
+					if (controller.createScope(scopeName).get(controlApiTimeoutMillis, MILLISECONDS)) {
+						Loggers.MSG.trace("Scope \"{}\" was created", scopeName);
+					} else {
+						Loggers.MSG.info(
+										"Scope \"{}\" was not created, may be already existing before", scopeName);
+					}
+				} catch (final InterruptedException e) {
+					throwUnchecked(e);
+				} catch (final Throwable cause) {
+					LogUtil.exception(
+						Level.WARN, cause, "{}: failed to create the scope \"{}\"", stepId, scopeName
+					);
 				}
-			} catch (final InterruptedException e) {
-				throwUnchecked(e);
-			} catch (final Throwable cause) {
-				LogUtil.exception(
-								Level.WARN, cause, "{}: failed to create the scope \"{}\"", stepId, scopeName);
 			}
 			return new StreamCreateFunctionImpl(controller, scopeName);
 		}
@@ -165,19 +172,25 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 
 		@Override
 		public final StreamConfiguration apply(final String scopeName) {
-			final StreamConfiguration streamConfig = StreamConfiguration.builder().scalingPolicy(scalingPolicy).scope(scopeName).build();
-			try {
-				if (controller.createScope(scopeName).get(controlApiTimeoutMillis, MILLISECONDS)) {
-					Loggers.MSG.trace("Scope \"{}\" was created", scopeName);
-				} else {
-					Loggers.MSG.info(
-									"Scope \"{}\" was not created, may be already existing before", scopeName);
+			final StreamConfiguration streamConfig = StreamConfiguration
+				.builder()
+				.scalingPolicy(scalingPolicy)
+				.scope(scopeName)
+				.build();
+			if(controlApiEnabled) {
+				try {
+					if (controller.createScope(scopeName).get(controlApiTimeoutMillis, MILLISECONDS)) {
+						Loggers.MSG.trace("Scope \"{}\" was created", scopeName);
+					} else {
+						Loggers.MSG.info("Scope \"{}\" was not created, may be already existing before", scopeName);
+					}
+				} catch (final InterruptedException e) {
+					throwUnchecked(e);
+				} catch (final Throwable cause) {
+					LogUtil.exception(
+						Level.WARN, cause, "{}: failed to create the scope \"{}\"", stepId, scopeName
+					);
 				}
-			} catch (final InterruptedException e) {
-				throwUnchecked(e);
-			} catch (final Throwable cause) {
-				LogUtil.exception(
-								Level.WARN, cause, "{}: failed to create the scope \"{}\"", stepId, scopeName);
 			}
 			return streamConfig;
 		}
@@ -195,23 +208,25 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 			final StreamConfiguration streamConfig = StreamConfiguration.builder()
 							.scalingPolicy(scalingPolicy)
 							.build();
-			try {
-				val createStreamFuture = controller.createStream(scopeName, streamName, streamConfig);
-				if (createStreamFuture.get(controlApiTimeoutMillis, MILLISECONDS)) {
-					Loggers.MSG.trace(
-									"Stream \"{}/{}\" was created using the config: {}",
-									scopeName,
-									streamName,
-									streamConfig);
-				} else {
-					scaleToFixedSegmentCount(
-									controller, controlApiTimeoutMillis, scopeName, streamName, scalingPolicy);
+			if(controlApiEnabled) {
+				try {
+					val createStreamFuture = controller.createStream(scopeName, streamName, streamConfig);
+					if (createStreamFuture.get(controlApiTimeoutMillis, MILLISECONDS)) {
+						Loggers.MSG.trace(
+										"Stream \"{}/{}\" was created using the config: {}",
+										scopeName,
+										streamName,
+										streamConfig);
+					} else {
+						scaleToFixedSegmentCount(
+										controller, controlApiTimeoutMillis, scopeName, streamName, scalingPolicy);
+					}
+				} catch (final InterruptedException e) {
+					throwUnchecked(e);
+				} catch (final Throwable cause) {
+					LogUtil.exception(
+									Level.WARN, cause, "{}: failed to create the stream \"{}\"", stepId, streamName);
 				}
-			} catch (final InterruptedException e) {
-				throwUnchecked(e);
-			} catch (final Throwable cause) {
-				LogUtil.exception(
-								Level.WARN, cause, "{}: failed to create the stream \"{}\"", stepId, streamName);
 			}
 			return streamConfig;
 		}
@@ -288,7 +303,9 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		super(stepId, dataInput, storageConfig, verifyFlag, batchSize);
 		this.concurrencyThrottle = new Semaphore(concurrencyLimit > 0 ? concurrencyLimit : Integer.MAX_VALUE, true);
 		val driverConfig = storageConfig.configVal("driver");
-		this.controlApiTimeoutMillis = driverConfig.longVal("control-timeoutMillis");
+		val controlConfig = driverConfig.configVal("control");
+		this.controlApiTimeoutMillis = controlConfig.longVal("timeoutMillis");
+		this.controlApiEnabled = controlConfig.boolVal("enabled");
 		val scalingConfig = driverConfig.configVal("scaling");
 		this.scalingPolicy = PravegaScalingConfig.scalingPolicy(scalingConfig);
 		val netConfig = storageConfig.configVal("net");
@@ -318,6 +335,13 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		this.bgExecutor = Executors.newScheduledThreadPool(
 						Runtime.getRuntime().availableProcessors(),
 						new LogContextThreadFactory(toString(), true));
+		// resolve the credential providers
+		val coreRes = new CoreResourcesToInstall();
+		val homePath = coreRes.appHomePath();
+		val extClsLoader = Extension.extClassLoader(Paths.get(homePath.toString(), DIR_EXT).toFile());
+		this.optExtCred = ServiceLoader
+			.load(Credentials.class, extClsLoader)
+			.findFirst();
 	}
 
 	String nextEndpointAddr() {
@@ -344,16 +368,21 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	}
 
 	ClientConfig createClientConfig(final URI endpointUri) {
-		return ClientConfig.builder()
-						.controllerURI(endpointUri)
-						.maxConnectionsPerSegmentStore(concurrencyLimit > 0 ? concurrencyLimit : Integer.MAX_VALUE)
-						.build();
+		val maxConnPerSegStore = concurrencyLimit > 0 ? concurrencyLimit : Integer.MAX_VALUE;
+		val clientConfigBuilder = ClientConfig
+			.builder()
+			.controllerURI(endpointUri)
+			.maxConnectionsPerSegmentStore(maxConnPerSegStore);
+		optExtCred.ifPresent(clientConfigBuilder::credentials);
+		return clientConfigBuilder.build();
 	}
 
 	Controller createController(final ClientConfig clientConfig) {
 		val controllerConfig = ControllerImplConfig
-						.builder().clientConfig(clientConfig)
-						.maxBackoffMillis(MAX_BACKOFF_MILLIS).build();
+			.builder()
+			.clientConfig(clientConfig)
+			.maxBackoffMillis(MAX_BACKOFF_MILLIS)
+			.build();
 		return new ControllerImpl(controllerConfig, bgExecutor);
 	}
 
