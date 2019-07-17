@@ -346,6 +346,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 			.load(Credentials.class)
 			.findFirst()
 			.orElseGet(this::getBasicCredentialsIfAny);
+		Loggers.MSG.info("Authentication type: {}", cred == null ? "none" : cred.getAuthenticationType());
 	}
 
 	Credentials getBasicCredentialsIfAny() {
