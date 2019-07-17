@@ -2,6 +2,7 @@
 storage:
   driver:
     control:
+      scope: true
       timeoutMillis: 10000
     event:
       transaction: false

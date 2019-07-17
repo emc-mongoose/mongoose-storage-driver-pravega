@@ -48,6 +48,7 @@ import com.github.akurilov.commons.system.DirectMemUtil;
 import com.github.akurilov.confuse.Config;
 import io.pravega.client.ByteStreamClientFactory;
 import io.pravega.client.ClientConfig;
+import io.pravega.client.ClientConfig.ClientConfigBuilder;
 import io.pravega.client.EventStreamClientFactory;
 import io.pravega.client.admin.ReaderGroupManager;
 import io.pravega.client.byteStream.ByteStreamReader;
@@ -91,7 +92,6 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-
 import io.pravega.common.util.AsyncIterator;
 import lombok.Value;
 import lombok.val;
@@ -131,6 +131,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	private volatile Position lastFailedStreamPos = null;
 	private final Lock lastFailedStreamPosLock = new ReentrantLock();
 	private volatile AsyncIterator<Stream> streamIterator = null;
+	private final boolean controlScopeFlag;
 
 	@Value
 	final class ScopeCreateFunctionImpl
@@ -140,18 +141,21 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 
 		@Override
 		public final StreamCreateFunction apply(final String scopeName) {
-			try {
-				if (controller.createScope(scopeName).get(controlApiTimeoutMillis, MILLISECONDS)) {
-					Loggers.MSG.trace("Scope \"{}\" was created", scopeName);
-				} else {
-					Loggers.MSG.info(
-									"Scope \"{}\" was not created, may be already existing before", scopeName);
+			if(controlScopeFlag) {
+				try {
+					if (controller.createScope(scopeName).get(controlApiTimeoutMillis, MILLISECONDS)) {
+						Loggers.MSG.trace("Scope \"{}\" was created", scopeName);
+					} else {
+						Loggers.MSG.info(
+										"Scope \"{}\" was not created, may be already existing before", scopeName);
+					}
+				} catch (final InterruptedException e) {
+					throwUnchecked(e);
+				} catch (final Throwable cause) {
+					LogUtil.exception(
+						Level.WARN, cause, "{}: failed to create the scope \"{}\"", stepId, scopeName
+					);
 				}
-			} catch (final InterruptedException e) {
-				throwUnchecked(e);
-			} catch (final Throwable cause) {
-				LogUtil.exception(
-								Level.WARN, cause, "{}: failed to create the scope \"{}\"", stepId, scopeName);
 			}
 			return new StreamCreateFunctionImpl(controller, scopeName);
 		}
@@ -165,19 +169,25 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 
 		@Override
 		public final StreamConfiguration apply(final String scopeName) {
-			final StreamConfiguration streamConfig = StreamConfiguration.builder().scalingPolicy(scalingPolicy).scope(scopeName).build();
-			try {
-				if (controller.createScope(scopeName).get(controlApiTimeoutMillis, MILLISECONDS)) {
-					Loggers.MSG.trace("Scope \"{}\" was created", scopeName);
-				} else {
-					Loggers.MSG.info(
-									"Scope \"{}\" was not created, may be already existing before", scopeName);
+			final StreamConfiguration streamConfig = StreamConfiguration
+				.builder()
+				.scalingPolicy(scalingPolicy)
+				.scope(scopeName)
+				.build();
+			if(controlScopeFlag) {
+				try {
+					if (controller.createScope(scopeName).get(controlApiTimeoutMillis, MILLISECONDS)) {
+						Loggers.MSG.trace("Scope \"{}\" was created", scopeName);
+					} else {
+						Loggers.MSG.info("Scope \"{}\" was not created, may be already existing before", scopeName);
+					}
+				} catch (final InterruptedException e) {
+					throwUnchecked(e);
+				} catch (final Throwable cause) {
+					LogUtil.exception(
+						Level.WARN, cause, "{}: failed to create the scope \"{}\"", stepId, scopeName
+					);
 				}
-			} catch (final InterruptedException e) {
-				throwUnchecked(e);
-			} catch (final Throwable cause) {
-				LogUtil.exception(
-								Level.WARN, cause, "{}: failed to create the scope \"{}\"", stepId, scopeName);
 			}
 			return streamConfig;
 		}
@@ -288,7 +298,9 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		super(stepId, dataInput, storageConfig, verifyFlag, batchSize);
 		this.concurrencyThrottle = new Semaphore(concurrencyLimit > 0 ? concurrencyLimit : Integer.MAX_VALUE, true);
 		val driverConfig = storageConfig.configVal("driver");
-		this.controlApiTimeoutMillis = driverConfig.longVal("control-timeoutMillis");
+		val controlConfig = driverConfig.configVal("control");
+		this.controlApiTimeoutMillis = controlConfig.longVal("timeoutMillis");
+		this.controlScopeFlag = controlConfig.boolVal("scope");
 		val scalingConfig = driverConfig.configVal("scaling");
 		this.scalingPolicy = PravegaScalingConfig.scalingPolicy(scalingConfig);
 		val netConfig = storageConfig.configVal("net");
@@ -343,17 +355,25 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		}
 	}
 
+	protected ClientConfigBuilder createClientConfigBuilder(final URI endpointUri) {
+		val maxConnPerSegStore = concurrencyLimit > 0 ? concurrencyLimit : Integer.MAX_VALUE;
+		return ClientConfig
+			.builder()
+			.controllerURI(endpointUri)
+			.maxConnectionsPerSegmentStore(maxConnPerSegStore);
+	}
+
 	ClientConfig createClientConfig(final URI endpointUri) {
-		return ClientConfig.builder()
-						.controllerURI(endpointUri)
-						.maxConnectionsPerSegmentStore(concurrencyLimit > 0 ? concurrencyLimit : Integer.MAX_VALUE)
-						.build();
+		val clientConfigBuilder = createClientConfigBuilder(endpointUri);
+		return clientConfigBuilder.build();
 	}
 
 	Controller createController(final ClientConfig clientConfig) {
 		val controllerConfig = ControllerImplConfig
-						.builder().clientConfig(clientConfig)
-						.maxBackoffMillis(MAX_BACKOFF_MILLIS).build();
+			.builder()
+			.clientConfig(clientConfig)
+			.maxBackoffMillis(MAX_BACKOFF_MILLIS)
+			.build();
 		return new ControllerImpl(controllerConfig, bgExecutor);
 	}
 

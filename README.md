@@ -62,7 +62,7 @@ Mongoose and Pravega are using quite different concepts. So it's necessary to de
 
 # 2. Features
 
-* Authentication: not implemented yet
+* Authentication: provided externally
 * SSL/TLS: not implemented yet
 * Item Types:
     * `data`: corresponds to an ***event*** either ***byte stream*** depending on the configuration 
@@ -155,6 +155,7 @@ docker run \
 
 | Name                              | Type            | Default Value | Description                                      |
 |:----------------------------------|:----------------|:--------------|:-------------------------------------------------|
+| storage-driver-control-scope      | boolean         | true          | Allow to try to create scope
 | storage-driver-control-timeoutMillis | integer      | 30000         | The timeout for any Pravega Controller API call
 | storage-driver-event-key-enabled | boolean         | false         | Specifies if Mongoose should generate its own routing key during the events creation
 | storage-driver-event-key-count   | integer         | 0             | Specifies a max count of unique routing keys to use during the events creation (may be considered as a routing key period). 0 value means to use unique routing key for each new event
@@ -382,8 +383,7 @@ Note the Pravega commit # which should be used to build the corresponding Mongoo
 Specify the required Pravega commit # in the `build.gradle` file. Then run:
 
 ```bash
-./gradlew clean pravegaClientJars
-./gradlew jar
+./gradlew clean jar
 ```
 
 ## 7.2. Test
