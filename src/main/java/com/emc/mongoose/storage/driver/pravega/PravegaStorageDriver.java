@@ -1,6 +1,5 @@
 package com.emc.mongoose.storage.driver.pravega;
 
-import static com.emc.mongoose.base.Constants.DIR_EXT;
 import static com.emc.mongoose.base.Exceptions.throwUncheckedIfInterrupted;
 import static com.emc.mongoose.base.item.op.OpType.NOOP;
 import static com.emc.mongoose.base.item.op.Operation.SLASH;
@@ -21,8 +20,6 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 import com.emc.mongoose.base.config.IllegalConfigurationException;
 import com.emc.mongoose.base.data.DataInput;
-import com.emc.mongoose.base.env.CoreResourcesToInstall;
-import com.emc.mongoose.base.env.Extension;
 import com.emc.mongoose.base.item.DataItem;
 import com.emc.mongoose.base.item.ItemFactory;
 import com.emc.mongoose.base.item.op.OpType;
@@ -51,6 +48,7 @@ import com.github.akurilov.commons.system.DirectMemUtil;
 import com.github.akurilov.confuse.Config;
 import io.pravega.client.ByteStreamClientFactory;
 import io.pravega.client.ClientConfig;
+import io.pravega.client.ClientConfig.ClientConfigBuilder;
 import io.pravega.client.EventStreamClientFactory;
 import io.pravega.client.admin.ReaderGroupManager;
 import io.pravega.client.byteStream.ByteStreamReader;
@@ -79,8 +77,10 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
-import java.nio.file.Paths;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -92,8 +92,6 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-
-import io.pravega.client.stream.impl.Credentials;
 import io.pravega.common.util.AsyncIterator;
 import lombok.Value;
 import lombok.val;
@@ -133,7 +131,6 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	private volatile Position lastFailedStreamPos = null;
 	private final Lock lastFailedStreamPosLock = new ReentrantLock();
 	private volatile AsyncIterator<Stream> streamIterator = null;
-	private final Optional<Credentials> optExtCred;
 	private final boolean controlScopeFlag;
 
 	@Value
@@ -333,13 +330,6 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		this.bgExecutor = Executors.newScheduledThreadPool(
 						Runtime.getRuntime().availableProcessors(),
 						new LogContextThreadFactory(toString(), true));
-		// resolve the credential providers
-		val coreRes = new CoreResourcesToInstall();
-		val homePath = coreRes.appHomePath();
-		val extClsLoader = Extension.extClassLoader(Paths.get(homePath.toString(), DIR_EXT).toFile());
-		this.optExtCred = ServiceLoader
-			.load(Credentials.class, extClsLoader)
-			.findFirst();
 	}
 
 	String nextEndpointAddr() {
@@ -365,13 +355,16 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		}
 	}
 
-	ClientConfig createClientConfig(final URI endpointUri) {
+	protected ClientConfigBuilder createClientConfigBuilder(final URI endpointUri) {
 		val maxConnPerSegStore = concurrencyLimit > 0 ? concurrencyLimit : Integer.MAX_VALUE;
-		val clientConfigBuilder = ClientConfig
+		return ClientConfig
 			.builder()
 			.controllerURI(endpointUri)
 			.maxConnectionsPerSegmentStore(maxConnPerSegStore);
-		optExtCred.ifPresent(clientConfigBuilder::credentials);
+	}
+
+	ClientConfig createClientConfig(final URI endpointUri) {
+		val clientConfigBuilder = createClientConfigBuilder(endpointUri);
 		return clientConfigBuilder.build();
 	}
 
