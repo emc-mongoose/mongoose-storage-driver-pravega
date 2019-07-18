@@ -78,6 +78,7 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URLClassLoader;
 import java.nio.ByteBuffer;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -139,7 +140,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	private final Lock lastFailedStreamPosLock = new ReentrantLock();
 	private volatile AsyncIterator<Stream> streamIterator = null;
 	private final boolean controlScopeFlag;
-	private final ClassLoader extClsLoader;
+	private final URLClassLoader extClsLoader;
 	private final Credentials cred;
 
 	@Value
@@ -343,7 +344,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		val appHomePath = res.appHomePath();
 		extClsLoader = Extension.extClassLoader(Paths.get(appHomePath.toString(), DIR_EXT).toFile());
 		cred = ServiceLoader
-			.load(Credentials.class)
+			.load(Credentials.class, extClsLoader)
 			.findFirst()
 			.orElseGet(this::getBasicCredentialsIfAny);
 		Loggers.MSG.info("Authentication type: {}", cred == null ? "none" : cred.getAuthenticationType());
@@ -1168,6 +1169,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	protected void doClose()
 					throws IOException {
 		super.doClose();
+		extClsLoader.close();
 		// clear all caches & pools
 		evtReaderGroupManagerCreateFuncCache.clear();
 		closeAllWithTimeout(evtReaderGroupManagerCache.values());
