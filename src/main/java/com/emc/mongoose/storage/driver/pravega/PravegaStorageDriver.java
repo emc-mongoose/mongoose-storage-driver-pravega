@@ -378,7 +378,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	}
 
 	ClientConfig createClientConfig(final URI endpointUri) {
-		val maxConnPerSegStore = concurrencyLimit > 0 ? concurrencyLimit : Integer.MAX_VALUE;
+		val maxConnPerSegStore = ioWorkerCount;
 		val clientConfigBuilder = ClientConfig
 			.builder()
 			.controllerURI(endpointUri)
