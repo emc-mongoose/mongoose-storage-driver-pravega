@@ -100,7 +100,6 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
 			config.val("storage-driver-stream-data", "events");
 			config.val("storage-driver-threads", 0);
 			config.val("storage-driver-limit-queue-input", 1_000_000);
-			config.val("storage-driver-limit-queue-output", 1_000_000);
 			config.val("storage-driver-limit-concurrency", 0);
 			config.val("storage-namespace", "goose");
 
