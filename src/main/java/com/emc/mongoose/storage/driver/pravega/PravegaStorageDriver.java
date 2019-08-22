@@ -140,6 +140,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	private final Lock lastFailedStreamPosLock = new ReentrantLock();
 	private volatile AsyncIterator<Stream> streamIterator = null;
 	private final boolean controlScopeFlag;
+	private final boolean controlStreamFlag;
 	private final Credentials cred;
 
 	@Value
@@ -214,23 +215,25 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 			final StreamConfiguration streamConfig = StreamConfiguration.builder()
 							.scalingPolicy(scalingPolicy)
 							.build();
-			try {
-				val createStreamFuture = controller.createStream(scopeName, streamName, streamConfig);
-				if (createStreamFuture.get(controlApiTimeoutMillis, MILLISECONDS)) {
-					Loggers.MSG.trace(
-									"Stream \"{}/{}\" was created using the config: {}",
-									scopeName,
-									streamName,
-									streamConfig);
-				} else {
-					scaleToFixedSegmentCount(
-									controller, controlApiTimeoutMillis, scopeName, streamName, scalingPolicy);
+			if(controlStreamFlag) {
+				try {
+					val createStreamFuture = controller.createStream(scopeName, streamName, streamConfig);
+					if (createStreamFuture.get(controlApiTimeoutMillis, MILLISECONDS)) {
+						Loggers.MSG.trace(
+								"Stream \"{}/{}\" was created using the config: {}",
+								scopeName,
+								streamName,
+								streamConfig);
+					} else {
+						scaleToFixedSegmentCount(
+								controller, controlApiTimeoutMillis, scopeName, streamName, scalingPolicy);
+					}
+				} catch (final InterruptedException e) {
+					throwUnchecked(e);
+				} catch (final Throwable cause) {
+					LogUtil.exception(
+							Level.WARN, cause, "{}: failed to create the stream \"{}\"", stepId, streamName);
 				}
-			} catch (final InterruptedException e) {
-				throwUnchecked(e);
-			} catch (final Throwable cause) {
-				LogUtil.exception(
-								Level.WARN, cause, "{}: failed to create the stream \"{}\"", stepId, streamName);
 			}
 			return streamConfig;
 		}
@@ -310,6 +313,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		val controlConfig = driverConfig.configVal("control");
 		this.controlApiTimeoutMillis = controlConfig.longVal("timeoutMillis");
 		this.controlScopeFlag = controlConfig.boolVal("scope");
+		this.controlStreamFlag = controlConfig.boolVal("stream");
 		val scalingConfig = driverConfig.configVal("scaling");
 		this.scalingPolicy = PravegaScalingConfig.scalingPolicy(scalingConfig);
 		val netConfig = storageConfig.configVal("net");
