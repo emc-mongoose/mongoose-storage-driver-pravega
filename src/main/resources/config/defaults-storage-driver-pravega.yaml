@@ -23,6 +23,7 @@ storage:
     interestOpQueued: false
     keepAlive: true
     linger: 0
+    maxConnPerSegmentstore: 5
     reuseAddr: true
     rcvBuf: 0
     sndBuf: 0

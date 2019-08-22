@@ -114,6 +114,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	protected final String scopeName;
 	protected final String[] endpointAddrs;
 	protected final int nodePort;
+	protected final int maxConnectionsPerSegmentstore;
 	protected final long controlApiTimeoutMillis;
 	protected final boolean transactionMode;
 	protected final long evtOpTimeoutMillis;
@@ -315,6 +316,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		val netConfig = storageConfig.configVal("net");
 		this.uriSchema = netConfig.stringVal("uri-schema");
 		this.scopeName = storageConfig.stringVal("namespace");
+		this.maxConnectionsPerSegmentstore = netConfig.intVal("maxConnPerSegmentstore");
 		if (scopeName == null || scopeName.isEmpty()) {
 			Loggers.ERR.warn("Scope name not set, use the \"storage-namespace\" configuration option");
 		}
@@ -378,7 +380,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	}
 
 	ClientConfig createClientConfig(final URI endpointUri) {
-		val maxConnPerSegStore = ioWorkerCount;
+		val maxConnPerSegStore = maxConnectionsPerSegmentstore;
 		val clientConfigBuilder = ClientConfig
 			.builder()
 			.controllerURI(endpointUri)

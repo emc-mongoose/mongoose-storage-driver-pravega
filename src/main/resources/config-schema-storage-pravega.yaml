@@ -23,6 +23,7 @@ storage:
     interestOpQueued: boolean
     keepAlive: boolean
     linger: int
+    maxConnPerSegmentstore: int
     reuseAddr: boolean
     rcvBuf: int
     sndBuf: int
