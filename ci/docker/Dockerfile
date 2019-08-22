@@ -1,6 +1,6 @@
 ARG BASE_VERSION
 
-FROM adoptopenjdk/openjdk11:alpine
+FROM adoptopenjdk/openjdk11:x86_64-alpine-jdk-11.0.4_11
 ADD src ./src/
 ADD gradle ./gradle/
 ADD build.gradle ./build.gradle
