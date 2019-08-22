@@ -24,6 +24,9 @@ plugins {
 }
 repositories {
 	mavenCentral()
+	/*maven {
+		url "https://oss.sonatype.org/service/local/repositories/releases/content/"
+	}*/
 	if (findProperty("repositoryUrl")) {
 		maven {
 			url findProperty("repositoryUrl")
@@ -57,9 +60,9 @@ ext {
 		grpc                     : "1.17.1",
 		guava                    : "27.0.1-jre",
 		log4j                    : "2.8.2",
-		mongooseBase             : "4.2.12",
-		mongooseStorageDriverPreempt: "4.2.14",
-		mongooseLoadStepPipeline : "4.2.9",
+		mongooseBase             : "4.2.14",
+		mongooseStorageDriverPreempt: "4.2.17",
+		mongooseLoadStepPipeline : "4.2.11",
 		netty                    : "4.1.16.Final",
 		nettyTcNative            : "2.0.17.Final",
 		protobuf                 : "3.5.1",

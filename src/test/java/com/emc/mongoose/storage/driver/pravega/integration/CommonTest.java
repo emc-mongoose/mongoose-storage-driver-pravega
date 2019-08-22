@@ -93,7 +93,6 @@ public class CommonTest {
 			config.val("storage-driver-stream-data", "events");
 			config.val("storage-driver-threads", 0);
 			config.val("storage-driver-limit-queue-input", 1_000_000);
-			config.val("storage-driver-limit-queue-output", 1_000_000);
 			config.val("storage-driver-limit-concurrency", 1);
 			config.val("storage-namespace", "goose");
 			return config;
