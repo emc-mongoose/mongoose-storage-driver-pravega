@@ -68,15 +68,19 @@ public class CommonTest {
 			config.val("storage-net-tcpNoDelay", false);
 			config.val("storage-net-interestOpQueued", false);
 			config.val("storage-net-linger", 0);
+			config.val("storage-net-maxConnPerSegmentstore", 5);
 			config.val("storage-net-timeoutMillis", 0);
 			config.val("storage-net-node-addrs", PravegaNode.addr());
 			config.val("storage-net-node-port", PravegaNode.PORT);
 			config.val("storage-net-node-connAttemptsLimit", 0);
 			config.val("storage-net-uri-schema", "tcp");
+
 			config.val("storage-auth-uid", CREDENTIAL.getUid());
 			config.val("storage-auth-token", null);
 			config.val("storage-auth-secret", CREDENTIAL.getSecret());
+
 			config.val("storage-driver-control-scope", true);
+			config.val("storage-driver-control-stream", true);
 			config.val("storage-driver-control-timeoutMillis", 10_000);
 			config.val("storage-driver-event-transaction", false);
 			config.val("storage-driver-event-key-enabled", true);

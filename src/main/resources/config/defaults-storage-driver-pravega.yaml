@@ -3,6 +3,7 @@ storage:
   driver:
     control:
       scope: true
+      stream: true
       timeoutMillis: 10000
     event:
       transaction: false
@@ -23,6 +24,7 @@ storage:
     interestOpQueued: false
     keepAlive: true
     linger: 0
+    maxConnPerSegmentstore: 5
     reuseAddr: true
     rcvBuf: 0
     sndBuf: 0

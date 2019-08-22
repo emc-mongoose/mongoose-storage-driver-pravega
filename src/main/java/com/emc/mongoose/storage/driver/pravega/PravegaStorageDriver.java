@@ -114,6 +114,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	protected final String scopeName;
 	protected final String[] endpointAddrs;
 	protected final int nodePort;
+	protected final int maxConnectionsPerSegmentstore;
 	protected final long controlApiTimeoutMillis;
 	protected final boolean transactionMode;
 	protected final long evtOpTimeoutMillis;
@@ -140,6 +141,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	private final Lock lastFailedStreamPosLock = new ReentrantLock();
 	private volatile AsyncIterator<Stream> streamIterator = null;
 	private final boolean controlScopeFlag;
+	private final boolean controlStreamFlag;
 	private final Credentials cred;
 
 	@Value
@@ -214,23 +216,25 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 			final StreamConfiguration streamConfig = StreamConfiguration.builder()
 							.scalingPolicy(scalingPolicy)
 							.build();
-			try {
-				val createStreamFuture = controller.createStream(scopeName, streamName, streamConfig);
-				if (createStreamFuture.get(controlApiTimeoutMillis, MILLISECONDS)) {
-					Loggers.MSG.trace(
-									"Stream \"{}/{}\" was created using the config: {}",
-									scopeName,
-									streamName,
-									streamConfig);
-				} else {
-					scaleToFixedSegmentCount(
-									controller, controlApiTimeoutMillis, scopeName, streamName, scalingPolicy);
+			if(controlStreamFlag) {
+				try {
+					val createStreamFuture = controller.createStream(scopeName, streamName, streamConfig);
+					if (createStreamFuture.get(controlApiTimeoutMillis, MILLISECONDS)) {
+						Loggers.MSG.trace(
+								"Stream \"{}/{}\" was created using the config: {}",
+								scopeName,
+								streamName,
+								streamConfig);
+					} else {
+						scaleToFixedSegmentCount(
+								controller, controlApiTimeoutMillis, scopeName, streamName, scalingPolicy);
+					}
+				} catch (final InterruptedException e) {
+					throwUnchecked(e);
+				} catch (final Throwable cause) {
+					LogUtil.exception(
+							Level.WARN, cause, "{}: failed to create the stream \"{}\"", stepId, streamName);
 				}
-			} catch (final InterruptedException e) {
-				throwUnchecked(e);
-			} catch (final Throwable cause) {
-				LogUtil.exception(
-								Level.WARN, cause, "{}: failed to create the stream \"{}\"", stepId, streamName);
 			}
 			return streamConfig;
 		}
@@ -310,11 +314,13 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		val controlConfig = driverConfig.configVal("control");
 		this.controlApiTimeoutMillis = controlConfig.longVal("timeoutMillis");
 		this.controlScopeFlag = controlConfig.boolVal("scope");
+		this.controlStreamFlag = controlConfig.boolVal("stream");
 		val scalingConfig = driverConfig.configVal("scaling");
 		this.scalingPolicy = PravegaScalingConfig.scalingPolicy(scalingConfig);
 		val netConfig = storageConfig.configVal("net");
 		this.uriSchema = netConfig.stringVal("uri-schema");
 		this.scopeName = storageConfig.stringVal("namespace");
+		this.maxConnectionsPerSegmentstore = netConfig.intVal("maxConnPerSegmentstore");
 		if (scopeName == null || scopeName.isEmpty()) {
 			Loggers.ERR.warn("Scope name not set, use the \"storage-namespace\" configuration option");
 		}
@@ -378,7 +384,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	}
 
 	ClientConfig createClientConfig(final URI endpointUri) {
-		val maxConnPerSegStore = ioWorkerCount;
+		val maxConnPerSegStore = maxConnectionsPerSegmentstore;
 		val clientConfigBuilder = ClientConfig
 			.builder()
 			.controllerURI(endpointUri)
