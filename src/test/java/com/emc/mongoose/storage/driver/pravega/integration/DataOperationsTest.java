@@ -8,7 +8,6 @@ import com.emc.mongoose.base.data.DataInput;
 import com.emc.mongoose.base.env.Extension;
 import com.emc.mongoose.base.item.DataItem;
 import com.emc.mongoose.base.item.DataItemImpl;
-import com.emc.mongoose.base.item.io.SingleItemOutput;
 import com.emc.mongoose.base.item.op.OpType;
 import com.emc.mongoose.base.item.op.Operation;
 import com.emc.mongoose.base.item.op.data.DataOperation;
@@ -17,7 +16,7 @@ import com.emc.mongoose.storage.driver.pravega.PravegaStorageDriver;
 import com.emc.mongoose.storage.driver.pravega.io.ByteBufferSerializer;
 import com.emc.mongoose.storage.driver.pravega.util.PravegaNode;
 import com.github.akurilov.commons.collection.TreeUtil;
-import com.github.akurilov.commons.io.collection.LimitedQueueBuffer;
+import com.github.akurilov.commons.io.collection.ListOutput;
 import com.github.akurilov.commons.system.SizeInBytes;
 import com.github.akurilov.confuse.Config;
 import com.github.akurilov.confuse.SchemaProvider;
@@ -29,7 +28,6 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.util.*;
-import java.util.concurrent.SynchronousQueue;
 import java.util.stream.Collectors;
 import lombok.val;
 import org.junit.Ignore;
@@ -136,14 +134,16 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
 						0, OpType.CREATE, dataItem, null, streamName, credential, null, 0, null);
 
 		String scope = "goose";
+		val result = new ArrayList<DataOperation<DataItem>>(1);
+		val resultOut = new ListOutput<DataOperation<DataItem>>(result);
+		operationResultOutput(resultOut);
 		prepare(createTask);
 		createTask.status(Operation.Status.ACTIVE);
-		val resultSync = new SynchronousQueue<DataOperation<DataItem>>();
-		val resultOutput = new LimitedQueueBuffer<>(resultSync);
-		operationResultOutput(resultOutput);
 		put(createTask);
-		val result = resultSync.take();
-		assertEquals(Operation.Status.SUCC, result.status());
+		while (result.isEmpty()) {
+			Thread.sleep(1);
+		}
+		assertEquals(Operation.Status.SUCC, result.get(0).status());
 		assertEquals(dataItem.size(), createTask.countBytesDone());
 
 		final URI controllerURI = URI.create(
@@ -184,24 +184,28 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
 		String streamName = "default";
 		final DataOperation<DataItem> createTask = new DataOperationImpl<>(0, OpType.CREATE, dataItem, null, streamName, credential, null, 0, null);
 		String scope = "goose";
+		val results = new ArrayList<DataOperation<DataItem>>(2);
+		val resultOut = new ListOutput<DataOperation<DataItem>>(results);
+		operationResultOutput(resultOut);
 		prepare(createTask);
 		createTask.status(Operation.Status.ACTIVE);
-		val resultSync = new SynchronousQueue<DataOperation<DataItem>>();
-		val resultOutput = new LimitedQueueBuffer<>(resultSync);
-		operationResultOutput(resultOutput);
 		put(createTask);
-		val result = resultSync.take();
-		assertEquals(Operation.Status.SUCC, result.status());
+		while (results.isEmpty()) {
+			Thread.sleep(1);
+		}
+		assertEquals(Operation.Status.SUCC, results.get(0).status());
 		assertEquals(dataItem.size(), createTask.countBytesDone());
 		final DataItem dataItem2 = new DataItemImpl(0, MIB, 0);
 		dataItem2.name("0001");
 		final DataOperation<DataItem> createTask2 = new DataOperationImpl<>(0, OpType.READ, dataItem2, null, streamName, credential, null, 0, null);
 		prepare(createTask2);
 		createTask2.status(Operation.Status.ACTIVE);
-		boolean results = put(createTask2);
-		val result2 = resultSync.take();
-		assertTrue(results);
-		assertEquals("we didn't read the same size we had put into stream", (int) dataItem.size(),
-						(result2.item().size()));
+		assertTrue(put(createTask2));
+		while (results.size() < 2) {
+			Thread.sleep(1);
+		}
+		val result2 = results.get(1);
+		val item2 = result2.item();
+		assertEquals("we didn't read the same size we had put into stream", (int) dataItem.size(), item2.size());
 	}
 }
