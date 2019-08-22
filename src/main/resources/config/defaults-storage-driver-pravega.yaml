@@ -3,6 +3,7 @@ storage:
   driver:
     control:
       scope: true
+      stream: true
       timeoutMillis: 10000
     event:
       transaction: false
