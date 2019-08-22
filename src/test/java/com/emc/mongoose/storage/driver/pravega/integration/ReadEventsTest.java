@@ -8,6 +8,8 @@ import com.emc.mongoose.base.item.op.data.DataOperationImpl;
 import com.emc.mongoose.base.storage.Credential;
 import com.emc.mongoose.base.storage.driver.StorageDriver;
 import com.emc.mongoose.storage.driver.pravega.PravegaStorageDriver;
+import com.github.akurilov.commons.io.Output;
+import com.github.akurilov.commons.io.collection.ListOutput;
 import com.github.akurilov.commons.system.SizeInBytes;
 import lombok.val;
 import org.junit.After;
@@ -43,6 +45,9 @@ public class ReadEventsTest {
 		val config = DataOperationsTest.getConfig();
 		driver = new PravegaStorageDriver(
 						getClass().getSimpleName(), dataInput, config.configVal("storage"), false, 32768);
+		val createResults = new ArrayList<DataOperation<DataItem>>(EVENT_COUNT);
+		val createResultsOut = new ListOutput<DataOperation<DataItem>>(createResults);
+		driver.operationResultOutput(createResultsOut);
 		driver.start();
 		evtItems = new ArrayList<>(EVENT_COUNT);
 		for (var i = 0; i < EVENT_COUNT; i++) {
@@ -54,16 +59,14 @@ public class ReadEventsTest {
 										evtItem -> new DataOperationImpl<>(
 														0, CREATE, evtItem, SLASH + STREAM_NAME, SLASH + STREAM_NAME, Credential.NONE, null, 0))
 						.collect(Collectors.toList());
-		for (var i = 0; i < EVENT_COUNT; i += driver.put(createOps, i, EVENT_COUNT))
-			;
-		val createResults = new ArrayList<DataOperation<DataItem>>(EVENT_COUNT);
-		var n = 0;
-		for (var i = 0; i < EVENT_COUNT; i += driver.get(createResults, EVENT_COUNT - i)) {
-			if (n < i) {
-				System.out.println((i + 1) + " events been written...");
-				n = i;
+		for (var i = 0; i < EVENT_COUNT; i += driver.put(createOps, i, EVENT_COUNT));
+		for (var i = 0; i < 10; i ++) {
+			if(EVENT_COUNT == createResults.size()) {
+				break;
 			}
+			Thread.sleep(1_000);
 		}
+		assertEquals(EVENT_COUNT, createResults.size());
 		for (var i = 0; i < EVENT_COUNT; i++) {
 			val createResult = createResults.get(i);
 			assertEquals(SUCC, createResult.status());
@@ -87,16 +90,17 @@ public class ReadEventsTest {
 										evtItem -> new DataOperationImpl<>(
 														0, READ, evtItem, SLASH + STREAM_NAME, SLASH + STREAM_NAME, Credential.NONE, null, 0))
 						.collect(Collectors.toList());
-		for (var i = 0; i < EVENT_COUNT; i += driver.put(readOps, i, EVENT_COUNT))
-			;
 		val readResults = new ArrayList<DataOperation<DataItem>>(EVENT_COUNT);
-		var n = 0;
-		for (var i = 0; i < EVENT_COUNT; i += driver.get(readResults, EVENT_COUNT - i)) {
-			if (n < i) {
-				System.out.println((i + 1) + " events been read...");
-				n = i;
+		val readResultsOut = new ListOutput<DataOperation<DataItem>>(readResults);
+		driver.operationResultOutput(readResultsOut);
+		for (var i = 0; i < EVENT_COUNT; i += driver.put(readOps, i, EVENT_COUNT));
+		for (var i = 0; i < 10; i ++) {
+			if(EVENT_COUNT == readResults.size()) {
+				break;
 			}
+			Thread.sleep(1_000);
 		}
+		assertEquals(EVENT_COUNT, readResults.size());
 		for (var i = 0; i < EVENT_COUNT; i++) {
 			val readResult = readResults.get(i);
 			assertEquals("Event #" + i + " read failed", SUCC, readResult.status());
@@ -113,16 +117,17 @@ public class ReadEventsTest {
 										evtItem -> new DataOperationImpl<>(
 														0, READ, evtItem, SLASH + STREAM_NAME, SLASH + STREAM_NAME, Credential.NONE, null, 0))
 						.collect(Collectors.toList());
-		for (var i = 0; i < EVENT_COUNT; i += driver.put(readOps, i, EVENT_COUNT))
-			;
 		val readResults = new ArrayList<DataOperation<DataItem>>(EVENT_COUNT);
-		var n = 0;
-		for (var i = 0; i < EVENT_COUNT; i += driver.get(readResults, EVENT_COUNT - i)) {
-			if (n < i) {
-				System.out.println((i + 1) + " events been read...");
-				n = i;
+		val readResultsOut = new ListOutput<DataOperation<DataItem>>(readResults);
+		driver.operationResultOutput(readResultsOut);
+		for (var i = 0; i < EVENT_COUNT; i += driver.put(readOps, i, EVENT_COUNT)) ;
+		for (var i = 0; i < 10; i ++) {
+			if(EVENT_COUNT == readResults.size()) {
+				break;
 			}
+			Thread.sleep(1_000);
 		}
+		assertEquals(EVENT_COUNT, readResults.size());
 		for (var i = 0; i < EVENT_COUNT; i++) {
 			val readResult = readResults.get(i);
 			assertEquals("Event #" + i + " read failed", SUCC, readResult.status());
