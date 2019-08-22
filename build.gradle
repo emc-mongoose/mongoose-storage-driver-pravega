@@ -24,6 +24,9 @@ plugins {
 }
 repositories {
 	mavenCentral()
+	maven {
+		url "https://oss.sonatype.org/service/local/repositories/releases/content/"
+	}
 	if (findProperty("repositoryUrl")) {
 		maven {
 			url findProperty("repositoryUrl")
