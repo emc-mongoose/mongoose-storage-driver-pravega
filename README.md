@@ -59,7 +59,6 @@ Mongoose and Pravega are using quite different concepts. So it's necessary to de
 | [Event](http://pravega.io/docs/latest/pravega-concepts/#events) | *Data Item* |
 | Stream Segment | N/A |
 
-
 # 2. Features
 
 * Authentication: provided externally
@@ -194,15 +193,8 @@ Mongoose should perform the load operations on the *events* when the configurati
 
 ### 5.1.1. Create
 
-Steps:
-1. Get the endpoint URI from the cache.
-2. Check if the corresponding `StreamManager` exists using the cache, create a new one if it doesn't.
-3. Check if the destination scope exists using the cache, create a new one if it doesn't.
-4. Check if the destination stream exists using the cache, create a new one if it doesn't.
-5. Check if the corresponding `ClientFactory` exists using the cache, create a new one if it doesn't.
-6. Check if the `EventStreamWriter` exists using the cache, create new one if it doesn't.
-7. Submit the event writing, use a routing key if configured.
-8. Submit the load operation completion handler.
+Write new events into the specified stream(s). The operation latency is measured as the time between the corresponding 
+`writeEvent` call returns and the returned completion callback is triggered.
 
 #### 5.1.1.1. Transactional
 
@@ -223,23 +215,19 @@ docker run \
     --item-data-size=10KB
 ```
 
+Note that in this mode the operation (transaction) latency is equal to the duration.
+
 ### 5.1.2. Read
 
 **Notes**:
 > * The Pravega storage doesn't support reading the stream events in the random order.
+> * The operation latency is effectively equal to the duration due to blocking read event method.
 
 There is also another option, called `storage-driver-read-timeoutMillis`. Pravega documentation says it only works when
 there is no available event in the stream. `readNextEvent()` will block for the specified time in ms. So, in theory 0
 and 1 should work just fine. They do not. In practice, this value should be somewhere between 100 and 2000 ms (2000 is
 Pravega default value).
 
-Steps:
-1. Get the endpoint URI from the cache.
-2. Check if the corresponding `StreamManager` exists using the cache, create a new one if it doesn't.
-3. Check if the corresponding `ClientFactory` exists using the cache, create a new one if it doesn't.
-4. Check if the corresponding `EventStreamReader<ByteBuffer>` exists using the cache, create a new one if it doesn't.
-5. Read the next event, verify the returned byte buffer content if configured so, discard it otherwise.
-6. Invoke the load operation completion handler.
 
 ### 5.1.3. Update
 
