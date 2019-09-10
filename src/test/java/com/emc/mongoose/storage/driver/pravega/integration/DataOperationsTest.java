@@ -122,6 +122,7 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
 						config.configVal("storage"),
 						true,
 						config.configVal("load").intVal("batch-size"));
+		start();
 	}
 
 	@Test
