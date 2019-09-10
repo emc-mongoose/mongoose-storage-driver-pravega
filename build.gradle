@@ -61,7 +61,7 @@ ext {
 		guava                    : "27.0.1-jre",
 		log4j                    : "2.8.2",
 		mongooseBase             : "4.2.15",
-		mongooseStorageDriverPreempt: "4.2.18",
+		mongooseStorageDriverPreempt: "4.2.19",
 		mongooseLoadStepPipeline : "4.2.11",
 		netty                    : "4.1.16.Final",
 		nettyTcNative            : "2.0.17.Final",
