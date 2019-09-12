@@ -409,7 +409,7 @@ TEST=create_event_transactional_stream ./gradlew robotest
 cp -f build/libs/mongoose-storage-driver-pravega-*.jar ~/.mongoose/<MONGOOSE_BASE_VERSION>/ext/
 ```
 Note that the Pravega storage driver depends on the 
-[Coop Storage Driver](http://repo.maven.apache.org/maven2/com/github/emc-mongoose/mongoose-storage-driver-coop/) 
+[Preemptive Storage Driver](http://repo.maven.apache.org/maven2/com/github/emc-mongoose/mongoose-storage-driver-preempt/) 
 extension so it should be also put into the `ext` directory
 3. Build and install the corresponding Pravega version:
 ```bash
