@@ -1,6 +1,5 @@
 package com.emc.mongoose.storage.driver.pravega;
 
-import static com.emc.mongoose.base.Constants.DIR_EXT;
 import static com.emc.mongoose.base.Exceptions.throwUncheckedIfInterrupted;
 import static com.emc.mongoose.base.item.op.OpType.NOOP;
 import static com.emc.mongoose.base.item.op.Operation.SLASH;
@@ -21,8 +20,6 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 import com.emc.mongoose.base.config.IllegalConfigurationException;
 import com.emc.mongoose.base.data.DataInput;
-import com.emc.mongoose.base.env.CoreResourcesToInstall;
-import com.emc.mongoose.base.env.Extension;
 import com.emc.mongoose.base.item.DataItem;
 import com.emc.mongoose.base.item.ItemFactory;
 import com.emc.mongoose.base.item.op.OpType;
@@ -78,9 +75,7 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.URLClassLoader;
 import java.nio.ByteBuffer;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -593,11 +588,6 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	@Override
 	protected ThreadFactory ioWorkerThreadFactory() {
 		return new IoWorkerThreadFactory();
-	}
-
-	@Override
-	protected boolean isBatch(final List<O> ops, final int from, final int to) {
-		return EVENTS.equals(streamDataType);
 	}
 
 	@Override

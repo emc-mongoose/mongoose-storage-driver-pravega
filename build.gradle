@@ -24,9 +24,9 @@ plugins {
 }
 repositories {
 	mavenCentral()
-	/*maven {
-		url "https://oss.sonatype.org/service/local/repositories/releases/content/"
-	}*/
+	maven {
+        url "https://oss.sonatype.org/service/local/repositories/comgithubemc-mongoose-1551/content"
+	}
 	if (findProperty("repositoryUrl")) {
 		maven {
 			url findProperty("repositoryUrl")
@@ -46,7 +46,7 @@ repositories {
 }
 description = "Mongoose is a high-load storage performance testing tool"
 group = "com.github.emc-mongoose"
-version = "4.2.23"
+version = "4.2.24"
 sourceCompatibility = 11
 targetCompatibility = 11
 ext {
@@ -61,7 +61,7 @@ ext {
 		guava                    : "27.0.1-jre",
 		log4j                    : "2.8.2",
 		mongooseBase             : "4.2.15",
-		mongooseStorageDriverPreempt: "4.2.19",
+		mongooseStorageDriverPreempt: "4.2.20",
 		mongooseLoadStepPipeline : "4.2.11",
 		netty                    : "4.1.16.Final",
 		nettyTcNative            : "2.0.17.Final",
