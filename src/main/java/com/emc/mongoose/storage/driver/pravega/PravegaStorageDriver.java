@@ -700,14 +700,12 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 					if (null == routingKeyFunc) {
 						for (var i = 0; i < opsCount; i++) {
 							evtOp = ops.get(i);
-							prepare(evtOp);
 							evtOp.startRequest();
 							txn.writeEvent(evtOp.item());
 						}
 					} else {
 						for (var i = 0; i < opsCount; i++) {
 							evtOp = ops.get(i);
-							prepare(evtOp);
 							evtItem = evtOp.item();
 							routingKey = routingKeyFunc.apply(evtItem);
 							evtOp.startRequest();
@@ -761,7 +759,6 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				if (null == routingKeyFunc) {
 					for (var i = 0; i < opsCount; i++) {
 						val evtOp = ops.get(i);
-						prepare(evtOp);
 						concurrencyThrottle.acquire();
 						evtOp.startRequest();
 						val evtWriteFuture = evtWriter.writeEvent(evtOp.item());
@@ -773,7 +770,6 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				} else {
 					for (var i = 0; i < opsCount; i++) {
 						val evtOp = ops.get(i);
-						prepare(evtOp);
 						val evtItem = evtOp.item();
 						val routingKey = routingKeyFunc.apply(evtItem);
 						concurrencyThrottle.acquire();
