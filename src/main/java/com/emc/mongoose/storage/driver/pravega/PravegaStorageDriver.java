@@ -297,13 +297,31 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	private final ThreadLocal<Map<EventStreamClientFactory, TransactionalEventStreamWriter<I>>> threadLocalTxnEvtWriterCache = ThreadLocal.withInitial(ConcurrentHashMap::new);
 
 	public PravegaStorageDriver(
-					final String stepId,
-					final DataInput dataInput,
-					final Config storageConfig,
-					final boolean verifyFlag,
-					final int batchSize)
-					throws IllegalConfigurationException, IllegalArgumentException {
-		super(stepId, dataInput, storageConfig, verifyFlag, batchSize);
+		final String stepId,
+		final DataInput dataInput,
+		final Config storageConfig,
+		final boolean verifyFlag,
+		final int batchSize
+	) throws IllegalConfigurationException, IllegalArgumentException {
+		this(
+			stepId,
+			dataInput,
+			storageConfig,
+			verifyFlag,
+			batchSize,
+			StreamDataType.valueOf(storageConfig.stringVal("driver-stream-data").toUpperCase())
+		);
+	}
+
+	PravegaStorageDriver(
+		final String stepId,
+		final DataInput dataInput,
+		final Config storageConfig,
+		final boolean verifyFlag,
+		final int batchSize,
+		final StreamDataType streamDataType
+	) throws IllegalConfigurationException, IllegalArgumentException {
+		super(stepId, dataInput, storageConfig, verifyFlag, BYTES.equals(streamDataType) ? 1 : batchSize);
 		this.concurrencyThrottle = new Semaphore(concurrencyLimit > 0 ? concurrencyLimit : Integer.MAX_VALUE, true);
 		val driverConfig = storageConfig.configVal("driver");
 		val controlConfig = driverConfig.configVal("control");
