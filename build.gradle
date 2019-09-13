@@ -24,9 +24,6 @@ plugins {
 }
 repositories {
 	mavenCentral()
-	maven {
-        url "https://oss.sonatype.org/service/local/repositories/comgithubemc-mongoose-1551/content"
-	}
 	if (findProperty("repositoryUrl")) {
 		maven {
 			url findProperty("repositoryUrl")
