@@ -1,6 +1,5 @@
 package com.emc.mongoose.storage.driver.pravega;
 
-import static com.emc.mongoose.base.Constants.DIR_EXT;
 import static com.emc.mongoose.base.Exceptions.throwUncheckedIfInterrupted;
 import static com.emc.mongoose.base.item.op.OpType.NOOP;
 import static com.emc.mongoose.base.item.op.Operation.SLASH;
@@ -21,8 +20,6 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 import com.emc.mongoose.base.config.IllegalConfigurationException;
 import com.emc.mongoose.base.data.DataInput;
-import com.emc.mongoose.base.env.CoreResourcesToInstall;
-import com.emc.mongoose.base.env.Extension;
 import com.emc.mongoose.base.item.DataItem;
 import com.emc.mongoose.base.item.ItemFactory;
 import com.emc.mongoose.base.item.op.OpType;
@@ -78,9 +75,7 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.URLClassLoader;
 import java.nio.ByteBuffer;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -302,13 +297,31 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	private final ThreadLocal<Map<EventStreamClientFactory, TransactionalEventStreamWriter<I>>> threadLocalTxnEvtWriterCache = ThreadLocal.withInitial(ConcurrentHashMap::new);
 
 	public PravegaStorageDriver(
-					final String stepId,
-					final DataInput dataInput,
-					final Config storageConfig,
-					final boolean verifyFlag,
-					final int batchSize)
-					throws IllegalConfigurationException, IllegalArgumentException {
-		super(stepId, dataInput, storageConfig, verifyFlag, batchSize);
+		final String stepId,
+		final DataInput dataInput,
+		final Config storageConfig,
+		final boolean verifyFlag,
+		final int batchSize
+	) throws IllegalConfigurationException, IllegalArgumentException {
+		this(
+			stepId,
+			dataInput,
+			storageConfig,
+			verifyFlag,
+			batchSize,
+			StreamDataType.valueOf(storageConfig.stringVal("driver-stream-data").toUpperCase())
+		);
+	}
+
+	PravegaStorageDriver(
+		final String stepId,
+		final DataInput dataInput,
+		final Config storageConfig,
+		final boolean verifyFlag,
+		final int batchSize,
+		final StreamDataType streamDataType
+	) throws IllegalConfigurationException, IllegalArgumentException {
+		super(stepId, dataInput, storageConfig, verifyFlag, BYTES.equals(streamDataType) ? 1 : batchSize);
 		this.concurrencyThrottle = new Semaphore(concurrencyLimit > 0 ? concurrencyLimit : Integer.MAX_VALUE, true);
 		val driverConfig = storageConfig.configVal("driver");
 		val controlConfig = driverConfig.configVal("control");
@@ -596,11 +609,6 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	}
 
 	@Override
-	protected boolean isBatch(final List<O> ops, final int from, final int to) {
-		return EVENTS.equals(streamDataType);
-	}
-
-	@Override
 	protected final void execute(final O op)
 					throws IllegalStateException {
 		val opType = op.type();
@@ -710,14 +718,12 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 					if (null == routingKeyFunc) {
 						for (var i = 0; i < opsCount; i++) {
 							evtOp = ops.get(i);
-							prepare(evtOp);
 							evtOp.startRequest();
 							txn.writeEvent(evtOp.item());
 						}
 					} else {
 						for (var i = 0; i < opsCount; i++) {
 							evtOp = ops.get(i);
-							prepare(evtOp);
 							evtItem = evtOp.item();
 							routingKey = routingKeyFunc.apply(evtItem);
 							evtOp.startRequest();
@@ -771,7 +777,6 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				if (null == routingKeyFunc) {
 					for (var i = 0; i < opsCount; i++) {
 						val evtOp = ops.get(i);
-						prepare(evtOp);
 						concurrencyThrottle.acquire();
 						evtOp.startRequest();
 						val evtWriteFuture = evtWriter.writeEvent(evtOp.item());
@@ -783,7 +788,6 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				} else {
 					for (var i = 0; i < opsCount; i++) {
 						val evtOp = ops.get(i);
-						prepare(evtOp);
 						val evtItem = evtOp.item();
 						val routingKey = routingKeyFunc.apply(evtItem);
 						concurrencyThrottle.acquire();
