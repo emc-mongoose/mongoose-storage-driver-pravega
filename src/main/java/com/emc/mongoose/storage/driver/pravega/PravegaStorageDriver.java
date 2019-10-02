@@ -67,20 +67,14 @@ import io.pravega.client.stream.Stream;
 import io.pravega.client.stream.StreamConfiguration;
 import io.pravega.client.stream.TransactionalEventStreamWriter;
 import io.pravega.client.stream.TxnFailedException;
-import io.pravega.client.stream.impl.Controller;
-import io.pravega.client.stream.impl.ControllerImpl;
-import io.pravega.client.stream.impl.ControllerImplConfig;
+import io.pravega.client.stream.impl.*;
 
 import java.io.EOFException;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.ServiceLoader;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -93,8 +87,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-import io.pravega.client.stream.impl.Credentials;
-import io.pravega.client.stream.impl.DefaultCredentials;
 import io.pravega.common.util.AsyncIterator;
 import lombok.Value;
 import lombok.val;
@@ -132,13 +124,14 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	private final AtomicInteger rrc = new AtomicInteger(0);
 	private final ScheduledExecutorService bgExecutor;
 	private final RoutingKeyFunction<I> routingKeyFunc;
-	private volatile ThreadLocal<Position> lastFailedStreamPos = new ThreadLocal<Position>(); //TODO: probably erase ThreadLocal as it doesn't help. Position is a map for all segments.
+	private volatile Position lastFailedStreamPos = null;
 	//so we always will see corrupted events for all segments.
 	private final Lock lastFailedStreamPosLock = new ReentrantLock();
 	private volatile AsyncIterator<Stream> streamIterator = null;
 	private final boolean controlScopeFlag;
 	private final boolean controlStreamFlag;
 	private final Credentials cred;
+	private final int batchSize;
 
 	@Value
 	final class ScopeCreateFunctionImpl
@@ -323,6 +316,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		final StreamDataType streamDataType
 	) throws IllegalConfigurationException, IllegalArgumentException {
 		super(stepId, dataInput, storageConfig, verifyFlag, BYTES.equals(streamDataType) ? 1 : batchSize);
+		this.batchSize = batchSize;
 		this.concurrencyThrottle = new Semaphore(concurrencyLimit > 0 ? concurrencyLimit : Integer.MAX_VALUE, true);
 		val driverConfig = storageConfig.configVal("driver");
 		val controlConfig = driverConfig.configVal("control");
@@ -456,7 +450,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		if (BYTES.equals(streamDataType)) {
 			items = listStreams(itemFactory, path, prefix, idRadix, lastPrevItem, count);
 		} else {
-			items = makeEventItems(itemFactory, path, prefix, lastPrevItem, 100); //TODO: change to recycleLimit
+			items = makeEventItems(itemFactory, path, prefix, lastPrevItem, batchSize);
 		}
 		return items;
 	}
@@ -862,6 +856,16 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 			}
 		}
 	}
+    /*private boolean streamPositionsAreEqual(Position pos1,Position pos2) {
+	    if ((null==pos1) || (null==pos2)) {
+	        return true;
+        }
+        System.out.println(pos1.toString());
+        System.out.println(pos2.toString());
+        System.out.println(Arrays.hashCode(pos1.toBytes().array()));
+        System.out.println(Arrays.hashCode(pos2.toBytes().array()));
+        return true;
+    }*/
 
 	void readEvent(final EventStreamReader<ByteBuffer> evtReader, final O evtOp)
 	throws IOException {
@@ -880,11 +884,12 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				val streamPos = evtRead.getPosition();
 				lastFailedStreamPosLock.lock();
 				try {
+				    //streamPositionsAreEqual(lastFailedStreamPos,streamPos);
 					if ((null != lastFailedStreamPos) && (streamPos.toString().equals(lastFailedStreamPos.toString()))) { //TODO: streamPositionsAreEqual(pos1, pos2)
 						Loggers.MSG.debug("{}: no more events @ position {}", stepId, streamPos);
 						completeOperation(evtOp, FAIL_TIMEOUT);
 					} else {
-						lastFailedStreamPos.set(streamPos);
+						lastFailedStreamPos = streamPos;
 						Loggers.ERR.warn("{}: corrupted event @ position {}", stepId, streamPos);
 						completeOperation(evtOp, RESP_FAIL_CORRUPT);
 					}
