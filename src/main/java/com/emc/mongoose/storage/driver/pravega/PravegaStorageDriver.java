@@ -844,7 +844,8 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				val evtReaderPool = evtStreamReaderPoolCache.computeIfAbsent(streamName, this::createEventStreamReaderPool);
 				var evtReader_ = evtReaderPool.poll();
 				if(null == evtReader_) {
-					evtReader_ = clientFactory.createReader(Thread.currentThread().getName(), evtReaderGroupName, evtDeserializer, evtReaderConfig);
+					evtReader_ = clientFactory.createReader(Thread.currentThread().getName(),
+							evtReaderGroupName, evtDeserializer, evtReaderConfig);
 				}
 				val evtReader = evtReader_;
 				//val evtReader = evtStreamReaderCache.computeIfAbsent(evtReaderGroupName, evtReaderCreateFunc);
@@ -861,12 +862,11 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 			}
 		}
 	}
-    private boolean streamPositionsAreEqual(Position pos1,Position pos2) {
+    private boolean streamPositionsAreEqual(PositionImpl pos1,PositionImpl pos2) {
 	    if ((null==pos1) || (null==pos2)) {
 	        return false;
         }
-        //return pos1.asImpl().getOwnedSegmentsWithOffsets();
-		return true;
+        return pos1.getOwnedSegmentsWithOffsets().equals(pos2.getOwnedSegmentsWithOffsets());
     }
 
 	void readEvent(final EventStreamReader<ByteBuffer> evtReader, final O evtOp)
@@ -886,8 +886,8 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				val streamPos = evtRead.getPosition();
 				lastFailedStreamPosLock.lock();
 				try {
-				    //streamPositionsAreEqual(lastFailedStreamPos.get(),(PositionImpl)streamPos);
-					if ((null != lastFailedStreamPos.get()) && (streamPos.toString().equals(lastFailedStreamPos.get().toString()))) {
+					if ((null != lastFailedStreamPos.get())
+							&& (streamPositionsAreEqual((PositionImpl)lastFailedStreamPos.get(),(PositionImpl)streamPos))) {
 						Loggers.MSG.debug("{}: no more events @ position {}", stepId, streamPos);
 						completeOperation(evtOp, FAIL_TIMEOUT);
 					} else {
