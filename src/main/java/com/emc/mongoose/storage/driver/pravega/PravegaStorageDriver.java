@@ -83,6 +83,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import io.pravega.common.util.AsyncIterator;
 import lombok.Value;
 import lombok.val;
+import org.apache.commons.lang.RandomStringUtils;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.ThreadContext;
 
@@ -448,7 +449,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		if (BYTES.equals(streamDataType)) {
 			items = listStreams(itemFactory, path, prefix, idRadix, lastPrevItem, count);
 		} else {
-			items = makeEventItems(itemFactory, path, prefix, lastPrevItem, batchSize);
+			items = makeEventItems(itemFactory, path, prefix, lastPrevItem, 1);
 		}
 		return items;
 	}
@@ -824,35 +825,14 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				val nodeAddr = anyEvtOp.nodeAddr();
 				val endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
 				val clientConfig = clientConfigCache.computeIfAbsent(endpointUri, this::createClientConfig);
-				val streamName = extractStreamName(anyEvtOp.dstPath());
-				val readerGroupConfigBuilder = evtReaderGroupConfigBuilder.get();
-				val readerGroupConfig = evtReaderGroupConfigCache.computeIfAbsent(
-						scopeName + SLASH + streamName, key -> readerGroupConfigBuilder.stream(key).build());
-				val readerGroupManagerCreateFunc = evtReaderGroupManagerCreateFuncCache.computeIfAbsent(
-						clientConfig, ReaderGroupManagerCreateFunctionImpl::new);
 				val clientFactoryCreateFunc = clientFactoryCreateFuncCache.computeIfAbsent(
 						clientConfig, EventStreamClientFactoryCreateFunctionImpl::new);
 				val clientFactory = clientFactoryCache.computeIfAbsent(scopeName, clientFactoryCreateFunc);
-				val evtReaderCreateFunc = evtStreamReaderCreateFuncCache.computeIfAbsent(
-						clientFactory, ReaderCreateFunctionImpl::new);
-				evtReaderGroupManagerCache.computeIfAbsent(
-					scopeName, key -> {
-						val readerGroupManager = readerGroupManagerCreateFunc.apply(key);
-						readerGroupManager.createReaderGroup(evtReaderGroupName, readerGroupConfig);
-						return readerGroupManager;
-					});
-				val evtReaderPool = evtStreamReaderPoolCache.computeIfAbsent(streamName, this::createEventStreamReaderPool);
-				var evtReader_ = evtReaderPool.poll();
-				if(null == evtReader_) {
-					evtReader_ = clientFactory.createReader(Thread.currentThread().getName(),
-							evtReaderGroupName, evtDeserializer, evtReaderConfig);
-				}
-				val evtReader = evtReader_;
-				//val evtReader = evtStreamReaderCache.computeIfAbsent(evtReaderGroupName, evtReaderCreateFunc);
+				val readerGroupManagerCreateFunc = evtReaderGroupManagerCreateFuncCache.computeIfAbsent(
+						clientConfig, ReaderGroupManagerCreateFunctionImpl::new);
 				for(var i = 0; i < opsCount; i ++) {
-					readEvent(evtReader, evtOps.get(i));
+					readEvent(readerGroupManagerCreateFunc, clientFactory, evtOps.get(i));
 				}
-				evtReaderPool.offer(evtReader);
 			} catch(final Throwable e) {
 				throwUncheckedIfInterrupted(e);
 				completeOperations(evtOps, FAIL_UNKNOWN);
@@ -862,42 +842,55 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 			}
 		}
 	}
-    private boolean streamPositionsAreEqual(PositionImpl pos1,PositionImpl pos2) {
-	    if ((null==pos1) || (null==pos2)) {
-	        return false;
-        }
-        return pos1.getOwnedSegmentsWithOffsets().equals(pos2.getOwnedSegmentsWithOffsets());
-    }
 
-	void readEvent(final EventStreamReader<ByteBuffer> evtReader, final O evtOp)
+
+	void readEvent( ReaderGroupManagerCreateFunction readerGroupManagerCreateFunc, EventStreamClientFactory clientFactory, final O evtOp)
 	throws IOException {
+		val streamName = extractStreamName(evtOp.dstPath());
+		val readerGroupConfigBuilder = evtReaderGroupConfigBuilder.get();
+		val readerGroupConfig = evtReaderGroupConfigCache.computeIfAbsent(
+				scopeName + SLASH + streamName, key -> readerGroupConfigBuilder.stream(key).build());
+		val readerGroupManager = evtReaderGroupManagerCache.computeIfAbsent(scopeName, key -> {
+					return readerGroupManagerCreateFunc.apply(key);
+		});
+		readerGroupManager.createReaderGroup(evtReaderGroupName, readerGroupConfig);
+		val evtReaderPool = evtStreamReaderPoolCache.computeIfAbsent(streamName, this::createEventStreamReaderPool);
+		var evtReader_ = evtReaderPool.poll();
+		String randomGeneratedString = RandomStringUtils.randomAlphanumeric(10);
+		if(null == evtReader_) {
+			evtReader_ = clientFactory.createReader(Thread.currentThread().getName()+randomGeneratedString,
+					evtReaderGroupName, evtDeserializer, evtReaderConfig);
+		}
+		val evtReader = evtReader_;
 		evtOp.startRequest();
 		evtOp.finishRequest();
-		val evtRead = evtReader.readNextEvent(evtOpTimeoutMillis);
+		//TODO: should we startRequest() after all preparations or at the beginning of the method?
+		var evtRead_ = evtReader.readNextEvent(evtOpTimeoutMillis);
+		while (evtRead_.isCheckpoint()) {
+			Loggers.MSG.debug("{}: stream checkpoint @ position {}", stepId, evtRead_.getPosition());
+			evtRead_ = evtReader.readNextEvent(evtOpTimeoutMillis);
+		}
 		evtOp.startResponse();
 		evtOp.finishResponse();
-		if (null == evtRead) {
-			Loggers.MSG.info(
-				"{}: no more events in the stream \"{}\" @ the scope \"{}\"", stepId, evtOp.dstPath(), scopeName);
+		evtReaderPool.offer(evtReader);
+		val evtRead=evtRead_;
+		val evtData = evtRead.getEvent();
+		if (null == evtData) {
+			val streamPos = evtRead.getPosition();
+			if (null == streamPos) {
+				Loggers.MSG.info("{}: empty reader. No EventSegmentReader assigned", stepId);
+			}
+			Loggers.MSG.info("{}: no more events @ position {}", stepId, streamPos);
 			completeOperation(evtOp, FAIL_TIMEOUT);
-		} else {
-			val evtData = evtRead.getEvent();
-			if (null == evtData) {
-				val streamPos = evtRead.getPosition();
-				lastFailedStreamPosLock.lock();
-				try {
-					if ((null != lastFailedStreamPos.get())
-							&& (streamPositionsAreEqual((PositionImpl)lastFailedStreamPos.get(),(PositionImpl)streamPos))) {
-						Loggers.MSG.debug("{}: no more events @ position {}", stepId, streamPos);
-						completeOperation(evtOp, FAIL_TIMEOUT);
-					} else {
-						lastFailedStreamPos.set(streamPos);
-						Loggers.ERR.warn("{}: corrupted event @ position {}", stepId, streamPos);
-						completeOperation(evtOp, RESP_FAIL_CORRUPT);
-					}
-				} finally {
-					lastFailedStreamPosLock.unlock();
-				}
+						/*if ((null != lastFailedStreamPos.get())
+								&& (streamPositionsAreEqual((PositionImpl)lastFailedStreamPos.get(),(PositionImpl)streamPos))) {
+							Loggers.MSG.debug("{}: no more events @ position {}", stepId, streamPos);
+							completeOperation(evtOp, INTERRUPTED);
+						} else {
+							lastFailedStreamPos.set(streamPos);
+							Loggers.ERR.warn("{}: corrupted event @ position {}", stepId, streamPos);
+							completeOperation(evtOp, RESP_FAIL_CORRUPT);
+						}*/
 			} else {
 				val bytesDone = evtData.remaining();
 				val evtItem = evtOp.item();
@@ -905,7 +898,6 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				evtOp.countBytesDone(evtItem.size());
 				completeOperation(evtOp, SUCC);
 			}
-		}
 	}
 
 	void createByteStream(final O streamOp, final String nodeAddr) {
