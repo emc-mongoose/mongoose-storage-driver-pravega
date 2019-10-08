@@ -7,6 +7,7 @@ import static com.emc.mongoose.base.item.op.Operation.Status.FAIL_IO;
 import static com.emc.mongoose.base.item.op.Operation.Status.FAIL_TIMEOUT;
 import static com.emc.mongoose.base.item.op.Operation.Status.FAIL_UNKNOWN;
 import static com.emc.mongoose.base.item.op.Operation.Status.INTERRUPTED;
+import static com.emc.mongoose.base.item.op.Operation.Status.PENDING;
 import static com.emc.mongoose.base.item.op.Operation.Status.RESP_FAIL_CORRUPT;
 import static com.emc.mongoose.base.item.op.Operation.Status.RESP_FAIL_UNKNOWN;
 import static com.emc.mongoose.base.item.op.Operation.Status.SUCC;
@@ -110,7 +111,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 					.builder()
 					.initialAllocationDelay(0)
 					.build();
-	protected final String evtReaderGroupName = Long.toString(System.nanoTime());
+	//protected final String evtReaderGroupName = Long.toString(System.nanoTime());
 	protected final ThreadLocal<ReaderGroupConfig.ReaderGroupConfigBuilder> evtReaderGroupConfigBuilder = ThreadLocal.withInitial(ReaderGroupConfig::builder);
 	protected final ScalingPolicy scalingPolicy;
 	protected final StreamDataType streamDataType;
@@ -271,8 +272,12 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	// * reader group
 	private final Map<String, ReaderGroupConfig> evtReaderGroupConfigCache = new ConcurrentHashMap<>();
 	private final Map<ClientConfig, ReaderGroupManagerCreateFunction> evtReaderGroupManagerCreateFuncCache = new ConcurrentHashMap<>();
-	private final Map<String, ReaderGroupManager> evtReaderGroupManagerCache = new ConcurrentHashMap<>();
-	// * event stream reader
+    // * RGManager per scope
+    //TODO: idk who wrote this, probably me, but it doesn't make any sense as we can only have one scope so far.
+    private final Map<String, ReaderGroupManager> evtReaderGroupManagerCache = new ConcurrentHashMap<>();
+    // * RGName per stream per scope
+    private final Map<String, Map<String, String>> evtReaderGroupCache = new ConcurrentHashMap<>();
+    // * event stream reader
 	private final Map<EventStreamClientFactory, ReaderCreateFunction> evtStreamReaderCreateFuncCache = new ConcurrentHashMap<>();
 	// * pool of readers for each stream
 	private final Map<String, Queue<EventStreamReader<ByteBuffer>>> evtStreamReaderPoolCache = new ConcurrentHashMap<>();
@@ -853,12 +858,27 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		val readerGroupManager = evtReaderGroupManagerCache.computeIfAbsent(scopeName, key -> {
 					return readerGroupManagerCreateFunc.apply(key);
 		});
-		readerGroupManager.createReaderGroup(evtReaderGroupName, readerGroupConfig);
-		val evtReaderPool = evtStreamReaderPoolCache.computeIfAbsent(streamName, this::createEventStreamReaderPool);
+        //val evtReaderGroupName = "RG_"+scopeName + "/" + streamName;
+
+		/*val evtReaderGroupName = evtReaderGroupCache
+				.computeIfAbsent(scopeName, this::createInstanceCache)
+				.computeIfAbsent(streamName, key -> {
+					val evtLocalReaderGroupName = "RG_"+scopeName + "/" + streamName;
+					readerGroupManager.createReaderGroup(evtLocalReaderGroupName, readerGroupConfig);
+					return evtLocalReaderGroupName;
+				});*/
+
+        val evtReaderGroupName = "RG_"+scopeName + "/" + streamName;
+        evtReaderGroupCache
+                .computeIfAbsent(scopeName, this::createInstanceCache)
+                .computeIfAbsent(streamName, key -> {
+                    readerGroupManager.createReaderGroup(evtReaderGroupName, readerGroupConfig);
+                    return evtReaderGroupName;
+                });
+        val evtReaderPool = evtStreamReaderPoolCache.computeIfAbsent(streamName, this::createEventStreamReaderPool);
 		var evtReader_ = evtReaderPool.poll();
-		String randomGeneratedString = RandomStringUtils.randomAlphanumeric(10);
 		if(null == evtReader_) {
-			evtReader_ = clientFactory.createReader(Thread.currentThread().getName()+randomGeneratedString,
+			evtReader_ = clientFactory.createReader(Long.toString(System.nanoTime()),
 					evtReaderGroupName, evtDeserializer, evtReaderConfig);
 		}
 		val evtReader = evtReader_;
@@ -879,9 +899,11 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 			val streamPos = evtRead.getPosition();
 			if (null == streamPos) {
 				Loggers.MSG.info("{}: empty reader. No EventSegmentReader assigned", stepId);
+                completeOperation(evtOp,PENDING);
 			}
 			Loggers.MSG.info("{}: no more events @ position {}", stepId, streamPos);
 			completeOperation(evtOp, FAIL_TIMEOUT);
+			//TODO: this will make driver stop after we finish the first stream of many. We need to update list() method using length(item-input-path)
 						/*if ((null != lastFailedStreamPos.get())
 								&& (streamPositionsAreEqual((PositionImpl)lastFailedStreamPos.get(),(PositionImpl)streamPos))) {
 							Loggers.MSG.debug("{}: no more events @ position {}", stepId, streamPos);
