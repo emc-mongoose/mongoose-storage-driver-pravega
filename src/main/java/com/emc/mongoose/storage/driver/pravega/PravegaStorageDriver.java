@@ -128,7 +128,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	private final boolean controlStreamFlag;
 	private final Credentials cred;
 	private final int batchSize;
-	private volatile ScheduledExecutorService executor = Executors.newScheduledThreadPool(2); //TODO: volatile?
+	private volatile ScheduledExecutorService executor = Executors.newScheduledThreadPool(2); //TODO: volatile? size of pool?
 	Queue<EventStreamReader<ByteBuffer>> createEventStreamReaderPool(final String unused) {
 		return new ArrayBlockingQueue<>(ioWorkerCount);
 	}
@@ -842,27 +842,39 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				val clientFactory = clientFactoryCache.computeIfAbsent(scopeName, clientFactoryCreateFunc);
 				ReaderGroupManager readerGroupManager =evtReaderGroupManagerCache.computeIfAbsent(
 					scopeName, readerGroupManagerCreateFunc);
-				readerGroupManager.createReaderGroup(evtReaderGroupName, readerGroupConfig);
 				val evtReaderPool = evtStreamReaderPoolCache.computeIfAbsent(streamName, this::createEventStreamReaderPool);
 
 
-				readerGroupManager.getReaderGroup(evtReaderGroupName).getSegmentNotifier(executor).registerListener(segmentNotification -> {
-					val segments = segmentNotification.getNumOfSegments();
-					val currentAmountOfReaders = segmentNotification.getNumOfReaders();
-					val amountOfReadersToChange = Math.abs(segments - currentAmountOfReaders);
-					if (currentAmountOfReaders < segments) {
-						for(int i = 0; i < amountOfReadersToChange; ++i ) {
-							evtReaderPool.offer(clientFactory.createReader(Long.toString(System.nanoTime())+i,
-									evtReaderGroupName, evtDeserializer, evtReaderConfig));
-						}
-					} else {
-						for(int i = 0; i < amountOfReadersToChange; ++i ) {
-							evtReaderPool.poll();
-						}
-					}
-					Loggers.MSG.info("Scaling completed. Now {} readers and {} segments",currentAmountOfReaders,segments); //TODO: Change to debug
-				});
+				evtReaderGroupCache
+						.computeIfAbsent(scopeName, this::createInstanceCache)
+						.computeIfAbsent(streamName, key -> {
+							readerGroupManager.createReaderGroup(evtReaderGroupName, readerGroupConfig);
 
+							readerGroupManager.getReaderGroup(evtReaderGroupName).getSegmentNotifier(executor).registerListener(segmentNotification -> {
+								val segments = segmentNotification.getNumOfSegments();
+								val currentAmountOfReaders = segmentNotification.getNumOfReaders();
+								val amountOfReadersToChange = Math.abs(segments - currentAmountOfReaders);
+								if (currentAmountOfReaders < segments) {
+									for(int i = 0; i < amountOfReadersToChange; ++i ) {
+										evtReaderPool.offer(clientFactory.createReader(Long.toString(System.nanoTime())+i,
+												evtReaderGroupName, evtDeserializer, evtReaderConfig));
+										//the listeners should be started once, at the moment of
+										// creation of their readerGroups and listen for the readergroups in a separate thread
+										//We can make a flag to call this once at the thread. But we can have several RG created
+										//In the same thread. So if a new RG is created, then this listener activates
+										//Then we need a listener for map of RGs. As soon as one is created, we make a notifier for it.
+									}
+								} else {
+									for(int i = 0; i < amountOfReadersToChange; ++i ) {
+										evtReaderPool.poll();
+										//TODO: check if it's highly blocking for deleting several readers
+									}
+								}
+								Loggers.MSG.info("Scaling completed. Now amount of readers should be matched to {} segments",segments); //TODO: Change to debug
+							});
+
+							return evtReaderGroupName;
+						});
 				var evtReader_ = evtReaderPool.poll();
 
 				while (null == evtReader_) {
@@ -906,7 +918,8 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		if (null == evtData) {
 			val streamPos = evtRead.getPosition();
 			if (((PositionImpl)streamPos).getOwnedSegments().isEmpty()) {
-				Loggers.MSG.debug("{}: empty reader. No EventSegmentReader assigned", stepId);
+				Loggers.MSG.info("{}: empty reader. No EventSegmentReader assigned", stepId);
+				//TODO: this part shouldn't exist. we can't efficiently handle the case when we try to read with an empty reader
                 completeOperation(evtOp,PENDING);
 			} else {
 				Loggers.MSG.info("{}: no more events @ position {}", stepId, streamPos);
