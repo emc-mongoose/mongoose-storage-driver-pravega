@@ -631,7 +631,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 			}
 		}
 	}
-
+    
 	@Override
 	protected final void execute(final List<O> ops)
 					throws IllegalStateException {
@@ -866,6 +866,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 									}
 								} else {
 									for(int i = 0; i < amountOfReadersToChange; ++i ) {
+									    //TODO: check if pool is not empty
 										evtReaderPool.poll();
 										//TODO: check if it's highly blocking for deleting several readers
 									}
@@ -887,9 +888,9 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				}
 				val evtReader = evtReader_;
 				for(var i = 0; i < opsCount; i ++) {
-					readEvent(evtReader, evtOps.get(i));
+					readEvent(readerGroupManager, evtReader, evtOps.get(i));
 				}
-                evtReaderPool.offer(evtReader);
+				evtReaderPool.offer(evtReader);
 			} catch(final Throwable e) {
 				throwUncheckedIfInterrupted(e);
 				completeOperations(evtOps, FAIL_UNKNOWN);
@@ -901,11 +902,11 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	}
 
 
-	void readEvent( EventStreamReader<ByteBuffer> evtReader, final O evtOp)
+	void readEvent(ReaderGroupManager readerGroupManager, EventStreamReader<ByteBuffer> evtReader, final O evtOp)
 	throws IOException {
 		evtOp.startRequest();
 		evtOp.finishRequest();
-		// should we startRequest() after all preparations or at the beginning of the method?
+		// should we startRequest() after all preparations or at the beginning of the method in a multiStream case when we partially prepare objects inside this method?
 		var evtRead_ = evtReader.readNextEvent(evtOpTimeoutMillis);
 		while (evtRead_.isCheckpoint()) {
 			Loggers.MSG.debug("{}: stream checkpoint @ position {}", stepId, evtRead_.getPosition());
@@ -919,13 +920,21 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 			val streamPos = evtRead.getPosition();
 			if (((PositionImpl)streamPos).getOwnedSegments().isEmpty()) {
 				Loggers.MSG.info("{}: empty reader. No EventSegmentReader assigned", stepId);
-				//TODO: this part shouldn't exist. we can't efficiently handle the case when we try to read with an empty reader
                 completeOperation(evtOp,PENDING);
 			} else {
-				Loggers.MSG.info("{}: no more events @ position {}", stepId, streamPos);
-				completeOperation(evtOp, FAIL_TIMEOUT);
+                val leftBytesForReaderGroup = ((ReaderGroupImpl)(readerGroupManager.getReaderGroup(evtReaderGroupName))).unreadBytes();
+                if (leftBytesForReaderGroup == 0) {
+                    completeOperation(evtOp,INTERRUPTED);
+                    Loggers.MSG.info("{}: no more events for RG {}", stepId, evtReaderGroupName);
+                    //end of all segments. stop retrying
+                } else {
+                    completeOperation(evtOp,PENDING);
+                    //end of one of the segments
+                }
 				// this will make driver stop after we finish the first stream of many. We need to update list() method using length(item-input-path)
-						/*if ((null != lastFailedStreamPos.get())
+                //and the first segment of many
+
+                /*if ((null != lastFailedStreamPos.get())
 								&& (streamPositionsAreEqual((PositionImpl)lastFailedStreamPos.get(),(PositionImpl)streamPos))) {
 							Loggers.MSG.debug("{}: no more events @ position {}", stepId, streamPos);
 							completeOperation(evtOp, INTERRUPTED);
