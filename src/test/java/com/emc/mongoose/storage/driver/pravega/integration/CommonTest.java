@@ -72,7 +72,8 @@ public class CommonTest {
 			config.val("storage-net-timeoutMillis", 0);
 			config.val("storage-net-node-addrs", PravegaNode.addr());
 			config.val("storage-net-node-port", PravegaNode.PORT);
-			config.val("storage-net-node-connAttemptsLimit", 0);
+			config.val("storage-net-node-conn-attemptsLimit", 0);
+			config.val("storage-net-node-conn-pooling", true);
 			config.val("storage-net-uri-schema", "tcp");
 
 			config.val("storage-auth-uid", CREDENTIAL.getUid());

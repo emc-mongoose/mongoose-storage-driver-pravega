@@ -167,6 +167,8 @@ docker run \
 | storage-net-node-addrs             | list of strings | 127.0.0.1     | The list of the Pravega storage nodes to use for the load
 | storage-net-node-port              | integer         | 9090          | The default port of the Pravega storage nodes, should be explicitly set to 9090 (the value used by Pravega by default)
 | storage-net-maxConnPerSegmentstore | integer         | 5             | The default amount of connections per each Pravega Segmentstore
+| storage-net-node-conn-pooling      | boolean         | true          | Use or not the connection pooling for the event writers [See this Pravega issue for details](https://github.com/pravega/pravega/issues/4252)
+
 ## 4.2. Tuning
 
 * `storage-net-maxConnPerSegmentstore`
@@ -175,6 +177,7 @@ This parameter can largely affect the performance, but it also increases network
 * `storage-driver-threads` 
 Amount of eventReaders per stream is equal to amount of `storage-driver-threads`. And as known from Pravega doc, the largest effective reader group
 consists of as many readers as there are segments in the stream we read.
+
 ### 4.2.1. Concurrency
 
 There are two configuration options controlling the load operations concurrency level.

@@ -36,4 +36,6 @@ storage:
     node:
       addrs: list
       port: int
-      connAttemptsLimit: int
+      conn:
+        attemptsLimit: int
+        pooling: boolean
