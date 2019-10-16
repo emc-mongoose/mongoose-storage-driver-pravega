@@ -223,11 +223,35 @@ Note that in this mode the operation (transaction) latency is equal to the durat
 > * The Pravega storage doesn't support reading the stream events in the random order.
 > * The operation latency is effectively equal to the duration due to blocking read event method.
 
-There is also another option, called `storage-driver-read-timeoutMillis`. Pravega documentation says it only works when
+There is a configuration parameter called `storage-driver-read-timeoutMillis`. Pravega documentation says it only works when
 there is no available event in the stream. `readNextEvent()` will block for the specified time in ms. So, in theory 0
-and 1 should work just fine. They do not. In practice, this value should be somewhere between 100 and 2000 ms (2000 is
+and 1 should work just fine. They do not so far. In practice, this value should be somewhere around 2000 ms (it is the 
 Pravega default value).
 
+```bash
+docker run \
+    --network host \
+    emcmongoose/mongoose-storage-driver-pravega \
+    --storage-namespace=scope1 \
+    --item-input-path=stream3 \
+    --load-batch-size=100 \
+    --storage-driver-limit-concurrency=0 \
+    --load-op-type=read \
+    --load-op-recycle  
+```
+
+Right now only single stream reading is supported. Each thread user creates via `--storage-driver-threads` parameter will
+be taking a reader from a joint pool. All readers will be in the same readerGroup. So, it is user's responsibility to
+define an amount of threads the way that there aren't any readers with no EventSegmentReaders. Which happens when there 
+are no segments assigned to a reader as each segment is assigned to only one reader within a readerGroup. 
+
+To achieve maximum efficiency the main point to be considered is `auto-scaling`. If it's disabled, then the best match of 
+threads is amount of segments in the stream, which is constant during the reading. With auto-scaling enabled, it is yet 
+to be found out what the best match is.
+
+Another important thing to notice is that there is always a single failed event in the metrics. This isn't a corrupted 
+event but a nuisance caused by the fact that we don't know the amount of events in the stream. So, unless you actually see
+log messages about corrupted events - nevermind the single failed event.
 
 ### 5.1.3. Update
 
@@ -409,7 +433,7 @@ TEST=create_event_transactional_stream ./gradlew robotest
 cp -f build/libs/mongoose-storage-driver-pravega-*.jar ~/.mongoose/<MONGOOSE_BASE_VERSION>/ext/
 ```
 Note that the Pravega storage driver depends on the 
-[Coop Storage Driver](http://repo.maven.apache.org/maven2/com/github/emc-mongoose/mongoose-storage-driver-coop/) 
+[Preempt Storage Driver](http://repo.maven.apache.org/maven2/com/github/emc-mongoose/mongoose-storage-driver-preempt/)
 extension so it should be also put into the `ext` directory
 3. Build and install the corresponding Pravega version:
 ```bash

@@ -453,6 +453,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 			items = listStreams(itemFactory, path, prefix, idRadix, lastPrevItem, count);
 		} else {
 			items = makeEventItems(itemFactory, path, prefix, lastPrevItem, 1);
+			//as we don't know how many items in the stream, we allocate memory for 1 item
 		}
 		return items;
 	}
@@ -1198,7 +1199,6 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				}
 		);
 		evtStreamReaderPoolCache.clear();
-		//TODO: consult with Andrey -> why don't we fill and then clear threadLocalWriterCache
 		scopeStreamConfigsCache.clear();
 		closeAllWithTimeout(connFactoryCache.values());
 		connFactoryCache.clear();
