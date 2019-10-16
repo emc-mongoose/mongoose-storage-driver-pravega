@@ -57,7 +57,7 @@ ext {
 		grpc                     : "1.17.1",
 		guava                    : "27.0.1-jre",
 		log4j                    : "2.8.2",
-		mongooseBase             : "4.2.15",
+		mongooseBase             : "4.2.16",
 		mongooseStorageDriverPreempt: "4.2.21",
 		mongooseLoadStepPipeline : "4.2.11",
 		netty                    : "4.1.16.Final",

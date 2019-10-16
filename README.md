@@ -251,7 +251,7 @@ to be found out what the best match is.
 
 Another important thing to notice is that there is always a single failed event in the metrics. This isn't a corrupted 
 event but a nuisance caused by the fact that we don't know the amount of events in the stream. So, unless you actually see
-log messages about corrupted events - nevermind the single failed event.
+log messages about corrupted events - never mind the single failed event.
 
 ### 5.1.3. Update
 
