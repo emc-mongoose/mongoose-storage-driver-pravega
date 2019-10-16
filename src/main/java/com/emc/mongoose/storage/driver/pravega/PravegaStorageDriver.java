@@ -59,7 +59,6 @@ import io.pravega.client.netty.impl.ConnectionPoolImpl;
 import io.pravega.client.stream.EventStreamReader;
 import io.pravega.client.stream.EventStreamWriter;
 import io.pravega.client.stream.EventWriterConfig;
-import io.pravega.client.stream.Position;
 import io.pravega.client.stream.ReaderConfig;
 import io.pravega.client.stream.ReaderGroupConfig;
 import io.pravega.client.stream.ScalingPolicy;
@@ -68,20 +67,36 @@ import io.pravega.client.stream.Stream;
 import io.pravega.client.stream.StreamConfiguration;
 import io.pravega.client.stream.TransactionalEventStreamWriter;
 import io.pravega.client.stream.TxnFailedException;
-import io.pravega.client.stream.impl.*;
+import io.pravega.client.stream.impl.Controller;
+import io.pravega.client.stream.impl.ControllerImpl;
+import io.pravega.client.stream.impl.ControllerImplConfig;
 
 import java.io.EOFException;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Queue;
+import java.util.ServiceLoader;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 
-import io.pravega.client.stream.notifications.notifier.SegmentNotifier;
+import io.pravega.client.stream.impl.Credentials;
+import io.pravega.client.stream.impl.DefaultCredentials;
+import io.pravega.client.stream.impl.PositionImpl;
+import io.pravega.client.stream.impl.ReaderGroupImpl;
 import io.pravega.common.util.AsyncIterator;
 import lombok.Value;
 import lombok.val;
@@ -112,7 +127,6 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 					.builder()
 					.initialAllocationDelay(0)
 					.build();
-	protected final String evtReaderGroupName = Long.toString(System.nanoTime());
 	protected final ThreadLocal<ReaderGroupConfig.ReaderGroupConfigBuilder> evtReaderGroupConfigBuilder = ThreadLocal.withInitial(ReaderGroupConfig::builder);
 	protected final ScalingPolicy scalingPolicy;
 	protected final StreamDataType streamDataType;
@@ -120,15 +134,11 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	private final AtomicInteger rrc = new AtomicInteger(0);
 	private final ScheduledExecutorService bgExecutor;
 	private final RoutingKeyFunction<I> routingKeyFunc;
-	private volatile ThreadLocal<Position> lastFailedStreamPos =  new ThreadLocal<Position>();
-	//so we always will see corrupted events for all segments.
-	private final Lock lastFailedStreamPosLock = new ReentrantLock();
 	private volatile AsyncIterator<Stream> streamIterator = null;
 	private final boolean controlScopeFlag;
 	private final boolean controlStreamFlag;
 	private final Credentials cred;
-	private final int batchSize;
-	private volatile ScheduledExecutorService executor = Executors.newScheduledThreadPool(2); //TODO: volatile? size of pool?
+
 	Queue<EventStreamReader<ByteBuffer>> createEventStreamReaderPool(final String unused) {
 		return new ArrayBlockingQueue<>(ioWorkerCount);
 	}
@@ -230,18 +240,6 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	}
 
 	@Value
-	final class ReaderCreateFunctionImpl
-					implements ReaderCreateFunction {
-
-		EventStreamClientFactory clientFactory;
-
-		@Override
-		public EventStreamReader<ByteBuffer> apply(String readerGroupName) {
-			return clientFactory.createReader(Thread.currentThread().getName(), readerGroupName, evtDeserializer, evtReaderConfig); //TODO: change name of created reader and make a pool
-		}
-	}
-
-	@Value
 	final class ByteStreamClientFactoryCreateFunctionImpl
 					implements ByteStreamClientFactoryCreateFunction {
 
@@ -274,7 +272,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	private final Map<String, ReaderGroupConfig> evtReaderGroupConfigCache = new ConcurrentHashMap<>();
 	private final Map<ClientConfig, ReaderGroupManagerCreateFunction> evtReaderGroupManagerCreateFuncCache = new ConcurrentHashMap<>();
     // * RGManager per scope
-    //TODO: idk who wrote this, probably me, but it doesn't make any sense as we can only have one scope so far.
+    //todo: It doesn't make any sense as we can only have one scope so far.
     private final Map<String, ReaderGroupManager> evtReaderGroupManagerCache = new ConcurrentHashMap<>();
     // * RGName per stream per scope
     private final Map<String, Map<String, String>> evtReaderGroupCache = new ConcurrentHashMap<>();
@@ -321,7 +319,6 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		final StreamDataType streamDataType
 	) throws IllegalConfigurationException, IllegalArgumentException {
 		super(stepId, dataInput, storageConfig, verifyFlag, BYTES.equals(streamDataType) ? 1 : batchSize);
-		this.batchSize = batchSize;
 		this.concurrencyThrottle = new Semaphore(concurrencyLimit > 0 ? concurrencyLimit : Integer.MAX_VALUE, true);
 		val driverConfig = storageConfig.configVal("driver");
 		val controlConfig = driverConfig.configVal("control");
@@ -631,7 +628,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 			}
 		}
 	}
-    
+
 	@Override
 	protected final void execute(final List<O> ops)
 					throws IllegalStateException {
@@ -840,55 +837,25 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				val clientFactoryCreateFunc = clientFactoryCreateFuncCache.computeIfAbsent(
 						clientConfig, EventStreamClientFactoryCreateFunctionImpl::new);
 				val clientFactory = clientFactoryCache.computeIfAbsent(scopeName, clientFactoryCreateFunc);
-				ReaderGroupManager readerGroupManager =evtReaderGroupManagerCache.computeIfAbsent(
+				val readerGroupManager =evtReaderGroupManagerCache.computeIfAbsent(
 					scopeName, readerGroupManagerCreateFunc);
-				val evtReaderPool = evtStreamReaderPoolCache.computeIfAbsent(streamName, this::createEventStreamReaderPool);
-
-
-				evtReaderGroupCache
-						.computeIfAbsent(scopeName, this::createInstanceCache)
-						.computeIfAbsent(streamName, key -> {
-							readerGroupManager.createReaderGroup(evtReaderGroupName, readerGroupConfig);
-
-							readerGroupManager.getReaderGroup(evtReaderGroupName).getSegmentNotifier(executor).registerListener(segmentNotification -> {
-								val segments = segmentNotification.getNumOfSegments();
-								val currentAmountOfReaders = segmentNotification.getNumOfReaders();
-								val amountOfReadersToChange = Math.abs(segments - currentAmountOfReaders);
-								if (currentAmountOfReaders < segments) {
-									for(int i = 0; i < amountOfReadersToChange; ++i ) {
-										evtReaderPool.offer(clientFactory.createReader(Long.toString(System.nanoTime())+i,
-												evtReaderGroupName, evtDeserializer, evtReaderConfig));
-										//the listeners should be started once, at the moment of
-										// creation of their readerGroups and listen for the readergroups in a separate thread
-										//We can make a flag to call this once at the thread. But we can have several RG created
-										//In the same thread. So if a new RG is created, then this listener activates
-										//Then we need a listener for map of RGs. As soon as one is created, we make a notifier for it.
-									}
-								} else {
-									for(int i = 0; i < amountOfReadersToChange; ++i ) {
-									    //TODO: check if pool is not empty
-										evtReaderPool.poll();
-										//TODO: check if it's highly blocking for deleting several readers
-									}
-								}
-								Loggers.MSG.info("Scaling completed. Now amount of readers should be matched to {} segments",segments); //TODO: Change to debug
-							});
-
-							return evtReaderGroupName;
+				final var evtReaderGroupName = evtReaderGroupCache
+						.computeIfAbsent(scopeName, key -> new ConcurrentHashMap<>())
+						.computeIfAbsent(streamName,  key ->  {
+							val evtLocalReaderGroupName = "rg-" + scopeName + "-" + streamName + "-" + (System.nanoTime());
+							readerGroupManager.createReaderGroup(evtLocalReaderGroupName, readerGroupConfig);
+							return evtLocalReaderGroupName;
 						});
+				val evtReaderPool = evtStreamReaderPoolCache.computeIfAbsent(streamName, this::createEventStreamReaderPool);
 				var evtReader_ = evtReaderPool.poll();
-
-				while (null == evtReader_) {
-					Thread.sleep(10000);
-					evtReader_ = evtReaderPool.poll();
-					//evtReader_ = clientFactory.createReader(Thread.currentThread().getName(),
-							//evtReaderGroupName, evtDeserializer, evtReaderConfig);
-					//we can try taking already created reader and then checking if its valid -> killing if not.
-					//or try not creating any invalid readers whatsoever
+				if(null == evtReader_) {
+					evtReader_ = clientFactory.createReader("reader-" + (System.nanoTime()), evtReaderGroupName, evtDeserializer, evtReaderConfig);
 				}
+
 				val evtReader = evtReader_;
 				for(var i = 0; i < opsCount; i ++) {
-					readEvent(readerGroupManager, evtReader, evtOps.get(i));
+					readEvent(readerGroupManager, evtReaderGroupName, evtReader, evtOps.get(i));
+					//in multistream case readerGroup and associated reader might be different for each op
 				}
 				evtReaderPool.offer(evtReader);
 			} catch(final Throwable e) {
@@ -902,7 +869,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	}
 
 
-	void readEvent(ReaderGroupManager readerGroupManager, EventStreamReader<ByteBuffer> evtReader, final O evtOp)
+	void readEvent(ReaderGroupManager readerGroupManager,String evtReaderGroupName, EventStreamReader<ByteBuffer> evtReader, final O evtOp)
 	throws IOException {
 		evtOp.startRequest();
 		evtOp.finishRequest();
@@ -919,30 +886,20 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		if (null == evtData) {
 			val streamPos = evtRead.getPosition();
 			if (((PositionImpl)streamPos).getOwnedSegments().isEmpty()) {
-				Loggers.MSG.info("{}: empty reader. No EventSegmentReader assigned", stepId);
+				//means that reader doesn't own any segments, so it can't read anything
+				Loggers.MSG.debug("{}: empty reader. No EventSegmentReader assigned", stepId);
                 completeOperation(evtOp,PENDING);
 			} else {
                 val leftBytesForReaderGroup = ((ReaderGroupImpl)(readerGroupManager.getReaderGroup(evtReaderGroupName))).unreadBytes();
                 if (leftBytesForReaderGroup == 0) {
-                    completeOperation(evtOp,INTERRUPTED);
+					//end of all segments. unreadBytes() has a 20-30 sec delay.
+                    completeOperation(evtOp,FAIL_TIMEOUT);
                     Loggers.MSG.info("{}: no more events for RG {}", stepId, evtReaderGroupName);
-                    //end of all segments. stop retrying
-                } else {
-                    completeOperation(evtOp,PENDING);
-                    //end of one of the segments
-                }
-				// this will make driver stop after we finish the first stream of many. We need to update list() method using length(item-input-path)
-                //and the first segment of many
 
-                /*if ((null != lastFailedStreamPos.get())
-								&& (streamPositionsAreEqual((PositionImpl)lastFailedStreamPos.get(),(PositionImpl)streamPos))) {
-							Loggers.MSG.debug("{}: no more events @ position {}", stepId, streamPos);
-							completeOperation(evtOp, INTERRUPTED);
-						} else {
-							lastFailedStreamPos.set(streamPos);
-							Loggers.ERR.warn("{}: corrupted event @ position {}", stepId, streamPos);
-							completeOperation(evtOp, RESP_FAIL_CORRUPT);
-						}*/
+                } else {
+					//end of one of the segments
+                    completeOperation(evtOp,PENDING);
+                }
 			}
 			} else {
 				val bytesDone = evtData.remaining();
