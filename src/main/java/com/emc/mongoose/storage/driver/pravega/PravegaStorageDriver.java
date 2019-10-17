@@ -860,21 +860,21 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 							readerGroupManager.createReaderGroup(evtLocalReaderGroupName, readerGroupConfig);
 							return evtLocalReaderGroupName;
 						});
-				val evtReaderCreateFunc = evtStreamReaderCreateFuncCache.computeIfAbsent(
+				/*val evtReaderCreateFunc = evtStreamReaderCreateFuncCache.computeIfAbsent(
 						clientFactory, ReaderCreateFunctionImpl::new);
-				val evtReader = evtStreamReaderCache.computeIfAbsent(evtReaderGroupName, evtReaderCreateFunc);
-				/*val evtReaderPool = evtStreamReaderPoolCache.computeIfAbsent(streamName, this::createEventStreamReaderPool);
+				val evtReader = evtStreamReaderCache.computeIfAbsent(evtReaderGroupName, evtReaderCreateFunc);*/
+				val evtReaderPool = evtStreamReaderPoolCache.computeIfAbsent(streamName, this::createEventStreamReaderPool);
 				var evtReader_ = evtReaderPool.poll();
 				if(null == evtReader_) {
 					evtReader_ = clientFactory.createReader("reader-" + (System.nanoTime()), evtReaderGroupName, evtDeserializer, evtReaderConfig);
 				}
 
-				val evtReader = evtReader_;*/
+				val evtReader = evtReader_;
 				for(var i = 0; i < opsCount; i ++) {
 					readEvent(readerGroupManager, evtReaderGroupName, evtReader, evtOps.get(i));
 					//in multistream case readerGroup and associated reader might be different for each op
 				}
-				//evtReaderPool.offer(evtReader);
+				evtReaderPool.offer(evtReader);
 			} catch(final Throwable e) {
 				throwUncheckedIfInterrupted(e);
 				completeOperations(evtOps, FAIL_UNKNOWN);

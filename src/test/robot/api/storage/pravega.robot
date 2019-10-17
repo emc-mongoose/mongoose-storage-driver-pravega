@@ -122,7 +122,7 @@ Events Pipeline Test
     ...  --storage-net-node-addrs=${node_addr}
     ...  --storage-namespace=scope7 \
     ...  --storage-driver-limit-concurrency=10
-    ...  --storage-driver-threads=10
+    ...  --storage-driver-threads=1
     ...  --item-output-path=stream7 \
     ...  --run-scenario=${MONGOOSE_CONTAINER_DATA_DIR}/create_read_pipeline.js \
     ...  --load-step-id=${step_id} \
