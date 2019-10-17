@@ -26,6 +26,7 @@ import com.emc.mongoose.base.item.ItemFactory;
 import com.emc.mongoose.base.item.op.OpType;
 import com.emc.mongoose.base.item.op.Operation.Status;
 import com.emc.mongoose.base.item.op.data.DataOperation;
+import com.emc.mongoose.base.load.step.LoadStepBase;
 import com.emc.mongoose.base.logging.LogContextThreadFactory;
 import com.emc.mongoose.base.logging.LogUtil;
 import com.emc.mongoose.base.logging.Loggers;
@@ -170,6 +171,17 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 			return new StreamCreateFunctionImpl(controller, scopeName);
 		}
 	}
+	@Value
+	final class ReaderCreateFunctionImpl
+			implements ReaderCreateFunction {
+
+		EventStreamClientFactory clientFactory;
+
+		@Override
+		public EventStreamReader<ByteBuffer> apply(String readerGroupName) {
+				return clientFactory.createReader(Thread.currentThread().getName(), readerGroupName, evtDeserializer, evtReaderConfig); //TODO: change name of created reader and make a pool
+			}
+		}
 
 	@Value
 	final class ScopeCreateFunctionForStreamConfigImpl
@@ -279,6 +291,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
     // * event stream reader
 	private final Map<EventStreamClientFactory, ReaderCreateFunction> evtStreamReaderCreateFuncCache = new ConcurrentHashMap<>();
 	// * pool of readers for each stream
+	private final Map<String, EventStreamReader<ByteBuffer>> evtStreamReaderCache = new ConcurrentHashMap<>();
 	private final Map<String, Queue<EventStreamReader<ByteBuffer>>> evtStreamReaderPoolCache = new ConcurrentHashMap<>();
 	// * scopes with StreamConfigs
 	private final Map<Controller, ScopeCreateFunctionForStreamConfig> scopeCreateFuncForStreamConfigCache = new ConcurrentHashMap<>();
@@ -847,18 +860,21 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 							readerGroupManager.createReaderGroup(evtLocalReaderGroupName, readerGroupConfig);
 							return evtLocalReaderGroupName;
 						});
-				val evtReaderPool = evtStreamReaderPoolCache.computeIfAbsent(streamName, this::createEventStreamReaderPool);
+				val evtReaderCreateFunc = evtStreamReaderCreateFuncCache.computeIfAbsent(
+						clientFactory, ReaderCreateFunctionImpl::new);
+				val evtReader = evtStreamReaderCache.computeIfAbsent(evtReaderGroupName, evtReaderCreateFunc);
+				/*val evtReaderPool = evtStreamReaderPoolCache.computeIfAbsent(streamName, this::createEventStreamReaderPool);
 				var evtReader_ = evtReaderPool.poll();
 				if(null == evtReader_) {
 					evtReader_ = clientFactory.createReader("reader-" + (System.nanoTime()), evtReaderGroupName, evtDeserializer, evtReaderConfig);
 				}
 
-				val evtReader = evtReader_;
+				val evtReader = evtReader_;*/
 				for(var i = 0; i < opsCount; i ++) {
 					readEvent(readerGroupManager, evtReaderGroupName, evtReader, evtOps.get(i));
 					//in multistream case readerGroup and associated reader might be different for each op
 				}
-				evtReaderPool.offer(evtReader);
+				//evtReaderPool.offer(evtReader);
 			} catch(final Throwable e) {
 				throwUncheckedIfInterrupted(e);
 				completeOperations(evtOps, FAIL_UNKNOWN);
