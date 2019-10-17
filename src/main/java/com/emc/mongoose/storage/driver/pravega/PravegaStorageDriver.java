@@ -81,6 +81,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.ServiceLoader;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -115,11 +116,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	protected final long evtOpTimeoutMillis;
 	protected final Serializer<I> evtSerializer = new DataItemSerializer<>(false);
 	protected final Serializer<ByteBuffer> evtDeserializer = new ByteBufferSerializer();
-	protected final EventWriterConfig evtWriterConfig = EventWriterConfig
-					.builder()
-					.maxBackoffMillis(1)
-					.retryAttempts(1)
-					.build();
+	protected final EventWriterConfig evtWriterConfig;
 	protected final ReaderConfig evtReaderConfig = ReaderConfig
 					.builder()
 					.initialAllocationDelay(0)
@@ -363,6 +360,12 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 			.findFirst()
 			.orElseGet(this::getBasicCredentialsIfAny);
 		Loggers.MSG.info("Authentication type: {}", cred == null ? "none" : cred.getAuthenticationType());
+		val connConfig = nodeConfig.configVal("conn");
+		val poolingFlag = connConfig.boolVal("pooling");
+		evtWriterConfig = EventWriterConfig
+				.builder()
+				.enableConnectionPooling(poolingFlag)
+				.build();
 	}
 
 	Credentials getBasicCredentialsIfAny() {
@@ -488,18 +491,26 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 					}
 				} else {
 					val streamName = stream.getStreamName();
-					if (prefixLength > 0) {
-						if (streamName.startsWith(prefix)) {
+					try {
+						if (prefixLength > 0) {
+							if (streamName.startsWith(prefix)) {
+								val streamItem = makeStreamItem(
+												clientConfig, controller, streamName, idRadix, stream.getScope(), itemFactory);
+								streamItems.add(streamItem);
+								i++;
+							}
+						} else {
 							val streamItem = makeStreamItem(
 											clientConfig, controller, streamName, idRadix, stream.getScope(), itemFactory);
 							streamItems.add(streamItem);
 							i++;
 						}
-					} else {
-						val streamItem = makeStreamItem(
-										clientConfig, controller, streamName, idRadix, stream.getScope(), itemFactory);
-						streamItems.add(streamItem);
-						i++;
+					} catch(final Exception e) {
+						throwUncheckedIfInterrupted(e);
+						LogUtil.exception(
+							Level.WARN, e, "{}: failed to make the item for the stream \"{}\" @ scope \"{}\"",
+							stepId, streamName, scopeName
+						);
 					}
 				}
 			}
@@ -707,9 +718,11 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				// create the batch event stream writer if necessary
 				val txnEvtWriterCache = threadLocalTxnEvtWriterCache.get();
 				val batchEvtWriter = txnEvtWriterCache.computeIfAbsent(
-								clientFactory,
-								clientFactory_ -> clientFactory_.createTransactionalEventWriter(
-												streamName, evtSerializer, evtWriterConfig));
+					clientFactory,
+					clientFactory_ -> clientFactory_.createTransactionalEventWriter(
+						UUID.randomUUID().toString(), streamName, evtSerializer, evtWriterConfig
+					)
+				);
 				val txn = batchEvtWriter.beginTxn();
 				O evtOp;
 				I evtItem;
