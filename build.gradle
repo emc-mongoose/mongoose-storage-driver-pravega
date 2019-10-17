@@ -60,7 +60,7 @@ ext {
 		mongooseBase             : "4.2.15",
 		mongooseStorageDriverPreempt: "4.2.21",
 		mongooseLoadStepPipeline : "4.2.11",
-		netty                    : "4.1.30.Final",
+		netty                    : "4.1.16.Final",
 		nettyTcNative            : "2.0.17.Final",
 		protobuf                 : "3.5.1",
 		scala                    : "2.12.6",
@@ -118,6 +118,15 @@ task pravegaExtract(dependsOn: pravegaDistInstall) {
 	}
 }
 configurations {
+	all {
+		resolutionStrategy {
+			force("io.netty:netty-handler:${depVersion.netty}")
+			force("io.netty:netty-transport:${depVersion.netty}")
+			force("io.netty:netty-transport-native-epoll:${depVersion.netty}:linux-x86_64")
+			force("io.netty:netty-transport-native-kqueue:${depVersion.netty}:osx-x86_64")
+			force("io.netty:netty-transport-native-unix-common:${depVersion.netty}")
+		}
+	}
 	provided
 	testCompile {
 		extendsFrom(compileOnly, provided)
