@@ -491,18 +491,26 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 					}
 				} else {
 					val streamName = stream.getStreamName();
-					if (prefixLength > 0) {
-						if (streamName.startsWith(prefix)) {
+					try {
+						if (prefixLength > 0) {
+							if (streamName.startsWith(prefix)) {
+								val streamItem = makeStreamItem(
+												clientConfig, controller, streamName, idRadix, stream.getScope(), itemFactory);
+								streamItems.add(streamItem);
+								i++;
+							}
+						} else {
 							val streamItem = makeStreamItem(
 											clientConfig, controller, streamName, idRadix, stream.getScope(), itemFactory);
 							streamItems.add(streamItem);
 							i++;
 						}
-					} else {
-						val streamItem = makeStreamItem(
-										clientConfig, controller, streamName, idRadix, stream.getScope(), itemFactory);
-						streamItems.add(streamItem);
-						i++;
+					} catch(final Exception e) {
+						throwUncheckedIfInterrupted(e);
+						LogUtil.exception(
+							Level.WARN, e, "{}: failed to make the item for the stream \"{}\" @ scope \"{}\"",
+							stepId, streamName, scopeName
+						);
 					}
 				}
 			}
