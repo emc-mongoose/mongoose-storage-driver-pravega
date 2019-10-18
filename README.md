@@ -152,22 +152,31 @@ docker run \
 
 ## 4.1. Specific Options
 
-| Name                              | Type            | Default Value | Description                                      |
-|:----------------------------------|:----------------|:--------------|:-------------------------------------------------|
-| storage-driver-control-scope      | boolean         | true          | Allow to try to create scope
-| storage-driver-control-timeoutMillis | integer      | 30000         | The timeout for any Pravega Controller API call
-| storage-driver-event-key-enabled | boolean         | false         | Specifies if Mongoose should generate its own routing key during the events creation
-| storage-driver-event-key-count   | integer         | 0             | Specifies a max count of unique routing keys to use during the events creation (may be considered as a routing key period). 0 value means to use unique routing key for each new event
+| Name                               | Type            | Default Value | Description                                      |
+|:-----------------------------------|:----------------|:--------------|:-------------------------------------------------|
+| storage-driver-control-scope       | boolean         | true          | Allow to try to create scope
+| storage-driver-control-timeoutMillis | integer       | 30000         | The timeout for any Pravega Controller API call
+| storage-driver-event-key-enabled   | boolean         | false         | Specifies if Mongoose should generate its own routing key during the events creation
+| storage-driver-event-key-count     | integer         | 0             | Specifies a max count of unique routing keys to use during the events creation (may be considered as a routing key period). 0 value means to use unique routing key for each new event
 | storage-driver-event-timeoutMillis | integer         | 100           | The event read timeout in milliseconds
-| storage-driver-scaling-type       | enum | "fixed" | The scaling policy type to use (fixed/event_rate/kbyte_rate). [See the Pravega documentation](http://pravega.io/docs/latest/terminology/) for details
-| storage-driver-scaling-rate       | integer         | 0             | The scaling policy target rate. May be meausred in events per second either kilobytes per second depending on the scaling policy type
-| storage-driver-scaling-factor     | integer         | 0             | The scaling policy factor. From the Pravega javadoc: *the maximum number of splits of a segment for a scale-up event.*
-| storage-driver-scaling-segments   | integer         | 1             | From the Pravega javadoc: *the minimum number of segments that a stream can have independent of the number of scale down events.*
-| storage-driver-stream-data        | enum            | "events"      | Work on events or byte streams (if `bytes` is set)
-| storage-net-node-addrs            | list of strings | 127.0.0.1     | The list of the Pravega storage nodes to use for the load
-| storage-net-node-port             | integer         | 9090          | The default port of the Pravega storage nodes, should be explicitly set to 9090 (the value used by Pravega by default)
+| storage-driver-scaling-type        | enum | "fixed"  | The scaling policy type to use (fixed/event_rate/kbyte_rate). [See the Pravega documentation](http://pravega.io/docs/latest/terminology/) for details
+| storage-driver-scaling-rate        | integer         | 0             | The scaling policy target rate. May be measured in events per second either kilobytes per second depending on the scaling policy type
+| storage-driver-scaling-factor      | integer         | 0             | The scaling policy factor. From the Pravega javadoc: *the maximum number of splits of a segment for a scale-up event.*
+| storage-driver-scaling-segments    | integer         | 1             | From the Pravega javadoc: *the minimum number of segments that a stream can have independent of the number of scale down events.*
+| storage-driver-stream-data         | enum            | "events"      | Work on events or byte streams (if `bytes` is set)
+| storage-net-node-addrs             | list of strings | 127.0.0.1     | The list of the Pravega storage nodes to use for the load
+| storage-net-node-port              | integer         | 9090          | The default port of the Pravega storage nodes, should be explicitly set to 9090 (the value used by Pravega by default)
+| storage-net-maxConnPerSegmentstore | integer         | 5             | The default amount of connections per each Pravega Segmentstore
+| storage-net-node-conn-pooling      | boolean         | true          | Use or not the connection pooling for the event writers [See this Pravega issue for details](https://github.com/pravega/pravega/issues/4252)
 
 ## 4.2. Tuning
+
+* `storage-net-maxConnPerSegmentstore`
+This parameter can largely affect the performance, but it also increases network workload
+
+* `storage-driver-threads` 
+Amount of eventReaders per stream is equal to amount of `storage-driver-threads`. And as known from Pravega doc, the largest effective reader group
+consists of as many readers as there are segments in the stream we read.
 
 ### 4.2.1. Concurrency
 

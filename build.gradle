@@ -55,7 +55,7 @@ ext {
 		disruptor                : "3.4.2",
 		dockerJava               : "3.0.14",
 		grpc                     : "1.17.1",
-		guava                    : "27.0.1-jre",
+		guava                    : "28.1-jre",
 		log4j                    : "2.8.2",
 		mongooseBase             : "4.2.16",
 		mongooseStorageDriverPreempt: "4.2.21",
@@ -117,6 +117,15 @@ task pravegaExtract(dependsOn: pravegaDistInstall) {
 	}
 }
 configurations {
+	all {
+		resolutionStrategy {
+			force("io.netty:netty-handler:${depVersion.netty}")
+			force("io.netty:netty-transport:${depVersion.netty}")
+			force("io.netty:netty-transport-native-epoll:${depVersion.netty}:linux-x86_64")
+			force("io.netty:netty-transport-native-kqueue:${depVersion.netty}:osx-x86_64")
+			force("io.netty:netty-transport-native-unix-common:${depVersion.netty}")
+		}
+	}
 	provided
 	testCompile {
 		extendsFrom(compileOnly, provided)
