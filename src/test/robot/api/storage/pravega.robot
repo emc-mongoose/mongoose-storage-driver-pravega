@@ -120,14 +120,14 @@ Events Pipeline Test
     Remove Directory  ${LOG_DIR}/${step_id}  recursive=True
     ${args} =  Catenate  SEPARATOR= \\\n\t
     ...  --storage-net-node-addrs=${node_addr}
-    ...  --storage-namespace=scope7 \
+    ...  --storage-namespace=scope7
     ...  --storage-driver-limit-concurrency=10
-    ...  --storage-driver-threads=1
-    ...  --item-output-path=stream7 \
-    ...  --run-scenario=${MONGOOSE_CONTAINER_DATA_DIR}/create_read_pipeline.js \
-    ...  --load-step-id=${step_id} \
-    ...  --item-data-size=10KB \
-    ...  --load-op-limit-count=${count_limit} \
+    ...  --storage-driver-threads=10
+    ...  --item-output-path=stream7
+    ...  --run-scenario=${MONGOOSE_CONTAINER_DATA_DIR}/create_read_pipeline.js
+    ...  --load-step-id=${step_id}
+    ...  --item-data-size=10KB
+    ...  --load-op-limit-count=${count_limit}
     ...  --output-metrics-trace-persist
     &{env_params} =  Create Dictionary
     ${std_out} =  Execute Mongoose Scenario  ${DATA_DIR}  ${env_params}  ${args}
