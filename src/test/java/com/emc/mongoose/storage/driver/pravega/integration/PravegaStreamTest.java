@@ -9,6 +9,7 @@ import java.net.URI;
 
 import static org.junit.Assert.assertTrue;
 
+@Ignore
 public class PravegaStreamTest {
 
 	private StreamManager streamManager;

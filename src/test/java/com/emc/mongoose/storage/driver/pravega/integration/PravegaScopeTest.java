@@ -6,6 +6,7 @@ import io.pravega.client.admin.StreamManager;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.net.URI;
@@ -13,6 +14,7 @@ import java.net.URI;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+@Ignore
 public class PravegaScopeTest {
 
 	private StreamManager streamManager;

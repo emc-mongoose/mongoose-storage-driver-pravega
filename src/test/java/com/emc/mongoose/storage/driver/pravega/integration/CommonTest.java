@@ -20,8 +20,10 @@ import java.net.Socket;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import lombok.val;
+import org.junit.Ignore;
 import org.junit.Test;
 
+@Ignore
 public class CommonTest {
 
 	private final PravegaStorageDriver pravegaStorageDriver;

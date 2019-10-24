@@ -33,6 +33,7 @@ import lombok.val;
 import org.junit.Ignore;
 import org.junit.Test;
 
+@Ignore
 public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOperation<DataItem>> {
 	private static final DataInput DATA_INPUT;
 

@@ -8,6 +8,7 @@ import io.pravega.client.admin.StreamManager;
 import io.pravega.client.stream.*;
 import io.pravega.client.stream.impl.JavaSerializer;
 import lombok.val;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.net.URI;
@@ -16,6 +17,7 @@ import java.util.UUID;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
+@Ignore
 public class PravegaEventReadTest {
 
 	@Test

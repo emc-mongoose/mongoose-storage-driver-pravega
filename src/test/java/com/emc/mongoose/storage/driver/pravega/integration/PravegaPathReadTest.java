@@ -7,6 +7,7 @@ import io.pravega.client.admin.StreamManager;
 import io.pravega.client.stream.*;
 import io.pravega.client.stream.impl.JavaSerializer;
 
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.net.URI;
@@ -14,6 +15,7 @@ import java.util.UUID;
 
 import static org.junit.Assert.*;
 
+@Ignore
 public class PravegaPathReadTest {
 
 	//we put three strings into the stream, then we read it and check if we've read them in the
