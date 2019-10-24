@@ -266,12 +266,12 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	// * reader group
 	private final Map<String, ReaderGroupConfig> evtReaderGroupConfigCache = new ConcurrentHashMap<>();
 	private final Map<ClientConfig, ReaderGroupManagerCreateFunction> evtReaderGroupManagerCreateFuncCache = new ConcurrentHashMap<>();
-    // * RGManager per scope
-    //todo: It doesn't make any sense as we can only have one scope so far.
-    private final Map<String, ReaderGroupManager> evtReaderGroupManagerCache = new ConcurrentHashMap<>();
-    // * RGName per stream per scope
-    private final Map<String, Map<String, String>> evtReaderGroupCache = new ConcurrentHashMap<>();
-    // * event stream reader
+	// * RGManager per scope
+	//todo: It doesn't make any sense as we can only have one scope so far.
+	private final Map<String, ReaderGroupManager> evtReaderGroupManagerCache = new ConcurrentHashMap<>();
+	// * RGName per stream per scope
+	private final Map<String, Map<String, String>> evtReaderGroupCache = new ConcurrentHashMap<>();
+	// * event stream reader
 	private final Map<EventStreamClientFactory, ReaderCreateFunction> evtStreamReaderCreateFuncCache = new ConcurrentHashMap<>();
 	// * pool of readers for each stream
 	private final Map<String, Queue<EventStreamReader<ByteBuffer>>> evtStreamReaderPoolCache = new ConcurrentHashMap<>();
@@ -891,24 +891,24 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		}
 		evtOp.startResponse();
 		evtOp.finishResponse();
-		val evtRead=evtRead_;
+		val evtRead = evtRead_;
 		val evtData = evtRead.getEvent();
 		if (null == evtData) {
 			val streamPos = evtRead.getPosition();
 			if (((PositionImpl)streamPos).getOwnedSegments().isEmpty()) {
 				//means that reader doesn't own any segments, so it can't read anything
 				Loggers.MSG.debug("{}: empty reader. No EventSegmentReader assigned", stepId);
-                completeOperation(evtOp,PENDING);
+				completeOperation(evtOp,PENDING);
 			} else {
-                val leftBytesForReaderGroup = ((ReaderGroupImpl)(readerGroupManager.getReaderGroup(evtReaderGroupName))).unreadBytes();
-                if (leftBytesForReaderGroup == 0) {
+				val leftBytesForReaderGroup = ((ReaderGroupImpl)(readerGroupManager.getReaderGroup(evtReaderGroupName))).unreadBytes();
+				if (leftBytesForReaderGroup == 0) {
 					//end of all segments. unreadBytes() has a 20-30 sec delay.
-                    completeOperation(evtOp,FAIL_TIMEOUT);
-                    Loggers.MSG.info("{}: no more events for RG {}", stepId, evtReaderGroupName);
-                } else {
+					completeOperation(evtOp,FAIL_TIMEOUT);
+					Loggers.MSG.info("{}: no more events for RG {}", stepId, evtReaderGroupName);
+				} else {
 					//end of one of the segments
-                    completeOperation(evtOp,PENDING);
-                }
+					completeOperation(evtOp,PENDING);
+				}
 			}
 			} else {
 				val bytesDone = evtData.remaining();
