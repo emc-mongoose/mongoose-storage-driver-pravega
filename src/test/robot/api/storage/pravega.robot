@@ -2,7 +2,6 @@
 
 Library  OperatingSystem
 Library  CSVLibrary
-Library  OpTrace
 Test Setup  Start Containers
 Test Teardown  Stop Containers
 

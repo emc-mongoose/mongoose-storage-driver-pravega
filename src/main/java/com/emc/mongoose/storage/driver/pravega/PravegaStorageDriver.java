@@ -41,6 +41,7 @@ import com.emc.mongoose.storage.driver.pravega.cache.StreamCreateFunction;
 import com.emc.mongoose.storage.driver.pravega.io.ByteBufferSerializer;
 import com.emc.mongoose.storage.driver.pravega.io.ByteStreamWriteChannel;
 import com.emc.mongoose.storage.driver.pravega.io.DataItemSerializer;
+import com.emc.mongoose.storage.driver.pravega.io.NothingSerializer;
 import com.emc.mongoose.storage.driver.pravega.io.StreamDataType;
 import com.emc.mongoose.storage.driver.preempt.PreemptStorageDriverBase;
 import com.github.akurilov.commons.concurrent.ContextAwareThreadFactory;
@@ -80,6 +81,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.Random;
 import java.util.ServiceLoader;
 import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -133,6 +135,17 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	private final boolean controlScopeFlag;
 	private final boolean controlStreamFlag;
 	private final Credentials cred;
+	private final ByteBuffer msg = createPayload(10240);
+	protected final Serializer<ByteBuffer> nothingSerializer = new NothingSerializer<>(false);
+
+	private ByteBuffer createPayload(int size) {
+		Random random = new Random();
+		byte[] bytes = new byte[size];
+		for (int i = 0; i < size; ++i) {
+			bytes[i] = (byte) (random.nextInt(26) + 65);
+		}
+		return ByteBuffer.wrap(bytes);
+	}
 
 	Queue<EventStreamReader<ByteBuffer>> createEventStreamReaderPool(final String unused) {
 		return new ArrayBlockingQueue<>(ioWorkerCount);
@@ -262,7 +275,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	private final Map<ClientConfig, EventStreamClientFactoryCreateFunction> clientFactoryCreateFuncCache = new ConcurrentHashMap<>();
 	private final Map<String, EventStreamClientFactory> clientFactoryCache = new ConcurrentHashMap<>();
 	// * event stream writers
-	private final ThreadLocal<Map<String, EventStreamWriter<I>>> threadLocalEvtWriterCache = ThreadLocal.withInitial(ConcurrentHashMap::new);
+	private final ThreadLocal<Map<String, EventStreamWriter<ByteBuffer>>> threadLocalEvtWriterCache = ThreadLocal.withInitial(ConcurrentHashMap::new);
 	// * reader group
 	private final Map<String, ReaderGroupConfig> evtReaderGroupConfigCache = new ConcurrentHashMap<>();
 	private final Map<ClientConfig, ReaderGroupManagerCreateFunction> evtReaderGroupManagerCreateFuncCache = new ConcurrentHashMap<>();
@@ -782,14 +795,14 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				val evtWriterCache = threadLocalEvtWriterCache.get();
 				val evtWriter = evtWriterCache.computeIfAbsent(
 								streamName,
-								(streamName_) -> clientFactory.createEventWriter(streamName, evtSerializer, evtWriterConfig));
+								(streamName_) -> clientFactory.createEventWriter(streamName,/*evt*/ nothingSerializer, evtWriterConfig));
 				if (null == routingKeyFunc) {
 					for (var i = 0; i < opsCount; i++) {
 						val evtOp = ops.get(i);
 						concurrencyThrottle.acquire();
 						evtOp.startRequest();
-						val evtWriteFuture = evtWriter.writeEvent(evtOp.item());
-						evtWriteFuture.handle((result, thrown) -> handleEventWrite(evtOp, thrown));
+						val evtWriteFuture = evtWriter.writeEvent(/*evtOp.item()*/msg);
+						evtWriteFuture.handle((result, thrown) -> handleEventWrite(evtOp, msg.limit(), thrown));
 						try {
 							evtOp.finishRequest();
 						} catch (final IllegalStateException ignored) {}
@@ -801,8 +814,8 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 						val routingKey = routingKeyFunc.apply(evtItem);
 						concurrencyThrottle.acquire();
 						evtOp.startRequest();
-						val evtWriteFuture = evtWriter.writeEvent(routingKey, evtItem);
-						evtWriteFuture.handle((result, thrown) -> handleEventWrite(evtOp, thrown));
+						val evtWriteFuture = evtWriter.writeEvent(routingKey, /*evtItem*/msg);
+						evtWriteFuture.handle((result, thrown) -> handleEventWrite(evtOp, msg.limit(), thrown));
 						try {
 							evtOp.finishRequest();
 						} catch (final IllegalStateException ignored) {}
@@ -818,13 +831,14 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		}
 	}
 
-	boolean handleEventWrite(final O evtOp, final Throwable thrown) {
+	boolean handleEventWrite(final O evtOp, long msgSize, final Throwable thrown) {
 		concurrencyThrottle.release();
 		if (null == thrown) {
 			evtOp.startResponse();
 			evtOp.finishResponse();
 			try {
-				evtOp.countBytesDone(evtOp.item().size());
+				evtOp.countBytesDone(/*evtOp.item().size()*/msgSize);
+				evtOp.item().size();
 			} catch (final IOException ignored) {}
 			return completeOperation(evtOp, SUCC);
 		} else {
