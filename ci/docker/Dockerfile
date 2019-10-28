@@ -7,7 +7,7 @@ ADD build.gradle ./build.gradle
 ADD gradlew ./gradlew
 ADD gradle.properties ./gradle.properties
 ADD settings.gradle ./settings.gradle
-RUN ./gradlew clean pravegaClientJars \
+RUN ./gradlew clean pravegaClientJars; \
     ./gradlew jar
 
 FROM emcmongoose/mongoose-base:${BASE_VERSION}
