@@ -52,7 +52,8 @@ before_script:
 build:
   stage: build
   script:
-    - ./gradlew clean jar
+    - ./gradlew pravegaClientJars
+    - ./gradlew jar
   artifacts:
     paths:
       - build/libs/mongoose-*.jar
@@ -60,7 +61,8 @@ build:
 test_unit:
   stage: test
   script:
-    - ./gradlew clean test
+    - ./gradlew pravegaClientJars
+    - ./gradlew test
   artifacts:
     paths:
       - build/reports/tests/test/*
