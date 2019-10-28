@@ -118,10 +118,10 @@ task pravegaDistInstall(type: Exec, dependsOn: clonePravegaRepo) {
 task pravegaExtract(dependsOn: pravegaDistInstall) {
 	doLast {
 		copy {
-			from tarTree("${pravegaSrcDir}${File.separator}build${File.separator}distributions${File.separator}pravega-${pravegaVersion.substring(0, pravegaVersion.length() - "-SNAPSHOT".length())}.tgz")
+			from tarTree("${pravegaSrcDir}${File.separator}build${File.separator}distributions${File.separator}pravega-${pravegaVersion}.tgz")
 			into project.buildDir
 		}
-		def pravegaDir = new File("${project.buildDir}${File.separator}pravega-${pravegaVersion.substring(0, pravegaVersion.length() - "-SNAPSHOT".length())}")
+		def pravegaDir = new File("${project.buildDir}${File.separator}pravega-${pravegaVersion}")
 		pravegaDir.renameTo(pravegaDstDir)
 		pravegaDir.deleteDir()
 	}
