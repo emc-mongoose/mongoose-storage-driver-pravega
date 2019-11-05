@@ -45,6 +45,9 @@ public final class DataItemSerializer<I extends DataItem>
 			}
 			final var dstBuff = useDirectMem ? ByteBuffer.allocateDirect((int) dataItemSize) : // will crash if not enough memory
 							ByteBuffer.allocate((int) dataItemSize); // will throw OOM error if not enough memory
+			dstBuff.putLong(System.nanoTime()); //adding timestamp as first 8 bytes
+			//TODO: should getStartRequest be used for that? In this case we can't use Serializer<dataitem> +
+			//+ this nanoTime is closer to actual data send, so it's more accurate
 			while (dstBuff.remaining() > 0) {
 				dataItem.read(dstBuff);
 			}

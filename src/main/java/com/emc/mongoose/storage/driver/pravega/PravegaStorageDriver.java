@@ -117,6 +117,8 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	protected final long evtOpTimeoutMillis;
 	protected final Serializer<I> evtSerializer = new DataItemSerializer<>(false);
 	protected final Serializer<ByteBuffer> evtDeserializer = new ByteBufferSerializer();
+	private final boolean createTimestampFlag;
+	private final boolean tailReadFlag;
 	protected final EventWriterConfig evtWriterConfig;
 	protected final ReaderConfig evtReaderConfig = ReaderConfig
 					.builder()
@@ -133,6 +135,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	private final boolean controlScopeFlag;
 	private final boolean controlStreamFlag;
 	private final Credentials cred;
+	private int timestampLength = 8;
 
 	Queue<EventStreamReader<ByteBuffer>> createEventStreamReaderPool(final String unused) {
 		return new ArrayBlockingQueue<>(ioWorkerCount);
@@ -316,10 +319,14 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		super(stepId, dataInput, storageConfig, verifyFlag, BYTES.equals(streamDataType) ? 1 : batchSize);
 		this.concurrencyThrottle = new Semaphore(concurrencyLimit > 0 ? concurrencyLimit : Integer.MAX_VALUE, true);
 		val driverConfig = storageConfig.configVal("driver");
+		val createConfig = driverConfig.configVal("create");
+		this.createTimestampFlag = createConfig.boolVal("timestamp");
 		val controlConfig = driverConfig.configVal("control");
 		this.controlApiTimeoutMillis = controlConfig.longVal("timeoutMillis");
 		this.controlScopeFlag = controlConfig.boolVal("scope");
 		this.controlStreamFlag = controlConfig.boolVal("stream");
+		val readConfig = driverConfig.configVal("read");
+		this.tailReadFlag = readConfig.boolVal("tail");
 		val scalingConfig = driverConfig.configVal("scaling");
 		this.scalingPolicy = PravegaScalingConfig.scalingPolicy(scalingConfig);
 		val netConfig = storageConfig.configVal("net");
@@ -893,6 +900,20 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		evtOp.finishResponse();
 		val evtRead = evtRead_;
 		val evtData = evtRead.getEvent();
+		if (tailReadFlag) {
+			val timestampBuffer = ByteBuffer.allocate(timestampLength);
+			timestampBuffer.put(evtData.array(),0,8);
+			timestampBuffer.flip();
+			val e2eTimeMillis = System.nanoTime() - timestampBuffer.getLong();
+			val msgId = evtOp.item().name();
+			val msgSize = evtOp.item().size();
+			if(e2eTimeMillis > 0) {
+				Loggers.OP_TRACES.info(new EndToEndLogMessage(msgId, msgSize, e2eTimeMillis));
+			} else {
+				Loggers.ERR.warn("{}: publish time is in the future for the message \"{}\"", stepId, msgId);
+			}
+		}
+
 		if (null == evtData) {
 			val streamPos = evtRead.getPosition();
 			if (((PositionImpl)streamPos).getOwnedSegments().isEmpty()) {
