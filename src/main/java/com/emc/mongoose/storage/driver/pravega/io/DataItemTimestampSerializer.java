@@ -2,17 +2,15 @@ package com.emc.mongoose.storage.driver.pravega.io;
 
 import com.emc.mongoose.base.item.DataItem;
 import com.emc.mongoose.base.logging.Loggers;
-
 import com.github.akurilov.commons.system.SizeInBytes;
-
 import io.pravega.client.stream.Serializer;
 
 import java.io.IOException;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
 
-public final class DataItemSerializer<I extends DataItem>
-				implements Serializer<I>, Serializable {
+public class DataItemTimestampSerializer<I extends DataItem>
+	implements Serializer<I>, Serializable {
 
 	private final boolean useDirectMem;
 
@@ -21,7 +19,7 @@ public final class DataItemSerializer<I extends DataItem>
 	 *                     serialized data or not. Using the direct memory may lead to the better performance in case of
 	 *                     large data chunks but less safe.
 	 */
-	public DataItemSerializer(final boolean useDirectMem) {
+	public DataItemTimestampSerializer(final boolean useDirectMem) {
 		this.useDirectMem = useDirectMem;
 	}
 
@@ -32,7 +30,7 @@ public final class DataItemSerializer<I extends DataItem>
 	 */
 	@Override
 	public final ByteBuffer serialize(final I dataItem)
-					throws OutOfMemoryError, IllegalArgumentException {
+		throws OutOfMemoryError, IllegalArgumentException {
 		try {
 			final var dataItemSize = dataItem.size();
 			if (Integer.MAX_VALUE < dataItemSize) {
@@ -40,11 +38,14 @@ public final class DataItemSerializer<I extends DataItem>
 			}
 			if (MAX_EVENT_SIZE < dataItemSize) {
 				Loggers.ERR.warn(
-								"Event size is {}, Pravega storage doesn't support the event size more than {}",
-								SizeInBytes.formatFixedSize(dataItemSize), SizeInBytes.formatFixedSize(MAX_EVENT_SIZE));
+					"Event size is {}, Pravega storage doesn't support the event size more than {}",
+					SizeInBytes.formatFixedSize(dataItemSize), SizeInBytes.formatFixedSize(MAX_EVENT_SIZE));
 			}
 			final var dstBuff = useDirectMem ? ByteBuffer.allocateDirect((int) dataItemSize) : // will crash if not enough memory
-							ByteBuffer.allocate((int) dataItemSize); // will throw OOM error if not enough memory
+				ByteBuffer.allocate((int) dataItemSize); // will throw OOM error if not enough memory
+			dstBuff.putLong(System.currentTimeMillis()); //adding timestamp as first 8 bytes
+			//TODO: should getStartRequest be used for that? In this case we can't use Serializer<dataitem> +
+			//+ this time is closer to actual data send, so it's more accurate
 			while (dstBuff.remaining() > 0) {
 				dataItem.read(dstBuff);
 			}
@@ -64,3 +65,4 @@ public final class DataItemSerializer<I extends DataItem>
 		throw new AssertionError("Not implemented");
 	}
 }
+

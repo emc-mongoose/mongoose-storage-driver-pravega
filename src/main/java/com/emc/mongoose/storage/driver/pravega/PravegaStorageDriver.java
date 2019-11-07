@@ -41,6 +41,7 @@ import com.emc.mongoose.storage.driver.pravega.cache.StreamCreateFunction;
 import com.emc.mongoose.storage.driver.pravega.io.ByteBufferSerializer;
 import com.emc.mongoose.storage.driver.pravega.io.ByteStreamWriteChannel;
 import com.emc.mongoose.storage.driver.pravega.io.DataItemSerializer;
+import com.emc.mongoose.storage.driver.pravega.io.DataItemTimestampSerializer;
 import com.emc.mongoose.storage.driver.pravega.io.StreamDataType;
 import com.emc.mongoose.storage.driver.preempt.PreemptStorageDriverBase;
 import com.github.akurilov.commons.concurrent.ContextAwareThreadFactory;
@@ -115,7 +116,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	protected final long controlApiTimeoutMillis;
 	protected final boolean transactionMode;
 	protected final long evtOpTimeoutMillis;
-	protected final Serializer<I> evtSerializer = new DataItemSerializer<>(false);
+	protected final Serializer<I> evtSerializer;
 	protected final Serializer<ByteBuffer> evtDeserializer = new ByteBufferSerializer();
 	private final boolean createTimestampFlag;
 	private final boolean tailReadFlag;
@@ -321,6 +322,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		val driverConfig = storageConfig.configVal("driver");
 		val createConfig = driverConfig.configVal("create");
 		this.createTimestampFlag = createConfig.boolVal("timestamp");
+		evtSerializer = (createTimestampFlag) ? new DataItemTimestampSerializer<>(false) : new DataItemSerializer<>(false);
 		val controlConfig = driverConfig.configVal("control");
 		this.controlApiTimeoutMillis = controlConfig.longVal("timeoutMillis");
 		this.controlScopeFlag = controlConfig.boolVal("scope");
@@ -904,7 +906,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 			val timestampBuffer = ByteBuffer.allocate(timestampLength);
 			timestampBuffer.put(evtData.array(),0,8);
 			timestampBuffer.flip();
-			val e2eTimeMillis = System.nanoTime() - timestampBuffer.getLong();
+			val e2eTimeMillis = System.currentTimeMillis() - timestampBuffer.getLong();
 			val msgId = evtOp.item().name();
 			val msgSize = evtOp.item().size();
 			if(e2eTimeMillis > 0) {
