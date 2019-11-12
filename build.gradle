@@ -96,13 +96,16 @@ task clonePravegaRepo {
 		}
 		if(!destDir.exists()) {
 			def gitRepo = Grgit.clone {
-				uri = "https://github.com/akurilov/pravega.git"
+				uri = "https://github.com/pravega/pravega.git"
 				dir = pravegaSrcDir
 			}
-			gitRepo.reset {
+			gitRepo.checkout {
+				branch = "origin/netty-no-flush"
+			}
+			/*gitRepo.reset {
 				commit = pravegaCommit
 				mode = "hard"
-			}
+			}*/
 		}
 	}
 }
