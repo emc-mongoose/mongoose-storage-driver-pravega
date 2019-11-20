@@ -4,8 +4,9 @@ storage:
     control:
       scope: true
       stream: true
-      timeoutMillis: 10000
+      timeoutMillis: 2000
     event:
+      cachingDummySerializer: false
       transaction: false
       key:
         enabled: false

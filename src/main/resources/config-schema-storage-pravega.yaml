@@ -6,6 +6,7 @@ storage:
       stream: boolean
       timeoutMillis: long
     event:
+      cachingDummySerializer: boolean
       transaction: boolean
       key:
         enabled: boolean

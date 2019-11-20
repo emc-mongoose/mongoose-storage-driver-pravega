@@ -40,6 +40,7 @@ import com.emc.mongoose.storage.driver.pravega.cache.ScopeCreateFunctionForStrea
 import com.emc.mongoose.storage.driver.pravega.cache.StreamCreateFunction;
 import com.emc.mongoose.storage.driver.pravega.io.ByteBufferSerializer;
 import com.emc.mongoose.storage.driver.pravega.io.ByteStreamWriteChannel;
+import com.emc.mongoose.storage.driver.pravega.io.DataItemCachedSerializer;
 import com.emc.mongoose.storage.driver.pravega.io.DataItemSerializer;
 import com.emc.mongoose.storage.driver.pravega.io.StreamDataType;
 import com.emc.mongoose.storage.driver.preempt.PreemptStorageDriverBase;
@@ -115,7 +116,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	protected final long controlApiTimeoutMillis;
 	protected final boolean transactionMode;
 	protected final long evtOpTimeoutMillis;
-	protected final Serializer<I> evtSerializer = new DataItemSerializer<>(false);
+	protected Serializer<I> evtSerializer = null;
 	protected final Serializer<ByteBuffer> evtDeserializer = new ByteBufferSerializer();
 	protected final EventWriterConfig evtWriterConfig;
 	protected final ReaderConfig evtReaderConfig = ReaderConfig
@@ -132,6 +133,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	private volatile AsyncIterator<Stream> streamIterator = null;
 	private final boolean controlScopeFlag;
 	private final boolean controlStreamFlag;
+	private final boolean useCachingDummySerializer;
 	private final Credentials cred;
 
 	Queue<EventStreamReader<ByteBuffer>> createEventStreamReaderPool(final String unused) {
@@ -333,6 +335,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		this.nodePort = nodeConfig.intVal("port");
 		val endpointAddrList = nodeConfig.listVal("addrs");
 		val eventConfig = driverConfig.configVal("event");
+		this.useCachingDummySerializer = eventConfig.boolVal("cachingDummySerializer");
 		val createRoutingKeysConfig = eventConfig.configVal("key");
 		val createRoutingKeys = createRoutingKeysConfig.boolVal("enabled");
 		val createRoutingKeysPeriod = createRoutingKeysConfig.longVal("count");
@@ -761,6 +764,11 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		if (opsCount > 0) {
 			try {
 				val anyEvtOp = ops.get(0);
+				if (evtSerializer == null) {
+					evtSerializer = (useCachingDummySerializer)
+						? new DataItemCachedSerializer<>(true, anyEvtOp.item())
+						: new DataItemSerializer<>(false);
+				}
 				val nodeAddr = anyEvtOp.nodeAddr();
 				// prepare
 				val endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
