@@ -57,8 +57,8 @@ ext {
 		grpc                     : "1.17.1",
 		guava                    : "28.1-jre",
 		log4j                    : "2.8.2",
-		mongooseBase             : "4.2.16",
-		mongooseStorageDriverPreempt: "4.2.21",
+		mongooseBase             : "4.2.17",
+		mongooseStorageDriverPreempt: "4.2.22",
 		netty                    : "4.1.16.Final",
 		nettyTcNative            : "2.0.17.Final",
 		protobuf                 : "3.5.1",
@@ -96,13 +96,16 @@ task clonePravegaRepo {
 		}
 		if(!destDir.exists()) {
 			def gitRepo = Grgit.clone {
-				uri = "https://github.com/akurilov/pravega.git"
+				uri = "https://github.com/emc-mongoose/pravega.git"
 				dir = pravegaSrcDir
 			}
-			gitRepo.reset {
+			gitRepo.checkout {
+				branch = "origin/netty-no-flush-plus-more-optimization"
+			}
+			/*gitRepo.reset {
 				commit = pravegaCommit
 				mode = "hard"
-			}
+			}*/
 		}
 	}
 }
