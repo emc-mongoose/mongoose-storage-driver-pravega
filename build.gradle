@@ -100,7 +100,7 @@ task clonePravegaRepo {
 				dir = pravegaSrcDir
 			}
 			gitRepo.checkout {
-				branch = "origin/avoid_split_in_client_2"
+				branch = "origin/netty-no-flush"
 			}
 			/*gitRepo.reset {
 				commit = pravegaCommit
