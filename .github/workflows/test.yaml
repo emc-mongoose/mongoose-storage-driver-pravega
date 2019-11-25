@@ -1,0 +1,16 @@
+name: build and test
+on:
+  - push
+  - pull_request
+jobs:
+  build:
+    runs-on: ubuntu-18.04
+    steps:
+      - name: checkout
+        uses: actions/checkout@v1
+      - name: set up jdk
+        uses: actions/setup-java@v1
+        with:
+          java-version: 11
+      - name: build
+        run: ./gradlew clean jar
