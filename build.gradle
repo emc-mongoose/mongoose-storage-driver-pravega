@@ -100,7 +100,7 @@ task clonePravegaRepo {
 				dir = pravegaSrcDir
 			}
 			gitRepo.checkout {
-				branch = "origin/netty-no-flush"
+				branch = "origin/master"
 			}
 		}
 	}
