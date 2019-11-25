@@ -1,4 +1,4 @@
-name: build and test
+name: Build and Test
 on:
   - push
   - pull_request
@@ -6,11 +6,20 @@ jobs:
   build:
     runs-on: ubuntu-18.04
     steps:
-      - name: checkout
+      - name: Checkout
         uses: actions/checkout@v1
-      - name: set up jdk
+      - name: Set up JDK
         uses: actions/setup-java@v1
         with:
           java-version: 11
-      - name: build
+      - name: Build
         run: ./gradlew clean jar
+      - name: Unit Tests
+        run: ./gradlew clean test
+      - name: Integration Tests
+        run: |
+          ./gradlew pravegaExtract
+          nohup build/pravega_/bin/pravega-standalone 1,2 > build/pravega_nohup.out &
+          sleep 15
+          ./gradlew integrationTest
+          killall java
