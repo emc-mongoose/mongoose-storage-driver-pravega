@@ -58,7 +58,7 @@ ext {
 		guava                    : "28.1-jre",
 		log4j                    : "2.8.2",
 		mongooseBase             : "4.2.17",
-		mongooseStorageDriverPreempt: "4.2.23",
+		mongooseStorageDriverPreempt: "4.2.21",
 		netty                    : "4.1.16.Final",
 		nettyTcNative            : "2.0.17.Final",
 		protobuf                 : "3.5.1",
@@ -99,8 +99,9 @@ task clonePravegaRepo {
 				uri = "https://github.com/pravega/pravega.git"
 				dir = pravegaSrcDir
 			}
-			gitRepo.checkout {
-				branch = "origin/master"
+			gitRepo.reset {
+				commit = pravegaCommit
+				mode = "hard"
 			}
 		}
 	}
@@ -162,13 +163,18 @@ dependencies {
 		"org.apache.logging.log4j:log4j-api:${depVersion.log4j}",
 	)
 	provided(
-		files(
+		"io.pravega:pravega-common:${pravegaVersion}",
+		"io.pravega:pravega-client:${pravegaVersion}",
+		"io.pravega:pravega-shared-authplugin:${pravegaVersion}",
+		"io.pravega:pravega-shared-controller-api:${pravegaVersion}",
+		"io.pravega:pravega-shared-protocol:${pravegaVersion}",
+		/*files(
 			"${pravegaClientJarDir}${File.separator}pravega-client-${pravegaVersion}.jar",
 			"${pravegaCommonJarDir}${File.separator}pravega-common-${pravegaVersion}.jar",
 			"${pravegaSharedAuthpluginJarDir}${File.separator}pravega-shared-authplugin-${pravegaVersion}.jar",
 			"${pravegaSharedControllerApiJarDir}${File.separator}pravega-shared-controller-api-${pravegaVersion}.jar",
 			"${pravegaSharedProtocolJarDir}${File.separator}pravega-shared-protocol-${pravegaVersion}.jar",
-		),
+		),*/
 		"com.google.guava:guava:${depVersion.guava}",
 		"com.google.protobuf:protobuf-java:${depVersion.protobuf}",
 		"io.grpc:grpc-auth:${depVersion.grpc}",
