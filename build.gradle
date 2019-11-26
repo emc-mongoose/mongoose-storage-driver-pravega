@@ -113,15 +113,18 @@ task pravegaClientJars(type: Exec, dependsOn: clonePravegaRepo) {
 compileJava.dependsOn += pravegaClientJars
 task pravegaDistInstall(type: Exec, dependsOn: clonePravegaRepo) {
 	workingDir pravegaSrcDir
-	commandLine "./gradlew", "-PpravegaVersion=${pravegaVersion}", "distribution", "install"
+	//commandLine "./gradlew", "-PpravegaVersion=${pravegaVersion}", "distribution", "install"
+	commandLine "./gradlew", "-PpravegaVersion=${pravegaVersion.substring(0, pravegaVersion.length() - "-SNAPSHOT".length())}", "distribution", "install"
 }
 task pravegaExtract(dependsOn: pravegaDistInstall) {
 	doLast {
 		copy {
-			from tarTree("${pravegaSrcDir}${File.separator}build${File.separator}distributions${File.separator}pravega-${pravegaVersion}.tgz")
+			//from tarTree("${pravegaSrcDir}${File.separator}build${File.separator}distributions${File.separator}pravega-${pravegaVersion}.tgz")
+			from tarTree("${pravegaSrcDir}${File.separator}build${File.separator}distributions${File.separator}pravega-${pravegaVersion.substring(0, pravegaVersion.length() - "-SNAPSHOT".length())}.tgz")
 			into project.buildDir
 		}
-		def pravegaDir = new File("${project.buildDir}${File.separator}pravega-${pravegaVersion}")
+		//def pravegaDir = new File("${project.buildDir}${File.separator}pravega-${pravegaVersion}")
+		def pravegaDir = new File("${project.buildDir}${File.separator}pravega-${pravegaVersion.substring(0, pravegaVersion.length() - "-SNAPSHOT".length())}")
 		pravegaDir.renameTo(pravegaDstDir)
 		pravegaDir.deleteDir()
 	}
