@@ -99,9 +99,8 @@ task clonePravegaRepo {
 				uri = "https://github.com/pravega/pravega.git"
 				dir = pravegaSrcDir
 			}
-			gitRepo.reset {
-				commit = pravegaCommit
-				mode = "hard"
+			gitRepo.checkout {
+				branch = "origin/netty-no-flush"
 			}
 		}
 	}
@@ -113,18 +112,15 @@ task pravegaClientJars(type: Exec, dependsOn: clonePravegaRepo) {
 compileJava.dependsOn += pravegaClientJars
 task pravegaDistInstall(type: Exec, dependsOn: clonePravegaRepo) {
 	workingDir pravegaSrcDir
-	//commandLine "./gradlew", "-PpravegaVersion=${pravegaVersion}", "distribution", "install"
-	commandLine "./gradlew", "-PpravegaVersion=${pravegaVersion.substring(0, pravegaVersion.length() - "-SNAPSHOT".length())}", "distribution", "install"
+	commandLine "./gradlew", "-PpravegaVersion=${pravegaVersion}", "distribution", "install"
 }
 task pravegaExtract(dependsOn: pravegaDistInstall) {
 	doLast {
 		copy {
-			//from tarTree("${pravegaSrcDir}${File.separator}build${File.separator}distributions${File.separator}pravega-${pravegaVersion}.tgz")
-			from tarTree("${pravegaSrcDir}${File.separator}build${File.separator}distributions${File.separator}pravega-${pravegaVersion.substring(0, pravegaVersion.length() - "-SNAPSHOT".length())}.tgz")
+			from tarTree("${pravegaSrcDir}${File.separator}build${File.separator}distributions${File.separator}pravega-${pravegaVersion}.tgz")
 			into project.buildDir
 		}
-		//def pravegaDir = new File("${project.buildDir}${File.separator}pravega-${pravegaVersion}")
-		def pravegaDir = new File("${project.buildDir}${File.separator}pravega-${pravegaVersion.substring(0, pravegaVersion.length() - "-SNAPSHOT".length())}")
+		def pravegaDir = new File("${project.buildDir}${File.separator}pravega-${pravegaVersion}")
 		pravegaDir.renameTo(pravegaDstDir)
 		pravegaDir.deleteDir()
 	}
@@ -166,18 +162,13 @@ dependencies {
 		"org.apache.logging.log4j:log4j-api:${depVersion.log4j}",
 	)
 	provided(
-		"io.pravega:pravega-common:${pravegaVersion}",
-		"io.pravega:pravega-client:${pravegaVersion}",
-		"io.pravega:pravega-shared-authplugin:${pravegaVersion}",
-		"io.pravega:pravega-shared-controller-api:${pravegaVersion}",
-		"io.pravega:pravega-shared-protocol:${pravegaVersion}",
-		/*files(
+		files(
 			"${pravegaClientJarDir}${File.separator}pravega-client-${pravegaVersion}.jar",
 			"${pravegaCommonJarDir}${File.separator}pravega-common-${pravegaVersion}.jar",
 			"${pravegaSharedAuthpluginJarDir}${File.separator}pravega-shared-authplugin-${pravegaVersion}.jar",
 			"${pravegaSharedControllerApiJarDir}${File.separator}pravega-shared-controller-api-${pravegaVersion}.jar",
 			"${pravegaSharedProtocolJarDir}${File.separator}pravega-shared-protocol-${pravegaVersion}.jar",
-		),*/
+		),
 		"com.google.guava:guava:${depVersion.guava}",
 		"com.google.protobuf:protobuf-java:${depVersion.protobuf}",
 		"io.grpc:grpc-auth:${depVersion.grpc}",
