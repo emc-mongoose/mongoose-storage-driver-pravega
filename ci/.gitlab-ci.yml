@@ -49,37 +49,37 @@ before_script:
   - apk del binutils
   - rm -rf /tmp/${GLIBC_VER}.apk /tmp/gcc /tmp/gcc-libs.tar.xz /tmp/libz /tmp/libz.tar.xz /var/cache/apk/*
 
-build:
-  stage: build
-  script:
-    - ./gradlew clean jar
-  artifacts:
-    paths:
-      - build/libs/mongoose-*.jar
-
-test_unit:
-  stage: test
-  script:
-    - ./gradlew clean test
-  artifacts:
-    paths:
-      - build/reports/tests/test/*
-    when: on_failure
-
-test_integration:
-  stage: test
-  script:
-    - ./gradlew pravegaExtract
-    - nohup build/pravega_/bin/pravega-standalone 1,2 > build/pravega_nohup.out &
-    - sleep 15
-    - ./gradlew integrationTest
-  after_script:
-    - killall java
-  artifacts:
-    paths:
-      - build/pravega_nohup.out
-      - build/reports/tests/integrationTest/*
-    when: on_failure
+#build:
+#  stage: build
+#  script:
+#    - ./gradlew clean jar
+#  artifacts:
+#    paths:
+#      - build/libs/mongoose-*.jar
+#
+#test_unit:
+#  stage: test
+#  script:
+#    - ./gradlew clean test
+#  artifacts:
+#    paths:
+#      - build/reports/tests/test/*
+#    when: on_failure
+#
+#test_integration:
+#  stage: test
+#  script:
+#    - ./gradlew pravegaExtract
+#    - nohup build/pravega_/bin/pravega-standalone 1,2 > build/pravega_nohup.out &
+#    - sleep 15
+#    - ./gradlew integrationTest
+#  after_script:
+#    - killall java
+#  artifacts:
+#    paths:
+#      - build/pravega_nohup.out
+#      - build/reports/tests/integrationTest/*
+#    when: on_failure
 
 build_docker_image:
   stage: build_docker_image
