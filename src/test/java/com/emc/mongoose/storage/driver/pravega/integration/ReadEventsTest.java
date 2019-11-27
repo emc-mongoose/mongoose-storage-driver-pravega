@@ -41,7 +41,7 @@ public class ReadEventsTest {
 	@Before
 	public void setUp()
 					throws Exception {
-		dataInput = DataInput.instance(null, "7a42d9c483244167", new SizeInBytes(1024 * 1024 - 8), 16, true);
+		dataInput = DataInput.instance(null, "7a42d9c483244167", new SizeInBytes(1024 * 1024 - 8), 16);
 		val config = DataOperationsTest.getConfig();
 		driver = new PravegaStorageDriver(
 						getClass().getSimpleName(), dataInput, config.configVal("storage"), false, 32768);
