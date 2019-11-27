@@ -13,7 +13,7 @@ services:
   - docker:dind
 
 stages:
-#  - build
+  - build
 #  - test # unit/integration tests
   - build_docker_image
   - test_functional # functional containerized tests
@@ -49,14 +49,14 @@ before_script:
   - apk del binutils
   - rm -rf /tmp/${GLIBC_VER}.apk /tmp/gcc /tmp/gcc-libs.tar.xz /tmp/libz /tmp/libz.tar.xz /var/cache/apk/*
 
-#build:
-#  stage: build
-#  script:
-#    - ./gradlew clean jar
-#  artifacts:
-#    paths:
-#      - build/libs/mongoose-*.jar
-#
+build:
+  stage: build
+  script:
+    - ./gradlew clean jar
+  artifacts:
+    paths:
+      - build/libs/mongoose-*.jar
+
 #test_unit:
 #  stage: test
 #  script:
