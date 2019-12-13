@@ -15,14 +15,15 @@ public final class DataItemSerializer<I extends DataItem>
 				implements Serializer<I>, Serializable {
 
 	private final boolean useDirectMem;
-
+	private final boolean shouldRecordTime;
 	/**
 	 * @param useDirectMem Specifies whether should it use direct memory for the resulting buffer containing the
 	 *                     serialized data or not. Using the direct memory may lead to the better performance in case of
 	 *                     large data chunks but less safe.
 	 */
-	public DataItemSerializer(final boolean useDirectMem) {
+	public DataItemSerializer(final boolean useDirectMem, final boolean shouldRecordTime) {
 		this.useDirectMem = useDirectMem;
+		this.shouldRecordTime = shouldRecordTime;
 	}
 
 	/**
@@ -45,6 +46,9 @@ public final class DataItemSerializer<I extends DataItem>
 			}
 			final var dstBuff = useDirectMem ? ByteBuffer.allocateDirect((int) dataItemSize) : // will crash if not enough memory
 							ByteBuffer.allocate((int) dataItemSize); // will throw OOM error if not enough memory
+			if (shouldRecordTime) {
+				dstBuff.putLong(System.currentTimeMillis()); //adding timestamp as first 8 bytes
+			}
 			while (dstBuff.remaining() > 0) {
 				dataItem.read(dstBuff);
 			}

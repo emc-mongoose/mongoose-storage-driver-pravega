@@ -41,7 +41,6 @@ import com.emc.mongoose.storage.driver.pravega.cache.StreamCreateFunction;
 import com.emc.mongoose.storage.driver.pravega.io.ByteBufferSerializer;
 import com.emc.mongoose.storage.driver.pravega.io.ByteStreamWriteChannel;
 import com.emc.mongoose.storage.driver.pravega.io.DataItemSerializer;
-import com.emc.mongoose.storage.driver.pravega.io.DataItemTimestampSerializer;
 import com.emc.mongoose.storage.driver.pravega.io.StreamDataType;
 import com.emc.mongoose.storage.driver.preempt.PreemptStorageDriverBase;
 import com.github.akurilov.commons.concurrent.ContextAwareThreadFactory;
@@ -98,6 +97,7 @@ import io.pravega.client.stream.impl.Credentials;
 import io.pravega.client.stream.impl.DefaultCredentials;
 import io.pravega.client.stream.impl.PositionImpl;
 import io.pravega.client.stream.impl.ReaderGroupImpl;
+import io.pravega.client.stream.impl.StreamImpl;
 import io.pravega.common.util.AsyncIterator;
 import lombok.Value;
 import lombok.val;
@@ -118,7 +118,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	protected final long evtOpTimeoutMillis;
 	protected final Serializer<I> evtSerializer;
 	protected final Serializer<ByteBuffer> evtDeserializer = new ByteBufferSerializer();
-	private final boolean createTimestampFlag;
+	private final boolean recordWriteTimeFlag;
 	private final boolean tailReadFlag;
 	protected final EventWriterConfig evtWriterConfig;
 	protected final ReaderConfig evtReaderConfig = ReaderConfig
@@ -136,7 +136,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	private final boolean controlScopeFlag;
 	private final boolean controlStreamFlag;
 	private final Credentials cred;
-	private int timestampLength = 8;
+	private static final int TIMESTAMP_LENGTH = 8;
 
 	Queue<EventStreamReader<ByteBuffer>> createEventStreamReaderPool(final String unused) {
 		return new ArrayBlockingQueue<>(ioWorkerCount);
@@ -321,8 +321,11 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		this.concurrencyThrottle = new Semaphore(concurrencyLimit > 0 ? concurrencyLimit : Integer.MAX_VALUE, true);
 		val driverConfig = storageConfig.configVal("driver");
 		val createConfig = driverConfig.configVal("create");
-		this.createTimestampFlag = createConfig.boolVal("timestamp");
-		evtSerializer = (createTimestampFlag) ? new DataItemTimestampSerializer<>(false) : new DataItemSerializer<>(false);
+		this.recordWriteTimeFlag = createConfig.boolVal("timestamp");
+		if (recordWriteTimeFlag) {
+			Loggers.ERR.warn("{}: Make sure that event size is not smaller than 8 bytes ", stepId);
+		}
+		evtSerializer = new DataItemSerializer<>(false, recordWriteTimeFlag);
 		val controlConfig = driverConfig.configVal("control");
 		this.controlApiTimeoutMillis = controlConfig.longVal("timeoutMillis");
 		this.controlScopeFlag = controlConfig.boolVal("scope");
@@ -850,6 +853,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				val endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
 				val clientConfig = clientConfigCache.computeIfAbsent(endpointUri, this::createClientConfig);
 				val streamName = extractStreamName(anyEvtOp.dstPath());
+				Stream stream = new StreamImpl(scopeName, streamName);
 				val readerGroupConfigBuilder = evtReaderGroupConfigBuilder.get();
 				val readerGroupConfig = evtReaderGroupConfigCache.computeIfAbsent(
 					scopeName + SLASH + streamName, key -> readerGroupConfigBuilder.stream(key).build());
@@ -872,6 +876,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				if(null == evtReader_) {
 					evtReader_ = clientFactory.createReader("reader-" + (System.nanoTime()), evtReaderGroupName, evtDeserializer, evtReaderConfig);
 				}
+
 				val evtReader = evtReader_;
 				for(var i = 0; i < opsCount; i ++) {
 					readEvent(readerGroupManager, evtReaderGroupName, evtReader, evtOps.get(i));
@@ -903,8 +908,8 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		val evtRead = evtRead_;
 		val evtData = evtRead.getEvent();
 		if (tailReadFlag) {
-			val timestampBuffer = ByteBuffer.allocate(timestampLength);
-			timestampBuffer.put(evtData.array(),0,8);
+			val timestampBuffer = ByteBuffer.allocate(TIMESTAMP_LENGTH);
+			timestampBuffer.put(evtData.array(),0,TIMESTAMP_LENGTH);
 			timestampBuffer.flip();
 			val e2eTimeMillis = System.currentTimeMillis() - timestampBuffer.getLong();
 			val msgId = evtOp.item().name();
