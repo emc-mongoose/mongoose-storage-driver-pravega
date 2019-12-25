@@ -57,7 +57,7 @@ ext {
 		grpc                     : "1.17.1",
 		guava                    : "28.1-jre",
 		log4j                    : "2.8.2",
-		mongooseBase             : "4.2.17",
+		mongooseBase             : "4.2.16",
 		mongooseStorageDriverPreempt: "4.2.23",
 		netty                    : "4.1.16.Final",
 		nettyTcNative            : "2.0.17.Final",
@@ -99,8 +99,9 @@ task clonePravegaRepo {
 				uri = "https://github.com/pravega/pravega.git"
 				dir = pravegaSrcDir
 			}
-			gitRepo.checkout {
-				branch = "origin/netty-no-flush"
+			gitRepo.reset {
+				commit = pravegaCommit
+				mode = "hard"
 			}
 		}
 	}
@@ -108,6 +109,7 @@ task clonePravegaRepo {
 task pravegaClientJars(type: Exec, dependsOn: clonePravegaRepo) {
 	workingDir pravegaSrcDir
 	commandLine "./gradlew", "-PpravegaVersion=${pravegaVersion.substring(0, pravegaVersion.length())}", ":client:jar"
+	//TODO: remove substring if it's here for no good reason
 }
 compileJava.dependsOn += pravegaClientJars
 task pravegaDistInstall(type: Exec, dependsOn: clonePravegaRepo) {
