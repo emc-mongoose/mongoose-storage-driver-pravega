@@ -466,7 +466,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		val endpointUri = endpointCache.computeIfAbsent(endpointAddrs[0], this::createEndpointUri);
 		val clientConfig = clientConfigCache.computeIfAbsent(endpointUri, this::createClientConfig);
 		val controller = controllerCache.computeIfAbsent(clientConfig, this::createController);
-
+		val systemStreamPrefix = "_";
 		if (streamIterator == null) {
 			val scopeName = path.startsWith(SLASH) ? path.substring(1) : path;
 			streamIterator = controller.listStreams(scopeName);
@@ -488,18 +488,20 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				} else {
 					val streamName = stream.getStreamName();
 					try {
-						if (prefixLength > 0) {
-							if (streamName.startsWith(prefix)) {
+						if (!streamName.startsWith(systemStreamPrefix)) {
+							if (prefixLength > 0) {
+								if (streamName.startsWith(prefix)) {
+									val streamItem = makeStreamItem(
+										clientConfig, controller, streamName, idRadix, stream.getScope(), itemFactory);
+									streamItems.add(streamItem);
+									i++;
+								}
+							} else {
 								val streamItem = makeStreamItem(
-												clientConfig, controller, streamName, idRadix, stream.getScope(), itemFactory);
+									clientConfig, controller, streamName, idRadix, stream.getScope(), itemFactory);
 								streamItems.add(streamItem);
 								i++;
 							}
-						} else {
-							val streamItem = makeStreamItem(
-											clientConfig, controller, streamName, idRadix, stream.getScope(), itemFactory);
-							streamItems.add(streamItem);
-							i++;
 						}
 					} catch(final Exception e) {
 						throwUncheckedIfInterrupted(e);
