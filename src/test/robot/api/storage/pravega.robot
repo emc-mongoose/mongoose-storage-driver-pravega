@@ -79,7 +79,7 @@ Read All Byte Streams Test
     ${count_limit} =  Set Variable  10
     Remove Directory  ${LOG_DIR}/${step_id}  recursive=True
     ${args} =  Catenate  SEPARATOR= \\\n\t
-    ...  --load-step-id=readAllByteStreams #${step_id}
+    ...  --load-step-id=${step_id}
     ...  --load-op-limit-count=${count_limit}
     ...  --storage-driver-limit-concurrency=1000
     ...  --storage-driver-threads=10
