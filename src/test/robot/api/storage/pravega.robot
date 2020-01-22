@@ -84,8 +84,6 @@ Read All Byte Streams Test
     ...  --storage-driver-limit-concurrency=1000
     ...  --storage-driver-threads=10
     ...  --storage-net-node-addrs=${node_addr}
-    ...  --storage-driver-stream-data=bytes
-    ...  --storage-namespace=scope4
     ...  --run-scenario=${MONGOOSE_CONTAINER_DATA_DIR}/read_all_byte_streams.js
     &{env_params} =  Create Dictionary  SCOPE_NAME=scope4
     ${std_out} =  Execute Mongoose Scenario  ${DATA_DIR}  ${env_params}  ${args}
