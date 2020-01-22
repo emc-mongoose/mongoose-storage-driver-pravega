@@ -468,8 +468,11 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		val controller = controllerCache.computeIfAbsent(clientConfig, this::createController);
 		val systemStreamPrefix = "_";
 		if (streamIterator == null) {
+			Loggers.MSG.info(
+				"streamIterator is null. This should only happen once: {}", streamIterator == null);
 			val scopeName = path.startsWith(SLASH) ? path.substring(1) : path;
 			streamIterator = controller.listStreams(scopeName);
+
 		}
 
 		final int prefixLength = (prefix == null || prefix.isEmpty()) ? 0 : prefix.length();
@@ -479,6 +482,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 			while (i < count) {
 				val stream = streamIterator.getNext().get(controlApiTimeoutMillis, MILLISECONDS);
 				if (null == stream) {
+
 					if (i == 0) {
 						streamIterator = null;
 						throw new EOFException("End of stream listing");
