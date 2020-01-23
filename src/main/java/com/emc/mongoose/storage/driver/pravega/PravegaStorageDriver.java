@@ -485,6 +485,8 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 
 					if (i == 0) {
 						streamIterator = null;
+						Loggers.MSG.info(
+							"streamIterator should see that there is no next, so we throw EOF");
 						throw new EOFException("End of stream listing");
 					} else {
 						break;
