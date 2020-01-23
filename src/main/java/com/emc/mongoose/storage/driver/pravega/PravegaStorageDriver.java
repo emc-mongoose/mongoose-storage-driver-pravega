@@ -468,8 +468,8 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		val controller = controllerCache.computeIfAbsent(clientConfig, this::createController);
 		val systemStreamPrefix = "_";
 		if (streamIterator == null) {
-			Loggers.MSG.info(
-				"streamIterator is null. This should only happen once: {}", streamIterator == null);
+			//Loggers.MSG.info(
+				//"streamIterator is null. This should only happen once: {}", streamIterator == null);
 			val scopeName = path.startsWith(SLASH) ? path.substring(1) : path;
 			streamIterator = controller.listStreams(scopeName);
 
@@ -485,8 +485,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 
 					if (i == 0) {
 						streamIterator = null;
-						Loggers.MSG.info(
-							"streamIterator should see that there is no next, so we throw EOF");
+
 						throw new EOFException("End of stream listing");
 					} else {
 						break;
@@ -525,8 +524,8 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		} catch (final TimeoutException e) {
 			LogUtil.exception(Level.WARN, e, "{}: scope \"{}\" streams listing timeout", stepId, scopeName);
 		}
-		Loggers.MSG.info(
-			"StreamItems: {}", streamItems);
+		//Loggers.MSG.info(
+			//"StreamItems: {}", streamItems);
 		return streamItems;
 	}
 
@@ -985,8 +984,6 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		val streamName = extractStreamName(streamItem.name());
 		try {
 			var remainingBytes = streamItem.size();
-			Loggers.MSG.info(
-				"remainingBytes: {}", remainingBytes);
 			if (remainingBytes > 0) {
 				val connFactory = connFactoryCache.computeIfAbsent(clientConfig, this::createConnectionFactory);
 				val clientFactoryCreateFunc = byteStreamClientCreateFuncCache.computeIfAbsent(
