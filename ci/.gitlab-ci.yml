@@ -53,8 +53,6 @@ build:
   stage: build
   script:
     - ./gradlew clean jar
-  tags:
-    - pravega
   artifacts:
     paths:
       - build/libs/mongoose-*.jar
@@ -63,8 +61,6 @@ test_unit:
   stage: test
   script:
     - ./gradlew clean test
-  tags:
-    - pravega
   artifacts:
     paths:
       - build/reports/tests/test/*
@@ -77,8 +73,6 @@ test_integration:
     - nohup build/pravega_/bin/pravega-standalone 1,2 > build/pravega_nohup.out &
     - sleep 15
     - ./gradlew integrationTest
-  tags:
-    - pravega
   after_script:
     - killall java
   artifacts:
@@ -93,8 +87,6 @@ build_docker_image:
     - ./gradlew dockerBuildImage
     - export VERSION=$(cat build.gradle | grep version\ = | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
     - docker save ${IMAGE_NAME}:${VERSION} > ${IMAGE_FILE_NAME}
-  tags:
-    - pravega
   artifacts:
     paths:
       - ${IMAGE_FILE_NAME}
@@ -123,8 +115,6 @@ build_docker_image:
     - sleep 15
     # Run the tests
     - robot --outputdir build/robotest --suite ${SUITE} --include ${TEST} src/test/robot
-  tags:
-    - pravega
   after_script:
     - killall java
     - rebot build/robotest/output.xml
@@ -173,8 +163,6 @@ release_to_maven_repo:
     - if [ ! -z "$GPG_SECRING" ]; then echo $GPG_SECRING | base64 -d > /tmp/.gnupg/secring.gpg; fi
     - ./gradlew clean jar
     - ./gradlew -Psigning.keyId=${SIGNING_KEY_ID} -Psigning.password=${SIGNING_PASSWORD} -Psigning.secretKeyRingFile=/tmp/.gnupg/secring.gpg -PossrhUsername=${OSSRH_USERNAME} -PossrhPassword=${OSSRH_PASSWORD} publishToNexus closeAndReleaseRepository
-  tags:
-    - pravega
   only:
     - latest
   except:
@@ -189,8 +177,6 @@ release_to_docker_hub:
     - docker push ${IMAGE_NAME}:${VERSION}
     - docker tag ${IMAGE_NAME}:${VERSION} ${IMAGE_NAME}:latest
     - docker push ${IMAGE_NAME}:latest
-  tags:
-    - pravega
   only:
     - latest
   except:
