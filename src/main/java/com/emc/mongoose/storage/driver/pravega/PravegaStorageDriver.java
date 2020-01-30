@@ -468,8 +468,6 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		val controller = controllerCache.computeIfAbsent(clientConfig, this::createController);
 		val systemStreamPrefix = "_";
 		if (streamIterator == null) {
-			//Loggers.MSG.info(
-				//"streamIterator is null. This should only happen once: {}", streamIterator == null);
 			val scopeName = path.startsWith(SLASH) ? path.substring(1) : path;
 			streamIterator = controller.listStreams(scopeName);
 
@@ -485,7 +483,6 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 
 					if (i == 0) {
 						streamIterator = null;
-
 						throw new EOFException("End of stream listing");
 					} else {
 						break;
@@ -524,8 +521,6 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		} catch (final TimeoutException e) {
 			LogUtil.exception(Level.WARN, e, "{}: scope \"{}\" streams listing timeout", stepId, scopeName);
 		}
-		//Loggers.MSG.info(
-			//"StreamItems: {}", streamItems);
 		return streamItems;
 	}
 
