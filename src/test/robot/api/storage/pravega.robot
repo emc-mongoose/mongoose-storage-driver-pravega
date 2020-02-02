@@ -26,6 +26,8 @@ Create Event Stream Test
     ...  --load-op-limit-count=${count_limit}
     ...  --storage-driver-limit-concurrency=1000
     ...  --storage-driver-threads=10
+    ...  --load-batch-size=1000
+    ...  --storage-driver-limit-queue-input=1000
     ...  --storage-namespace=scope1
     ...  --storage-net-node-addrs=${node_addr}
     &{env_params} =  Create Dictionary

@@ -58,7 +58,7 @@ public class CommonTest {
 							.ifPresent(configSchemas::add);
 			val configSchema = TreeUtil.reduceForest(configSchemas);
 			val config = new BasicConfig("-", configSchema);
-			config.val("load-batch-size", 4096);
+			config.val("load-batch-size", 1000);
 			config.val("storage-net-reuseAddr", true);
 			config.val("storage-net-bindBacklogSize", 0);
 			config.val("storage-net-keepAlive", true);
@@ -93,7 +93,7 @@ public class CommonTest {
 			config.val("storage-driver-scaling-segments", 1);
 			config.val("storage-driver-stream-data", "events");
 			config.val("storage-driver-threads", 0);
-			config.val("storage-driver-limit-queue-input", 1_000_000);
+			config.val("storage-driver-limit-queue-input", 1_000);
 			config.val("storage-driver-limit-concurrency", 1);
 			config.val("storage-namespace", "goose");
 			return config;
