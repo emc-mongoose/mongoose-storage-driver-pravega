@@ -31,6 +31,8 @@ Create Event Stream Test
     ...  --storage-namespace=scope1
     ...  --storage-net-node-addrs=${node_addr}
     &{env_params} =  Create Dictionary
+    ${cmd} = Run ps -aux | grep java
+    Log  ${std_out}
     ${std_out} =  Execute Mongoose Scenario  ${DATA_DIR}  ${env_params}  ${args}
     Log  ${std_out}
     Validate Metrics Total Log File  ${step_id}  CREATE  ${count_limit}  0  1048576000
