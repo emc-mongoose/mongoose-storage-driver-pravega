@@ -17,7 +17,7 @@ ${MONGOOSE_CONTAINER_NAME} =  mongoose-storage-driver-pravega
 
 Create Event Stream Test
     [Tags]  create_event_stream
-    ${node_addr} =  Get Environment Variable  SERVICE_HOST  127.0.0.1
+    ${node_addr} =  Get Environment Variable 127.0.0.1
     ${step_id} =  Set Variable  create_event_stream_test
     ${count_limit} =  Set Variable  1000
     Remove Directory  ${LOG_DIR}/${step_id}  recursive=True
@@ -37,7 +37,7 @@ Create Event Stream Test
 
 Create Byte Streams Test
     [Tags]  create_byte_streams
-    ${node_addr} =  Get Environment Variable  SERVICE_HOST  127.0.0.1
+    ${node_addr} =  Get Environment Variable  127.0.0.1
     ${step_id} =  Set Variable  create_byte_streams_test
     ${count_limit} =  Set Variable  100
     Remove Directory  ${LOG_DIR}/${step_id}  recursive=True
