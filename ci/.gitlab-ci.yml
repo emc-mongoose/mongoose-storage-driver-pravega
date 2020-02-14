@@ -118,9 +118,9 @@ build_docker_image:
     # Run Pravega
     #- ./gradlew pravegaExtract
     #- nohup build/pravega_/bin/pravega-standalone 1,2 > build/pravega_nohup.out &
-    - docker run -e HOST_IP=127.0.0.1 -p 9090:9090 -p 12345:12345 pravega/pravega:latest standalone
+    - docker run -d -e HOST_IP=127.0.0.1 -p 9090:9090 -p 12345:12345 pravega/pravega:latest standalone
     - sleep 15
-    - docker run emcmongoose/mongoose-storage-driver-pravega:4.2.26 --storage-namespace=tp --load-op-limit-count=1000 --storage-net-node-addrs=127.0.0.1
+    #- docker run -d emcmongoose/mongoose-storage-driver-pravega:4.2.26 --storage-namespace=tp --load-op-limit-count=1000 --storage-net-node-addrs=127.0.0.1
     # Run the tests
     - robot --outputdir build/robotest --suite ${SUITE} --include ${TEST} src/test/robot
   tags:
