@@ -76,9 +76,9 @@ public class CommonTest {
 			config.val("storage-net-node-conn-pooling", true);
 			config.val("storage-net-uri-schema", "tcp");
 
-			config.val("storage-auth-uid", CREDENTIAL.getUid());
+			config.val("storage-auth-uid", null);
 			config.val("storage-auth-token", null);
-			config.val("storage-auth-secret", CREDENTIAL.getSecret());
+			config.val("storage-auth-secret", null);
 
 			config.val("storage-driver-control-scope", true);
 			config.val("storage-driver-control-stream", true);
