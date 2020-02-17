@@ -151,11 +151,11 @@ test_read_byte_streams:
     SUITE: api.storage
     TEST: read_byte_streams
 
-test_read_all_byte_streams:
-  extends: .test_robot
-  variables:
-    SUITE: api.storage
-    TEST: read_all_byte_streams
+#test_read_all_byte_streams:
+#  extends: .test_robot
+#  variables:
+#    SUITE: api.storage
+#    TEST: read_all_byte_streams
 
 test_create_event_transaction_stream:
   extends: .test_robot
