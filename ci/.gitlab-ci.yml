@@ -73,8 +73,9 @@ test_unit:
 test_integration:
   stage: test
   script:
-    - ./gradlew pravegaExtract
-    - nohup build/pravega_/bin/pravega-standalone 1,2 > build/pravega_nohup.out &
+    #- ./gradlew pravegaExtract
+    #- nohup build/pravega_/bin/pravega-standalone 1,2 > build/pravega_nohup.out &
+    - docker run -d -e HOST_IP=127.0.0.1 -p 9090:9090 -p 12345:12345 pravega/pravega:latest standalone
     - sleep 15
     - ./gradlew integrationTest
   tags:
