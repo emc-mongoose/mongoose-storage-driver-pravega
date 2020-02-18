@@ -38,7 +38,7 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
 
 	static {
 		try {
-			DATA_INPUT = DataInput.instance(null, "7a42d9c483244167", new SizeInBytes(1024 * 1024 - 8), 16, true);
+			DATA_INPUT = DataInput.instance(null, "7a42d9c483244167", new SizeInBytes(1024 * 1024 - 8), 16, false);
 		} catch (final IOException e) {
 			throw new AssertionError(e);
 		}

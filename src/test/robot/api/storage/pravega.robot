@@ -72,7 +72,7 @@ Read Byte Streams Test
     &{env_params} =  Create Dictionary  ITEM_LIST_FILE=${MONGOOSE_CONTAINER_DATA_DIR}/${step_id}.csv
     ${std_out} =  Execute Mongoose Scenario  ${DATA_DIR}  ${env_params}  ${args}
     Log  ${std_out}
-    Validate Metrics Total Log File  ${step_id}  READ  ${count_limit}  0  10485760
+    Validate Metrics Total Log File  ${step_id}  READ  ${count_limit}  0  104857600
 
 Read All Byte Streams Test
     [Tags]  read_all_byte_streams
