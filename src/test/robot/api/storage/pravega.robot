@@ -58,7 +58,7 @@ Read Byte Streams Test
     [Tags]  read_byte_streams
     ${node_addr} =  Set Variable  127.0.0.1
     ${step_id} =  Set Variable  read_byte_streams_test
-    ${count_limit} =  Set Variable  10
+    ${count_limit} =  Set Variable  100
     Remove Directory  ${LOG_DIR}/${step_id}  recursive=True
     ${args} =  Catenate  SEPARATOR= \\\n\t
     ...  --load-step-id=${step_id}
