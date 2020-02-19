@@ -7,7 +7,7 @@ variables:
   IMAGE_FILE_NAME: build/mongoose-storage-driver-pravega.tar
   JAVA_HOME: /opt/jdk-11.0.4+10
   ROBOTEST_CONTAINER_WORKING_DIR: /root/mongoose
-  SERVICE_HOST: docker # should be used instead of the "localhost"/"127.0.0.1" in GL CI
+  SERVICE_HOST: 127.0.0.1
 
 services:
   - docker:18.09.7-dind
@@ -118,7 +118,7 @@ build_docker_image:
     # Run Pravega
     #- ./gradlew pravegaExtract
     #- nohup build/pravega_/bin/pravega-standalone 1,2 > build/pravega_nohup.out &
-    - docker run -d -e HOST_IP=127.0.0.1 -p 9090:9090 -p 12345:12345 pravega/pravega:latest standalone
+    - docker run -d -e HOST_IP=${SERVICE_HOST} -p 9090:9090 -p 12345:12345 pravega/pravega:latest standalone
     - sleep 15
     # Run the tests
     - robot --outputdir build/robotest --suite ${SUITE} --include ${TEST} src/test/robot
