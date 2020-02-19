@@ -1,4 +1,4 @@
-image: docker:stable
+image: docker:18.09.7
 
 variables:
   DOCKER_HOST: tcp://docker:2375
@@ -7,10 +7,10 @@ variables:
   IMAGE_FILE_NAME: build/mongoose-storage-driver-pravega.tar
   JAVA_HOME: /opt/jdk-11.0.4+10
   ROBOTEST_CONTAINER_WORKING_DIR: /root/mongoose
-  SERVICE_HOST: 172.17.0.4 # should be used instead of the "localhost"/"127.0.0.1" in GL CI
+  SERVICE_HOST: 127.0.0.1
 
 services:
-  - docker:dind
+  - docker:18.09.7-dind
 
 stages:
   - build
@@ -53,6 +53,8 @@ build:
   stage: build
   script:
     - ./gradlew clean jar
+  tags:
+    - pravega
   artifacts:
     paths:
       - build/libs/mongoose-*.jar
@@ -61,6 +63,8 @@ test_unit:
   stage: test
   script:
     - ./gradlew clean test
+  tags:
+    - pravega
   artifacts:
     paths:
       - build/reports/tests/test/*
@@ -73,6 +77,8 @@ test_integration:
     - nohup build/pravega_/bin/pravega-standalone 1,2 > build/pravega_nohup.out &
     - sleep 15
     - ./gradlew integrationTest
+  tags:
+    - pravega
   after_script:
     - killall java
   artifacts:
@@ -110,11 +116,14 @@ build_docker_image:
     - docker login -u ${DOCKER_USER} -p ${DOCKER_PASS}
     - docker load < ${IMAGE_FILE_NAME}
     # Run Pravega
-    - ./gradlew pravegaExtract
-    - nohup build/pravega_/bin/pravega-standalone 1,2 > build/pravega_nohup.out &
+    #- ./gradlew pravegaExtract
+    #- nohup build/pravega_/bin/pravega-standalone 1,2 > build/pravega_nohup.out &
+    - docker run -d -e HOST_IP=${SERVICE_HOST} -p 9090:9090 -p 12345:12345 pravega/pravega:latest standalone
     - sleep 15
     # Run the tests
     - robot --outputdir build/robotest --suite ${SUITE} --include ${TEST} src/test/robot
+  tags:
+    - pravega
   after_script:
     - killall java
     - rebot build/robotest/output.xml
@@ -136,17 +145,17 @@ test_create_byte_streams:
     SUITE: api.storage
     TEST: create_byte_streams
 
-test_read_byte_streams:
-  extends: .test_robot
-  variables:
-    SUITE: api.storage
-    TEST: read_byte_streams
+#test_read_byte_streams:
+#  extends: .test_robot
+#  variables:
+#    SUITE: api.storage
+#    TEST: read_byte_streams
 
-test_read_all_byte_streams:
-  extends: .test_robot
-  variables:
-    SUITE: api.storage
-    TEST: read_all_byte_streams
+#test_read_all_byte_streams:
+#  extends: .test_robot
+#  variables:
+#    SUITE: api.storage
+#    TEST: read_all_byte_streams
 
 test_create_event_transaction_stream:
   extends: .test_robot
@@ -163,6 +172,8 @@ release_to_maven_repo:
     - if [ ! -z "$GPG_SECRING" ]; then echo $GPG_SECRING | base64 -d > /tmp/.gnupg/secring.gpg; fi
     - ./gradlew clean jar
     - ./gradlew -Psigning.keyId=${SIGNING_KEY_ID} -Psigning.password=${SIGNING_PASSWORD} -Psigning.secretKeyRingFile=/tmp/.gnupg/secring.gpg -PossrhUsername=${OSSRH_USERNAME} -PossrhPassword=${OSSRH_PASSWORD} publishToNexus closeAndReleaseRepository
+  tags:
+    - pravega
   only:
     - latest
   except:
@@ -170,6 +181,8 @@ release_to_maven_repo:
 
 release_to_docker_hub:
   stage: deploy
+  tags:
+    - pravega
   script:
     - docker login -u ${DOCKER_USER} -p ${DOCKER_PASS}
     - docker load < ${IMAGE_FILE_NAME}

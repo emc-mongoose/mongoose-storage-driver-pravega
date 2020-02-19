@@ -38,7 +38,7 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
 
 	static {
 		try {
-			DATA_INPUT = DataInput.instance(null, "7a42d9c483244167", new SizeInBytes(1024 * 1024 - 8), 16);
+			DATA_INPUT = DataInput.instance(null, "7a42d9c483244167", new SizeInBytes(1024 * 1024 - 8), 16, false);
 		} catch (final IOException e) {
 			throw new AssertionError(e);
 		}
@@ -66,7 +66,7 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
 			val configSchema = TreeUtil.reduceForest(configSchemas);
 			val config = new BasicConfig("-", configSchema);
 
-			config.val("load-batch-size", 4096);
+			config.val("load-batch-size", 1_000);
 
 			config.val("storage-net-reuseAddr", true);
 			config.val("storage-net-bindBacklogSize", 0);
@@ -102,7 +102,7 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
 			config.val("storage-driver-scaling-segments", 1);
 			config.val("storage-driver-stream-data", "events");
 			config.val("storage-driver-threads", 0);
-			config.val("storage-driver-limit-queue-input", 1_000_000);
+			config.val("storage-driver-limit-queue-input", 1_000);
 			config.val("storage-driver-limit-concurrency", 0);
 			config.val("storage-namespace", "goose");
 

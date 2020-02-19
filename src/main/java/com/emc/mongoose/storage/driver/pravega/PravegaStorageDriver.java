@@ -466,10 +466,11 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		val endpointUri = endpointCache.computeIfAbsent(endpointAddrs[0], this::createEndpointUri);
 		val clientConfig = clientConfigCache.computeIfAbsent(endpointUri, this::createClientConfig);
 		val controller = controllerCache.computeIfAbsent(clientConfig, this::createController);
-
+		val systemStreamPrefix = "_";
 		if (streamIterator == null) {
 			val scopeName = path.startsWith(SLASH) ? path.substring(1) : path;
 			streamIterator = controller.listStreams(scopeName);
+
 		}
 
 		final int prefixLength = (prefix == null || prefix.isEmpty()) ? 0 : prefix.length();
@@ -479,6 +480,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 			while (i < count) {
 				val stream = streamIterator.getNext().get(controlApiTimeoutMillis, MILLISECONDS);
 				if (null == stream) {
+
 					if (i == 0) {
 						streamIterator = null;
 						throw new EOFException("End of stream listing");
@@ -488,18 +490,20 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				} else {
 					val streamName = stream.getStreamName();
 					try {
-						if (prefixLength > 0) {
-							if (streamName.startsWith(prefix)) {
+						if (!streamName.startsWith(systemStreamPrefix)) {
+							if (prefixLength > 0) {
+								if (streamName.startsWith(prefix)) {
+									val streamItem = makeStreamItem(
+										clientConfig, controller, streamName, idRadix, stream.getScope(), itemFactory);
+									streamItems.add(streamItem);
+									i++;
+								}
+							} else {
 								val streamItem = makeStreamItem(
-												clientConfig, controller, streamName, idRadix, stream.getScope(), itemFactory);
+									clientConfig, controller, streamName, idRadix, stream.getScope(), itemFactory);
 								streamItems.add(streamItem);
 								i++;
 							}
-						} else {
-							val streamItem = makeStreamItem(
-											clientConfig, controller, streamName, idRadix, stream.getScope(), itemFactory);
-							streamItems.add(streamItem);
-							i++;
 						}
 					} catch(final Exception e) {
 						throwUncheckedIfInterrupted(e);
