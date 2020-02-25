@@ -97,7 +97,7 @@ jobs:
         - TEST=create_events
         - HOST_WORKING_DIR=${CI_PROJECT_DIR}
         - PYTHONPATH=${PYTHONPATH}:/usr/lib/python2.7/site-packages:src/test/robot/lib
-      script: "./gradlew robotest"
+      script:
         # Install robotframework and keyword libs
         - apk add --no-cache --update python py-pip
         - pip install -U virtualenv
