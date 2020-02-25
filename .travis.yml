@@ -5,11 +5,16 @@ sudo: true
 jdk:
   openjdk11
 
-addons:
-  ulimit:
-    nofile: 1048576
+#addons:
+#  ulimit:
+#    nofile: 1048576
+
+services:
+  - docker
 
 env:
+  # variable containing the 8 first characters of the git commit hash.
+  # and two environment variables described in repository settings in Travis
   global:
     - COMMIT=${TRAVIS_COMMIT::8}
     - secure: "uqpMB9LWKmDDwOTZkGhaf7ROUaRPNYRSvHQewqBZKzCw/jox3vwoamsy4aNA3SD0cWgh64Ojk5lc4WV40pOQjL/5fRXen4/mqIr6uHxz5rJtij+8Bx9eYCVskY90b0DWHnT8+Vukm283p3ucP4B0tFSALKFiMFWOrG/kbEt3WBgMrWhBAFOcSvhAmtu+b4IuDaIF0n2gwh1TBL+s+UauZQ/nSzFLBLyjb2v68GIEZmsRUyw2aFEObutppj7STtnKr1Nu2G2/Pz53CtusRB947PWFH5j/WUz+OETuJ3o7Fq/HV1B7g4E3dxsflzLmXhwynAHLZUdbHFvMfQJ1kHKPOQwRsJA5jjJcuxDzNQ40PhsISePCMh/txyZuyUh7hLxH4yv2MZ6IlT/BSkhGlmFYOjmOuBfRTyKiqgLn7lXk8HqsJy4/FjoAh/Pjj979IC4MXWi40RXas0fKTcDVzk77qwuydC5V1VXDKuFF5fiPkfhcpaBQ0YDcUCSsbWonsB9G56v25FrBI1TE1JvKwsTkZZ3B8GuW6E1EvbxDduPDp/QZLeG3MTsjHdEyZUM7tz1U8ouGckibZ8cQdBml5ONgeUMPyp7J49AAZ7gO36p/ManDScAVLWeMAfXTKktBGO4otX2LygDiYUkH9a5eeJFWpRAkTc87jhn0CKgTBNigEw0="
@@ -19,14 +24,19 @@ before_install:
   - sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
   - sudo apt-get update
   - sudo apt-get -y install docker-ce
-
+  # prepare temp docker image for passing files
+#  - docker build ...
 stages:
   - build
-  - unit tests
-  - integration tests
-  - build docker image
-  - system tests
+#  - unit tests
+#  - integration tests
+#  - build docker image
+#  - system tests
+#  - deploy
 
+# As Travis doesn't allow passing files between stages, two things were done:
+# 1. build artifacts are saved to public storage and can be viewed there
+# 2. temporary builds are passed between stages via docker image that is pushed and pulled during each stage
 
 jobs:
   include:
@@ -45,32 +55,34 @@ jobs:
 #      - build/libs/mongoose-*.jar
 
 
-    - stage: "Tests"
-      script: "./gradlew test"
+#    - stage: "Tests"
+#      script: "./gradlew test"
 
-    - stage: "System tests"
-      env:
-        - SUITE=api.storage
-        - TEST=create_events
-      script: "./gradlew robotest"
 
-    - stage: "Deploy to DockerHub"
-      script:
-        - ./gradlew clean jar
-        - docker login -u $DOCKER_USER -p $DOCKER_PASS
-        - export REPO=emcmongoose/mongoose-storage-driver-pravega
-        - export TAG=`if [ "$TRAVIS_BRANCH" == "master" ]; then echo "latest"; else echo $TRAVIS_BRANCH; fi`
-        - docker build --build-arg MONGOOSE_VERSION=4.1.0 -f docker/Dockerfile -t $REPO:$COMMIT .
-        - docker tag $REPO:$COMMIT $REPO:$TAG
-        - docker tag $REPO:$COMMIT $REPO:travis-$TRAVIS_BUILD_NUMBER
-        - docker push $REPO
+#    - stage: "System tests"
+#      env:
+#        - SUITE=api.storage
+#        - TEST=create_events
+#      script: "./gradlew robotest"
 
-    - stage: "Deploy to GitHub releases"
-      deploy:
-        skip_cleanup: true
-        provider: releases
-        api_key:
-          secure: sCzZ0wCOqzln2oQXkDSPr4Jv77QfktDStWD90y9VSS1lDn1CIRuH8OfUSnfeOmXtuNrMs+ngZw3e7y8QCCYpykancVKOpszgG1pYxcqEdFT9Dj8jzJAJXJZGHrT4E9lHFl3seNH0cFC5BCi2EyHP0Vb1MVBJKwSS0jW8oD9KLdcFaBM45RfTWMt22qHFEI+Bl6ButvRaGmCXgHqQ9fqu2yRaELl+pLT+D44ZS9uhHzoc0htbjnVyQWcCzzLxcAlP6r4YFlTqxznfALf0TRBkgvqqWZ2SnS3u8sd/TQMZAuKwIUFvhHLbiBkfrKH4Ers/gPzoJR8pi1/9CE9gAwHxaGPn2bcxYV/tKnD3B3BweMzairpoHd6um0Uas7EF5E7gj01DsvdgiMfA9PlDeDylzce8rJh5ZNVHGxI6INDDdmDUzo76s9W0d8bYJ5+rz2IfU5rGMaPckaq/b3tBN4yfdHxBAUE1R+OSd2TQ6YP6JP04McpTQb+D6Yo/ealyyt3Jh8Pz8pFq93FN0awUlE6fhIDvTqweBJh4quvGtydzbNukszgro2KMhiqaDuV4pXuIfNwy6KaNZDPui9zgRjDbTWFUlKQq2r0/Gk6tLu2ezPtsdS/KXMJlFkg8TCNN5PlTAlSAu9m8uXzm8/SRfMJvtLQB8pwz/oSjY0UNXHII9KQ=
-          file: "./build/libs/mongoose-storage-driver-pravega.jar"
-        on:
-          tags: true
+#    - stage: "Deploy to DockerHub"
+#      if: (branch = master) AND (tags??)
+#      script:
+#        - ./gradlew clean jar
+#        - docker login -u $DOCKER_USER -p $DOCKER_PASS
+#        - export REPO=emcmongoose/mongoose-storage-driver-pravega
+#        - export TAG=`if [ "$TRAVIS_BRANCH" == "master" ]; then echo "latest"; else echo $TRAVIS_BRANCH; fi`
+#        - docker build --build-arg MONGOOSE_VERSION=4.1.0 -f docker/Dockerfile -t $REPO:$COMMIT .
+#        - docker tag $REPO:$COMMIT $REPO:$TAG
+#        - docker tag $REPO:$COMMIT $REPO:travis-$TRAVIS_BUILD_NUMBER
+#        - docker push $REPO
+#
+#    - stage: "Deploy to GitHub releases"
+#      deploy:
+#        skip_cleanup: true
+#        provider: releases
+#        api_key:
+#          secure: sCzZ0wCOqzln2oQXkDSPr4Jv77QfktDStWD90y9VSS1lDn1CIRuH8OfUSnfeOmXtuNrMs+ngZw3e7y8QCCYpykancVKOpszgG1pYxcqEdFT9Dj8jzJAJXJZGHrT4E9lHFl3seNH0cFC5BCi2EyHP0Vb1MVBJKwSS0jW8oD9KLdcFaBM45RfTWMt22qHFEI+Bl6ButvRaGmCXgHqQ9fqu2yRaELl+pLT+D44ZS9uhHzoc0htbjnVyQWcCzzLxcAlP6r4YFlTqxznfALf0TRBkgvqqWZ2SnS3u8sd/TQMZAuKwIUFvhHLbiBkfrKH4Ers/gPzoJR8pi1/9CE9gAwHxaGPn2bcxYV/tKnD3B3BweMzairpoHd6um0Uas7EF5E7gj01DsvdgiMfA9PlDeDylzce8rJh5ZNVHGxI6INDDdmDUzo76s9W0d8bYJ5+rz2IfU5rGMaPckaq/b3tBN4yfdHxBAUE1R+OSd2TQ6YP6JP04McpTQb+D6Yo/ealyyt3Jh8Pz8pFq93FN0awUlE6fhIDvTqweBJh4quvGtydzbNukszgro2KMhiqaDuV4pXuIfNwy6KaNZDPui9zgRjDbTWFUlKQq2r0/Gk6tLu2ezPtsdS/KXMJlFkg8TCNN5PlTAlSAu9m8uXzm8/SRfMJvtLQB8pwz/oSjY0UNXHII9KQ=
+#          file: "./build/libs/mongoose-storage-driver-pravega.jar"
+#        on:
+#          tags: true
