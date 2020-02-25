@@ -28,7 +28,7 @@ before_install:
 #  - docker build ...
 stages:
   - build
-#  - unit tests
+  - unit tests
 #  - integration tests
 #  - build docker image
 #  - system tests
@@ -55,8 +55,8 @@ jobs:
 #      - build/libs/mongoose-*.jar
 
 
-#    - stage: "Tests"
-#      script: "./gradlew test"
+    - stage: "Tests"
+      script: "./gradlew test"
 
 
 #    - stage: "System tests"
