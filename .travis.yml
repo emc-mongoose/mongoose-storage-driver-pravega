@@ -1,6 +1,5 @@
 language: java
-
-sudo: true
+os: linux
 
 jdk:
   openjdk11
@@ -13,6 +12,14 @@ services:
   - docker
 
 env:
+  - DOCKER_HOST=tcp://docker:2375
+  - DOCKER_DRIVER=overlay2
+  - IMAGE_NAME=emcmongoose/mongoose-storage-driver-pravega
+  - IMAGE_FILE_NAME=build/mongoose-storage-driver-pravega.tar
+  - JAVA_HOME=/opt/jdk-11.0.4+10
+  - ROBOTEST_CONTAINER_WORKING_DIR=/root/mongoose
+  - SERVICE_HOST=127.0.0.1
+
   # variable containing the 8 first characters of the git commit hash.
   # and two environment variables described in repository settings in Travis
   global:
@@ -29,10 +36,10 @@ before_install:
 stages:
   - build
   - unit tests
-#  - integration tests
-#  - build docker image
+  - integration tests
+  - build docker image
 #  - system tests
-#  - deploy
+#  - release
 
 # As Travis doesn't allow passing files between stages, two things were done:
 # 1. build artifacts are saved to public storage and can be viewed there
@@ -55,8 +62,35 @@ jobs:
 #      - build/libs/mongoose-*.jar
 
 
-    - stage: "Tests"
+    - stage: unit tests
       script: "./gradlew test"
+      after_failure:
+        - more build/reports/tests/test/* | cat #TODO: upload these logs to google cloud?
+
+#  artifacts:
+#    paths:
+#      - build/reports/tests/test/*
+#    when: on_failure
+
+    - stage: integration tests
+      script:
+        - ./gradlew pravegaExtract
+        - nohup build/pravega_/bin/pravega-standalone 1,2 > build/pravega_nohup.out &
+        - sleep 15
+        - ./gradlew integrationTest
+      after_failure:
+        - cat build/pravega_nohup.out #TODO: upload this log to google cloud?
+        - more build/reports/tests/integrationTest/* | cat #TODO: upload these logs to google cloud?
+#      after_script:
+#        - killall java
+
+
+    - stage: build docker image
+      script:
+        - ./gradlew dockerBuildImage
+        - export VERSION=$(cat build.gradle | grep version\ = | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
+        - docker save ${IMAGE_NAME}:${VERSION} > ${IMAGE_FILE_NAME}
+        - cat "${IMAGE_FILE_NAME}" #TODO: upload this tar artifact to google cloud?
 
 
 #    - stage: "System tests"
@@ -65,8 +99,8 @@ jobs:
 #        - TEST=create_events
 #      script: "./gradlew robotest"
 
-#    - stage: "Deploy to DockerHub"
-#      if: (branch = master) AND (tags??)
+#    - stage: "Release to DockerHub"
+#      if: (branch = master) AND (tag = latest)
 #      script:
 #        - ./gradlew clean jar
 #        - docker login -u $DOCKER_USER -p $DOCKER_PASS
@@ -77,6 +111,8 @@ jobs:
 #        - docker tag $REPO:$COMMIT $REPO:travis-$TRAVIS_BUILD_NUMBER
 #        - docker push $REPO
 #
+#    - stage: "Release to maven"
+#      if: (branch = master) AND (tag = latest)
 #    - stage: "Deploy to GitHub releases"
 #      deploy:
 #        skip_cleanup: true

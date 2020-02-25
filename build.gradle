@@ -108,8 +108,7 @@ task clonePravegaRepo {
 }
 task pravegaClientJars(type: Exec, dependsOn: clonePravegaRepo) {
 	workingDir pravegaSrcDir
-	commandLine "./gradlew", "-PpravegaVersion=${pravegaVersion.substring(0, pravegaVersion.length())}", ":client:jar"
-	//TODO: remove substring if it's here for no good reason
+	commandLine "./gradlew", "-PpravegaVersion=${pravegaVersion}", ":client:jar"
 }
 compileJava.dependsOn += pravegaClientJars
 task pravegaDistInstall(type: Exec, dependsOn: clonePravegaRepo) {
