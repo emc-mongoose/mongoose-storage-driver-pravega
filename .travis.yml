@@ -66,10 +66,6 @@ jobs:
       after_failure:
         - more build/reports/tests/test/* | cat #TODO: upload these logs to google cloud?
 
-#  artifacts:
-#    paths:
-#      - build/reports/tests/test/*
-#    when: on_failure
 
     - stage: integration tests
       script:
