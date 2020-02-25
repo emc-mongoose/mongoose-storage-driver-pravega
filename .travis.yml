@@ -36,11 +36,11 @@ before_install:
   # prepare temp docker image for passing files
 #  - docker build ...
 stages:
-  - build
-  - unit tests
+#  - build
+#  - unit tests
   - integration tests
-  - build docker image
-  - system tests
+#  - build docker image
+#  - system tests
 #  - release
 
 # As Travis doesn't allow passing files between stages, two things were done:
@@ -50,8 +50,8 @@ stages:
 jobs:
   include:
 
-    - stage: build
-      script: "./gradlew clean jar"
+#    - stage: build
+#      script: "./gradlew clean jar"
 
 #build:
 #  stage: build
@@ -63,11 +63,11 @@ jobs:
 #    paths:
 #      - build/libs/mongoose-*.jar
 
-
-    - stage: unit tests
-      script: "./gradlew test"
-      after_failure:
-        - more build/reports/tests/test/* | cat #TODO: upload these logs to google cloud?
+#
+#    - stage: unit tests
+#      script: "./gradlew test"
+#      after_failure:
+#        - more build/reports/tests/test/* | cat #TODO: upload these logs to google cloud?
 
 
     - stage: integration tests
@@ -82,41 +82,45 @@ jobs:
 #      after_script:
 #        - killall java
 
+#
+#    - stage: build docker image
+#      script:
+#        - ./gradlew dockerBuildImage
+#        - export VERSION=$(cat build.gradle | grep version\ = | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
+#        - docker save ${IMAGE_NAME}:${VERSION} > ${IMAGE_FILE_NAME}
+#        - cat "${IMAGE_FILE_NAME}" #TODO: upload this tar artifact to google cloud?
+#
 
-    - stage: build docker image
-      script:
-        - ./gradlew dockerBuildImage
-        - export VERSION=$(cat build.gradle | grep version\ = | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
-        - docker save ${IMAGE_NAME}:${VERSION} > ${IMAGE_FILE_NAME}
-        - cat "${IMAGE_FILE_NAME}" #TODO: upload this tar artifact to google cloud?
+#    - stage: "System tests"
+#      env:
+#        - SUITE=api.storage
+#        - TEST=create_events
+#        - HOST_WORKING_DIR=${CI_PROJECT_DIR}
+#        - PYTHONPATH=${PYTHONPATH}:/usr/lib/python2.7/site-packages:src/test/robot/lib
+#      script:
+#        # Install robotframework and keyword libs
+#        - apk add --no-cache --update python py-pip
+#        - pip install -U virtualenv
+#        - pip install -U requests
+#        - pip install -U robotframework
+#        - pip install -U robotframework-requests
+#        - pip install -U robotframework-csvlibrary
+#        # Load the testing docker image
+#        - export BASE_VERSION=$(cat build.gradle | grep mongooseBase  | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
+#        - export VERSION=$(cat build.gradle | grep version\ = | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
+#        - docker login -u ${DOCKER_USER} -p ${DOCKER_PASS}
+#        - docker load < ${IMAGE_FILE_NAME}
+#        # Run Pravega
+#        #- ./gradlew pravegaExtract
+#        #- nohup build/pravega_/bin/pravega-standalone 1,2 > build/pravega_nohup.out &
+#        - docker run -d -e HOST_IP=${SERVICE_HOST} -p 9090:9090 -p 12345:12345 pravega/pravega:latest standalone
+#        - sleep 15
+#        # Run the tests
+#        - robot --outputdir build/robotest --suite ${SUITE} --include ${TEST} src/test/robot
+#      after_failure:
+#        - cat build/pravega_nohup.out #TODO: upload this log to google cloud?
+#        - more build/robotest/*.html | cat #TODO: upload html-s to google cloud?
 
-
-    - stage: "System tests"
-      env:
-        - SUITE=api.storage
-        - TEST=create_events
-        - HOST_WORKING_DIR=${CI_PROJECT_DIR}
-        - PYTHONPATH=${PYTHONPATH}:/usr/lib/python2.7/site-packages:src/test/robot/lib
-      script:
-        # Install robotframework and keyword libs
-        - apk add --no-cache --update python py-pip
-        - pip install -U virtualenv
-        - pip install -U requests
-        - pip install -U robotframework
-        - pip install -U robotframework-requests
-        - pip install -U robotframework-csvlibrary
-        # Load the testing docker image
-        - export BASE_VERSION=$(cat build.gradle | grep mongooseBase  | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
-        - export VERSION=$(cat build.gradle | grep version\ = | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
-        - docker login -u ${DOCKER_USER} -p ${DOCKER_PASS}
-        - docker load < ${IMAGE_FILE_NAME}
-        # Run Pravega
-        #- ./gradlew pravegaExtract
-        #- nohup build/pravega_/bin/pravega-standalone 1,2 > build/pravega_nohup.out &
-        - docker run -d -e HOST_IP=${SERVICE_HOST} -p 9090:9090 -p 12345:12345 pravega/pravega:latest standalone
-        - sleep 15
-        # Run the tests
-        - robot --outputdir build/robotest --suite ${SUITE} --include ${TEST} src/test/robot
 #      after_script:
 #        - killall java
 #        - rebot build/robotest/output.xml
@@ -125,9 +129,7 @@ jobs:
 #          - build/pravega_nohup.out
 #          - build/robotest/*.html
 #        when: on_failure
-      after_failure:
-        - cat build/pravega_nohup.out #TODO: upload this log to google cloud?
-        - more build/robotest/*.html | cat #TODO: upload html-s to google cloud?
+
         #yep, outputting html to console so far
 
 #    - stage: "Release to DockerHub"
@@ -141,9 +143,21 @@ jobs:
 #        - docker tag $REPO:$COMMIT $REPO:$TAG
 #        - docker tag $REPO:$COMMIT $REPO:travis-$TRAVIS_BUILD_NUMBER
 #        - docker push $REPO
-#
+
+
 #    - stage: "Release to maven"
 #      if: (branch = master) AND (tag = latest)
+#      script:
+#        - docker login -u ${DOCKER_USER} -p ${DOCKER_PASS}
+#        - docker load < ${IMAGE_FILE_NAME}
+#        - export VERSION=$(cat build.gradle | grep version\ = | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
+#        - docker push ${IMAGE_NAME}:${VERSION}
+#        - docker tag ${IMAGE_NAME}:${VERSION} ${IMAGE_NAME}:latest
+#        - docker push ${IMAGE_NAME}:latest
+
+
+
+
 #    - stage: "Deploy to GitHub releases"
 #      deploy:
 #        skip_cleanup: true
