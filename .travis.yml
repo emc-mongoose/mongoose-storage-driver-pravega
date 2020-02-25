@@ -1,3 +1,5 @@
+git:
+  depth: false
 language: java
 
 jdk:
@@ -11,17 +13,18 @@ services:
   - docker
 
 env:
-  - DOCKER_HOST=tcp://docker:2375
-  - DOCKER_DRIVER=overlay2
-  - IMAGE_NAME=emcmongoose/mongoose-storage-driver-pravega
-  - IMAGE_FILE_NAME=build/mongoose-storage-driver-pravega.tar
-  - JAVA_HOME=/opt/jdk-11.0.4+10
-  - ROBOTEST_CONTAINER_WORKING_DIR=/root/mongoose
-  - SERVICE_HOST=127.0.0.1
+  global:
+    - DOCKER_HOST=tcp://docker:2375
+    - DOCKER_DRIVER=overlay2
+    - IMAGE_NAME=emcmongoose/mongoose-storage-driver-pravega
+    - IMAGE_FILE_NAME=build/mongoose-storage-driver-pravega.tar
+    - JAVA_HOME=/opt/jdk-11.0.4+10
+    - ROBOTEST_CONTAINER_WORKING_DIR=/root/mongoose
+    - SERVICE_HOST=127.0.0.1
 
   # variable containing the 8 first characters of the git commit hash.
   # and two environment variables described in repository settings in Travis
-  global:
+    
     #- COMMIT=${TRAVIS_COMMIT::8}
     - secure: "uqpMB9LWKmDDwOTZkGhaf7ROUaRPNYRSvHQewqBZKzCw/jox3vwoamsy4aNA3SD0cWgh64Ojk5lc4WV40pOQjL/5fRXen4/mqIr6uHxz5rJtij+8Bx9eYCVskY90b0DWHnT8+Vukm283p3ucP4B0tFSALKFiMFWOrG/kbEt3WBgMrWhBAFOcSvhAmtu+b4IuDaIF0n2gwh1TBL+s+UauZQ/nSzFLBLyjb2v68GIEZmsRUyw2aFEObutppj7STtnKr1Nu2G2/Pz53CtusRB947PWFH5j/WUz+OETuJ3o7Fq/HV1B7g4E3dxsflzLmXhwynAHLZUdbHFvMfQJ1kHKPOQwRsJA5jjJcuxDzNQ40PhsISePCMh/txyZuyUh7hLxH4yv2MZ6IlT/BSkhGlmFYOjmOuBfRTyKiqgLn7lXk8HqsJy4/FjoAh/Pjj979IC4MXWi40RXas0fKTcDVzk77qwuydC5V1VXDKuFF5fiPkfhcpaBQ0YDcUCSsbWonsB9G56v25FrBI1TE1JvKwsTkZZ3B8GuW6E1EvbxDduPDp/QZLeG3MTsjHdEyZUM7tz1U8ouGckibZ8cQdBml5ONgeUMPyp7J49AAZ7gO36p/ManDScAVLWeMAfXTKktBGO4otX2LygDiYUkH9a5eeJFWpRAkTc87jhn0CKgTBNigEw0="
     - secure: "behFDyjsAiKxoGoqroAXEfzQx6TdydnwEypEkUJ0lDjTgn2rq7BbAj6gW/nX0W4mfYGaalf/9KEc24qFy/7fly1RMuno6n+KN8eT0dBd0ZyS1rnDqOetuSoukVwEI/r8Yx4PWmNcHi+004GmKpZQILHtNs07rcSFzdiGlj+8YvFFMiIpubdjJq0+ikm+a7QzysMLC5OqSywda1HpxrYF0Nk3w8PSr/tLIkMMsUbr0CrZwaOpbqP8p3pvArTOZ0xNagtUUMq+efJkvTOXTYwfxGTcy+KsBFd6xPdCtwX5ru4NJFixnJhW4nKRf61jqzA41hsjgxcCx3IOpInSQAvmSfCi5dtsn8aYZ2oWPYVME4vhmHJbsYgohuQr5ax6X32ZOYNfBMmJP+AzF1rCgZpnZFOU856g8RziVKb5CeA91OqclAgmINgQGMGBVKIbhGEBkMvD8cGudGTsSthtBDpDJ0dm/j/U3OPoexrPAr+hb7sCZCQL6e5n7um/Um82eRg5LdR2+ZKdQ6CQcCWGVWJ5i5KqjyRfMW6lEfGtJPmPuds7oPgzGppyYh8UERh9OxU01tbvdjevLgheOH/wD8YF+HLEs7Yw7Fisu0m1L23SLYiVlmXOklvEP36BRuUi0RUykhf2/EdQjFRQR934DHKXR1r2cXYE2gn5C/Bx4/JB3ro="
