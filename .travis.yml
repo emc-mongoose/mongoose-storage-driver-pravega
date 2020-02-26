@@ -73,7 +73,11 @@ jobs:
       script:
         #- ./gradlew pravegaExtract
         #- nohup build/pravega_/bin/pravega-standalone 1,2 > build/pravega_nohup.out &
-        - docker run -d -e HOST_IP=${SERVICE_HOST} -p 9090:9090 -p 12345:12345 pravega/pravega:latest standalone
+        #- docker run -d -e HOST_IP=${SERVICE_HOST} -p 9090:9090 -p 12345:12345 pravega/pravega:latest standalone
+        - docker run -d emcmongoose/mongoose-storage-driver-pravega:4.2.27
+        - docker run --network host -d emcmongoose/mongoose-storage-driver-pravega:4.2.27
+        - sleep 15
+        - docker ps
         - sleep 15
         - ./gradlew integrationTest
       after_failure:
