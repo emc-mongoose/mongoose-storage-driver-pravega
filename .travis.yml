@@ -8,14 +8,14 @@ jdk:
 #addons:
 #  ulimit:
 #    nofile: 1048576
-
+sudo: required
 services:
   - docker
 
 env:
   global:
-    - DOCKER_HOST=tcp://docker:2375
-    - DOCKER_DRIVER=overlay2
+#    - DOCKER_HOST=tcp://docker:2375
+#    - DOCKER_DRIVER=overlay2
     - IMAGE_NAME=emcmongoose/mongoose-storage-driver-pravega
     - IMAGE_FILE_NAME=build/mongoose-storage-driver-pravega.tar
     - ROBOTEST_CONTAINER_WORKING_DIR=/root/mongoose
@@ -31,7 +31,7 @@ before_install:
   - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
   - sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
   - sudo apt-get update
-  - sudo apt-get -y install docker-ce
+#  - sudo apt-get -y install docker-ce
   # prepare temp docker image for passing files
 #  - docker build ...
 stages:
@@ -109,7 +109,8 @@ jobs:
         - export BASE_VERSION=$(cat build.gradle | grep mongooseBase  | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
         - export VERSION=$(cat build.gradle | grep version\ = | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
         - docker login -u ${DOCKER_USER} -p ${DOCKER_PASS}
-        - docker load < ${IMAGE_FILE_NAME}
+        - docker load < ${IMAGE_FILE_NAME} #TODO: network storage. Won't work rn.
+        #We either need to upload it to dockerhub and pull it back or do the same with tar
         # Run Pravega
         #- ./gradlew pravegaExtract
         #- nohup build/pravega_/bin/pravega-standalone 1,2 > build/pravega_nohup.out &
