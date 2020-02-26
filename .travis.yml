@@ -73,12 +73,9 @@ jobs:
       script:
         #- ./gradlew pravegaExtract
         #- nohup build/pravega_/bin/pravega-standalone 1,2 > build/pravega_nohup.out &
-        #- docker run -d -e HOST_IP=${SERVICE_HOST} -p 9090:9090 -p 12345:12345 pravega/pravega:latest standalone
-        - docker run -d emcmongoose/mongoose-storage-driver-pravega:4.2.27
-        - docker run --network host -d emcmongoose/mongoose-storage-driver-pravega:4.2.27
+        - docker run -d -e HOST_IP=${SERVICE_HOST} -p 9090:9090 -p 12345:12345 pravega/pravega:latest standalone
         - sleep 15
         - docker ps
-        - sleep 15
         - ./gradlew integrationTest
       after_failure:
         - cat build/pravega_nohup.out #TODO: upload this log to google cloud?
@@ -92,7 +89,7 @@ jobs:
         - ./gradlew dockerBuildImage
         - export VERSION=$(cat build.gradle | grep version\ = | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
         - docker save ${IMAGE_NAME}:${VERSION} > ${IMAGE_FILE_NAME}
-        - cat "${IMAGE_FILE_NAME}" #TODO: upload this tar artifact to google cloud?
+        #- cat "${IMAGE_FILE_NAME}" #TODO: upload this tar artifact to google cloud?
 #
 
     - stage: "System tests"
