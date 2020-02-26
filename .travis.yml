@@ -35,8 +35,8 @@ before_install:
   # prepare temp docker image for passing files
 #  - docker build ...
 stages:
-  - build
-  - unit tests
+#  - build
+#  - unit tests
   - integration tests
   - build docker image
   - system tests
@@ -49,8 +49,8 @@ stages:
 jobs:
   include:
 
-    - stage: build
-      script: "./gradlew clean jar"
+#    - stage: build
+#      script: "./gradlew clean jar"
 
 #build:
 #  stage: build
@@ -63,16 +63,17 @@ jobs:
 #      - build/libs/mongoose-*.jar
 
 
-    - stage: unit tests
-      script: "./gradlew test"
-      after_failure:
-        - more build/reports/tests/test/* | cat #TODO: upload these logs to google cloud?
+#    - stage: unit tests
+#      script: "./gradlew test"
+#      after_failure:
+#        - more build/reports/tests/test/* | cat #TODO: upload these logs to google cloud?
 
 
     - stage: integration tests
       script:
-        - ./gradlew pravegaExtract
-        - nohup build/pravega_/bin/pravega-standalone 1,2 > build/pravega_nohup.out &
+        #- ./gradlew pravegaExtract
+        #- nohup build/pravega_/bin/pravega-standalone 1,2 > build/pravega_nohup.out &
+        - docker run -d -e HOST_IP=${SERVICE_HOST} -p 9090:9090 -p 12345:12345 pravega/pravega:latest standalone
         - sleep 15
         - ./gradlew integrationTest
       after_failure:
