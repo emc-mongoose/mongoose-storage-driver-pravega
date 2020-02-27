@@ -31,14 +31,15 @@ before_install:
   - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
   - sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
   - sudo apt-get update
+  - sudo apt-get install python3
 #  - sudo apt-get -y install docker-ce
   # prepare temp docker image for passing files
 #  - docker build ...
 stages:
 #  - build
 #  - unit tests
-  - integration tests
-  - build docker image
+#  - integration tests
+#  - build docker image
   - system tests
 #  - release
 
@@ -69,27 +70,27 @@ jobs:
 #        - more build/reports/tests/test/* | cat #TODO: upload these logs to google cloud?
 
 
-    - stage: integration tests
-      script:
-        #- ./gradlew pravegaExtract
-        #- nohup build/pravega_/bin/pravega-standalone 1,2 > build/pravega_nohup.out &
-        - docker run -d -e HOST_IP=${SERVICE_HOST} -p 9090:9090 -p 12345:12345 pravega/pravega:latest standalone
-        - sleep 15
-        - docker ps
-        - ./gradlew integrationTest
-      after_failure:
-        - cat build/pravega_nohup.out #TODO: upload this log to google cloud?
-        - more build/reports/tests/integrationTest/* | cat #TODO: upload these logs to google cloud?
+#    - stage: integration tests
+#      script:
+#        #- ./gradlew pravegaExtract
+#        #- nohup build/pravega_/bin/pravega-standalone 1,2 > build/pravega_nohup.out &
+#        - docker run -d -e HOST_IP=${SERVICE_HOST} -p 9090:9090 -p 12345:12345 pravega/pravega:latest standalone
+#        - sleep 15
+#        - docker ps
+#        - ./gradlew integrationTest
+#      after_failure:
+#        - cat build/pravega_nohup.out #TODO: upload this log to google cloud?
+#        - more build/reports/tests/integrationTest/* | cat #TODO: upload these logs to google cloud?
 #      after_script:
 #        - killall java
-
-
-    - stage: build docker image
-      script:
-        - ./gradlew dockerBuildImage
-        - export VERSION=$(cat build.gradle | grep version\ = | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
-        - docker save ${IMAGE_NAME}:${VERSION} > ${IMAGE_FILE_NAME}
-        #- cat "${IMAGE_FILE_NAME}" #TODO: upload this tar artifact to google cloud?
+#
+#
+#    - stage: build docker image
+#      script:
+#        - ./gradlew dockerBuildImage
+#        - export VERSION=$(cat build.gradle | grep version\ = | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
+#        - docker save ${IMAGE_NAME}:${VERSION} > ${IMAGE_FILE_NAME}
+#        #- cat "${IMAGE_FILE_NAME}" #TODO: upload this tar artifact to google cloud?
 #
 
     - stage: "System tests"
@@ -100,17 +101,18 @@ jobs:
         - PYTHONPATH=${PYTHONPATH}:/usr/lib/python2.7/site-packages:src/test/robot/lib
       script:
         # Install robotframework and keyword libs
-        - apk add --no-cache --update python py-pip
-        - pip install -U virtualenv
-        - pip install -U requests
-        - pip install -U robotframework
-        - pip install -U robotframework-requests
-        - pip install -U robotframework-csvlibrary
+        - sudo apt install python3-pip
+        - pip3 install -U virtualenv
+        - pip3 install -U requests
+        - pip3 install -U robotframework
+        - pip3 install -U robotframework-requests
+        - pip3 install -U robotframework-csvlibrary
         # Load the testing docker image
         - export BASE_VERSION=$(cat build.gradle | grep mongooseBase  | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
         - export VERSION=$(cat build.gradle | grep version\ = | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
-        - docker login -u ${DOCKER_USER} -p ${DOCKER_PASS}
-        - docker load < ${IMAGE_FILE_NAME} #TODO: network storage. Won't work rn.
+#        - docker login -u ${DOCKER_USER} -p ${DOCKER_PASS}
+#        - docker load < ${IMAGE_FILE_NAME} #TODO: network storage. Won't work rn.
+        - ./gradlew dockerBuildImage
         #We either need to upload it to dockerhub and pull it back or do the same with tar
         # Run Pravega
         #- ./gradlew pravegaExtract
