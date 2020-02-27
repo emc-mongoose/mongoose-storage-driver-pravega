@@ -98,7 +98,7 @@ jobs:
         - SUITE=api.storage
         - TEST=create_events
         - HOST_WORKING_DIR=${CI_PROJECT_DIR}
-        - PYTHONPATH=${PYTHONPATH}:/usr/lib/python2.7/site-packages:src/test/robot/lib
+        #- PYTHONPATH=${PYTHONPATH}:/usr/lib/python2.7/site-packages:src/test/robot/lib
       script:
         # Install robotframework and keyword libs
         - sudo apt install python3-pip
@@ -139,15 +139,12 @@ jobs:
 #    - stage: "Release to DockerHub"
 #      if: (branch = master) AND (tag = latest)
 #      script:
+#        - if [ ! -z "$GPG_SECRET_KEYS" ]; then echo $GPG_SECRET_KEYS | base64 -d | gpg --import --batch; fi
+#        - if [ ! -z "$GPG_OWNERTRUST" ]; then echo $GPG_OWNERTRUST | base64 -d | gpg --import-ownertrust --batch; fi
+#        - mkdir /tmp/.gnupg
+#        - if [ ! -z "$GPG_SECRING" ]; then echo $GPG_SECRING | base64 -d > /tmp/.gnupg/secring.gpg; fi
 #        - ./gradlew clean jar
-#        - docker login -u $DOCKER_USER -p $DOCKER_PASS
-#        - export REPO=emcmongoose/mongoose-storage-driver-pravega
-#        - export TAG=`if [ "$TRAVIS_BRANCH" == "master" ]; then echo "latest"; else echo $TRAVIS_BRANCH; fi`
-#        - docker build --build-arg MONGOOSE_VERSION=4.1.0 -f docker/Dockerfile -t $REPO:$COMMIT .
-#        - docker tag $REPO:$COMMIT $REPO:$TAG
-#        - docker tag $REPO:$COMMIT $REPO:travis-$TRAVIS_BUILD_NUMBER
-#        - docker push $REPO
-
+#        - ./gradlew -Psigning.keyId=${SIGNING_KEY_ID} -Psigning.password=${SIGNING_PASSWORD} -Psigning.secretKeyRingFile=/tmp/.gnupg/secring.gpg -PossrhUsername=${OSSRH_USERNAME} -PossrhPassword=${OSSRH_PASSWORD} publishToNexus closeAndReleaseRepository
 
 #    - stage: "Release to maven"
 #      if: (branch = master) AND (tag = latest)
