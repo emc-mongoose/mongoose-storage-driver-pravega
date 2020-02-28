@@ -107,6 +107,7 @@ jobs:
         - pip install -U robotframework
         - pip install -U robotframework-requests
         - pip install -U robotframework-csvlibrary
+        - sudo apt-get install html2text
         # Load the testing docker image
         - export BASE_VERSION=$(cat build.gradle | grep mongooseBase  | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
         - export VERSION=$(cat build.gradle | grep version\ = | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
@@ -125,11 +126,11 @@ jobs:
         - robot --outputdir build/robotest --suite api.storage --include create_event_transaction_stream src/test/robot
 #        - robot --outputdir build/robotest --suite api.storage --include read_byte_streams src/test/robot
 #        - robot --outputdir build/robotest --suite api.storage --include read_all_byte_streams src/test/robot
-#        - robot --outputdir build/robotest --suite api.storage --include read_event_streams src/test/robot
+        - robot --outputdir build/robotest --suite api.storage --include read_event_streams src/test/robot
 #        - robot --outputdir build/robotest --suite api.storage --include read_all_event_streams src/test/robot
       after_failure:
         - cat build/pravega_nohup.out #TODO: upload this log to google cloud?
-        - more build/robotest/*.html | cat #TODO: upload html-s to google cloud?
+        - ls build/robotest/*.html | html2text #TODO: upload html-s to google cloud?
 
 
 #test_read_byte_streams:
