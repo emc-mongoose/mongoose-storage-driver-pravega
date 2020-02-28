@@ -67,7 +67,7 @@ jobs:
 #    - stage: unit tests
 #      script: "./gradlew test"
 #      after_failure:
-#        - more build/reports/tests/test/* | cat #TODO: upload these logs to google cloud?
+#        - more build/reports/tests/test/* | cat #TODO: upload these logs to cloud
 
 
 #    - stage: integration tests
@@ -79,8 +79,8 @@ jobs:
 #        - docker ps
 #        - ./gradlew integrationTest
 #      after_failure:
-#        - cat build/pravega_nohup.out #TODO: upload this log to google cloud?
-#        - more build/reports/tests/integrationTest/* | cat #TODO: upload these logs to google cloud?
+#        - cat build/pravega_nohup.out #TODO: upload this log to cloud
+#        - more build/reports/tests/integrationTest/* | cat #TODO: upload these logs to cloud
 #      after_script:
 #        - killall java
 #
@@ -90,7 +90,7 @@ jobs:
 #        - ./gradlew dockerBuildImage
 #        - export VERSION=$(cat build.gradle | grep version\ = | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
 #        - docker save ${IMAGE_NAME}:${VERSION} > ${IMAGE_FILE_NAME}
-#        #- cat "${IMAGE_FILE_NAME}" #TODO: upload this tar artifact to google cloud?
+#        #- cat "${IMAGE_FILE_NAME}" #TODO: upload this tar artifact to cloud
 #
 
     - stage: System tests
@@ -129,9 +129,9 @@ jobs:
         - robot --outputdir build/robotest --suite api.storage --include read_event_streams src/test/robot
 #        - robot --outputdir build/robotest --suite api.storage --include read_all_event_streams src/test/robot
       after_failure:
-        - cat build/pravega_nohup.out #TODO: upload this log to google cloud?
-        - ls -1 build/robotest/*.html | html2text #TODO: upload html-s to google cloud?
-
+        - cat build/pravega_nohup.out #TODO: upload this log to cloud
+        - ls -1 build/robotest/log.html| html2text #TODO: upload html-s to cloud
+        #build/robotest/*.html
 
 #test_read_byte_streams:
 #  extends: .test_robot
