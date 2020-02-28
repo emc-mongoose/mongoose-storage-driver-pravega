@@ -114,6 +114,7 @@ jobs:
 #        - docker login -u ${DOCKER_USER} -p ${DOCKER_PASS}
 #        - docker load < ${IMAGE_FILE_NAME} #TODO: network storage. Won't work rn.
         - ./gradlew dockerBuildImage
+        - docker images
         #We either need to upload it to dockerhub and pull it back or do the same with tar
         # Run Pravega
         #- ./gradlew pravegaExtract
@@ -122,6 +123,7 @@ jobs:
         - sleep 15
         # Run the tests
         - robot --outputdir build/robotest --suite api.storage --include create_event_stream src/test/robot
+        - docker ps
         - robot --outputdir build/robotest --suite api.storage --include create_byte_streams src/test/robot
         - robot --outputdir build/robotest --suite api.storage --include create_event_transaction_stream src/test/robot
 #        - robot --outputdir build/robotest --suite api.storage --include read_byte_streams src/test/robot
