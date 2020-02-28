@@ -130,7 +130,7 @@ jobs:
 #        - robot --outputdir build/robotest --suite api.storage --include read_all_event_streams src/test/robot
       after_failure:
         - cat build/pravega_nohup.out #TODO: upload this log to google cloud?
-        - ls build/robotest/*.html | html2text #TODO: upload html-s to google cloud?
+        - ls -1 build/robotest/*.html | html2text #TODO: upload html-s to google cloud?
 
 
 #test_read_byte_streams:
