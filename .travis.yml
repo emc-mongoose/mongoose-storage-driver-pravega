@@ -106,7 +106,7 @@ jobs:
         - pip3 install -U requests
         - pip3 install -U robotframework
         - pip3 install -U robotframework-requests
-        - pip3 install -U robotframework-csvlibrary
+        - pip3 install -U robotframework-csvlib
         # Load the testing docker image
         - export BASE_VERSION=$(cat build.gradle | grep mongooseBase  | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
         - export VERSION=$(cat build.gradle | grep version\ = | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
