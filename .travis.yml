@@ -31,7 +31,7 @@ before_install:
   - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
   - sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
   - sudo apt-get update
-  - sudo apt-get install python3
+  - sudo apt-get install python
 #  - sudo apt-get -y install docker-ce
   # prepare temp docker image for passing files
 #  - docker build ...
@@ -93,20 +93,20 @@ jobs:
 #        #- cat "${IMAGE_FILE_NAME}" #TODO: upload this tar artifact to google cloud?
 #
 
-    - stage: "System tests"
+    - stage: System tests
       env:
         - HOST_WORKING_DIR=${CI_PROJECT_DIR}
         #- PYTHONPATH=${PYTHONPATH}:/usr/lib/python2.7/site-packages:src/test/robot/lib
       script:
         # Install robotframework and keyword libs
-        - sudo apt install python3-pip
-        - sudo apt install python3-setuptools
-        - pip3 install --upgrade pip
-        - pip3 install -U virtualenv
-        - pip3 install -U requests
-        - pip3 install -U robotframework
-        - pip3 install -U robotframework-requests
-        - pip3 install -U robotframework-csvlib
+        - sudo apt install python-pip
+        - sudo apt install python-setuptools
+        - pip install --upgrade pip
+        - pip install -U virtualenv
+        - pip install -U requests
+        - pip install -U robotframework
+        - pip install -U robotframework-requests
+        - pip install -U robotframework-csvlibrary
         # Load the testing docker image
         - export BASE_VERSION=$(cat build.gradle | grep mongooseBase  | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
         - export VERSION=$(cat build.gradle | grep version\ = | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
