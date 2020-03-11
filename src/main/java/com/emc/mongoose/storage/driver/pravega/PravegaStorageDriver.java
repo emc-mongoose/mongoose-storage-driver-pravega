@@ -50,6 +50,8 @@ import io.pravega.client.ByteStreamClientFactory;
 import io.pravega.client.ClientConfig;
 import io.pravega.client.EventStreamClientFactory;
 import io.pravega.client.admin.ReaderGroupManager;
+import io.pravega.client.admin.StreamInfo;
+import io.pravega.client.admin.StreamManager;
 import io.pravega.client.byteStream.ByteStreamReader;
 import io.pravega.client.byteStream.impl.ByteStreamClientImpl;
 import io.pravega.client.netty.impl.ConnectionFactory;
@@ -64,6 +66,7 @@ import io.pravega.client.stream.ScalingPolicy;
 import io.pravega.client.stream.Serializer;
 import io.pravega.client.stream.Stream;
 import io.pravega.client.stream.StreamConfiguration;
+import io.pravega.client.stream.StreamCut;
 import io.pravega.client.stream.TransactionalEventStreamWriter;
 import io.pravega.client.stream.TxnFailedException;
 import io.pravega.client.stream.impl.Controller;
@@ -856,7 +859,16 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				Stream stream = new StreamImpl(scopeName, streamName);
 				val readerGroupConfigBuilder = evtReaderGroupConfigBuilder.get();
 				val readerGroupConfig = evtReaderGroupConfigCache.computeIfAbsent(
-					scopeName + SLASH + streamName, key -> readerGroupConfigBuilder.stream(key).build());
+					scopeName + SLASH + streamName, key -> {
+							StreamManager streamManager = StreamManager.create(clientConfig);
+							StreamInfo streamInfo = streamManager.getStreamInfo(scopeName, streamName);
+							StreamCut streamCut = tailReadFlag ? streamInfo.getTailStreamCut() : streamInfo.getHeadStreamCut();
+							return readerGroupConfigBuilder
+								.stream(Stream.of(scopeName, streamName),
+									streamCut,
+									StreamCut.UNBOUNDED)
+								.build();
+						});
 				val readerGroupManagerCreateFunc = evtReaderGroupManagerCreateFuncCache.computeIfAbsent(
 					clientConfig, ReaderGroupManagerCreateFunctionImpl::new);
 				val clientFactoryCreateFunc = clientFactoryCreateFuncCache.computeIfAbsent(
