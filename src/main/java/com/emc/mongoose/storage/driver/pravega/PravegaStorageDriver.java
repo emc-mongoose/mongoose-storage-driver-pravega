@@ -938,18 +938,8 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 			if (((PositionImpl)streamPos).getOwnedSegments().isEmpty()) {
 				//means that reader doesn't own any segments, so it can't read anything
 				Loggers.MSG.debug("{}: empty reader. No EventSegmentReader assigned", stepId);
-				completeOperation(evtOp,PENDING);
-			} else {
-				val leftBytesForReaderGroup = ((ReaderGroupImpl)(readerGroupManager.getReaderGroup(evtReaderGroupName))).unreadBytes();
-				if (leftBytesForReaderGroup == 0) {
-					//end of all segments. unreadBytes() has a 20-30 sec delay.
-					completeOperation(evtOp,FAIL_TIMEOUT);
-					Loggers.MSG.info("{}: no more events for RG {}", stepId, evtReaderGroupName);
-				} else {
-					//end of one of the segments
-					completeOperation(evtOp,PENDING);
-				}
 			}
+			completeOperation(evtOp,PENDING);
 			} else {
 				val bytesDone = evtData.remaining();
 				val evtItem = evtOp.item();
