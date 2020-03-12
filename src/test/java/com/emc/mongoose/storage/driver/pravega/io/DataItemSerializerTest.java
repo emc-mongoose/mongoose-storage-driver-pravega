@@ -19,7 +19,7 @@ public class DataItemSerializerTest {
 		try (val dataInput = DataInput.instance(null, "7a42d9c483244167", new SizeInBytes("4KB"), 1, false)) {
 			val dataItem = new DataItemImpl("test_event_item", 1234, MIB, 0);
 			dataItem.dataInput(dataInput);
-			val serializer = new DataItemSerializer(true);
+			val serializer = new DataItemSerializer(true, false);
 			val serializedData = serializer.serialize(dataItem);
 			assertEquals(MIB, serializedData.capacity());
 			assertEquals(MIB, serializedData.remaining());
@@ -32,7 +32,7 @@ public class DataItemSerializerTest {
 		try (val dataInput = DataInput.instance(null, "7a42d9c483244167", new SizeInBytes("10KB"), 1, true)) {
 			val dataItem = new DataItemImpl("test_event_item", 5678, MIB, 0);
 			dataItem.dataInput(dataInput);
-			val serializer = new DataItemSerializer(false);
+			val serializer = new DataItemSerializer(false, false);
 			val serializedData = serializer.serialize(dataItem);
 			assertEquals(MIB, serializedData.capacity());
 			assertEquals(MIB, serializedData.remaining());
