@@ -20,6 +20,8 @@ env:
     - IMAGE_FILE_NAME=build/mongoose-storage-driver-pravega.tar
     - ROBOTEST_CONTAINER_WORKING_DIR=/root/mongoose
     - SERVICE_HOST=127.0.0.1
+    - AWS_ACCESS_KEY_ID=${S3ACCESSKEY}
+    - AWS_SECRET_ACCESS_KEY=${S3SECRETKEY}
 
   # variable containing the 8 first characters of the git commit hash.
   # and two environment variables described in repository settings in Travis
@@ -32,6 +34,7 @@ before_install:
   - sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
   - sudo apt-get update
   - sudo apt-get install python
+  - sudo apt install awscli
 #  - sudo apt-get -y install docker-ce
   # prepare temp docker image for passing files
 #  - docker build ...
@@ -64,33 +67,38 @@ jobs:
 #      - build/libs/mongoose-*.jar
 
 
-#    - stage: unit tests
-#      script: "./gradlew test"
-#      after_failure:
-#        - more build/reports/tests/test/* | cat #TODO: upload these logs to cloud
+    - stage: unit tests
+      script: "./gradlew test"
+      after_failure:
+        #s3://mongoose-ci-logs/$RUNNAME/${COMMIT}
+        - ls -1 build/reports/tests/test/ | xargs -t -n1 -I{} aws s3 cp {} s3://mongoose-ci-logs/${COMMIT}/
+        #- more build/reports/tests/test/* | cat #TODO: upload these logs to cloud
 
 
-#    - stage: integration tests
-#      script:
-#        #- ./gradlew pravegaExtract
-#        #- nohup build/pravega_/bin/pravega-standalone 1,2 > build/pravega_nohup.out &
-#        - docker run -d -e HOST_IP=${SERVICE_HOST} -p 9090:9090 -p 12345:12345 pravega/pravega:latest standalone
-#        - sleep 15
-#        - docker ps
-#        - ./gradlew integrationTest
-#      after_failure:
-#        - cat build/pravega_nohup.out #TODO: upload this log to cloud
-#        - more build/reports/tests/integrationTest/* | cat #TODO: upload these logs to cloud
-#      after_script:
-#        - killall java
+    - stage: integration tests
+      script:
+        #- ./gradlew pravegaExtract
+        #- nohup build/pravega_/bin/pravega-standalone 1,2 > build/pravega_nohup.out &
+        - docker run -d -e HOST_IP=${SERVICE_HOST} -p 9090:9090 -p 12345:12345 pravega/pravega:latest standalone
+        - sleep 15
+        - docker ps
+        - ./gradlew integrationTest
+      after_failure:
+        - docker logs
+        - ls -1 build/reports/tests/integrationTest/ | xargs -t -n1 -I{} aws s3 cp {} s3://mongoose-ci-logs/${COMMIT}/
+        - aws s3 cp build/pravega_nohup.out s3://mongoose-ci-logs/${COMMIT}/pravega_nohup_integration.out
+        #- cat build/pravega_nohup.out #TODO: upload this log to cloud
+        #- more build/reports/tests/integrationTest/* | cat #TODO: upload these logs to cloud
+      after_script:
+        - killall java
 #
 #
-#    - stage: build docker image
-#      script:
-#        - ./gradlew dockerBuildImage
-#        - export VERSION=$(cat build.gradle | grep version\ = | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
-#        - docker save ${IMAGE_NAME}:${VERSION} > ${IMAGE_FILE_NAME}
-#        #- cat "${IMAGE_FILE_NAME}" #TODO: upload this tar artifact to cloud
+    - stage: build docker image
+      script:
+        - ./gradlew dockerBuildImage
+        - export VERSION=$(cat build.gradle | grep version\ = | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
+        - docker save ${IMAGE_NAME}:${VERSION} > ${IMAGE_FILE_NAME}
+        #- cat "${IMAGE_FILE_NAME}" #TODO: upload this tar artifact to cloud
 #
 
     - stage: System tests
@@ -113,6 +121,7 @@ jobs:
         - export VERSION=$(cat build.gradle | grep version\ = | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
 #        - docker login -u ${DOCKER_USER} -p ${DOCKER_PASS}
 #        - docker load < ${IMAGE_FILE_NAME} #TODO: network storage. Won't work rn.
+#         should probably just rebuild the image in this stage to save up s3 space and traffic
         - ./gradlew dockerBuildImage
         - docker images
         #We either need to upload it to dockerhub and pull it back or do the same with tar
@@ -131,7 +140,9 @@ jobs:
         - robot --outputdir build/robotest --suite api.storage --include read_event_streams src/test/robot
 #        - robot --outputdir build/robotest --suite api.storage --include read_all_event_streams src/test/robot
       after_failure:
-        - cat build/pravega_nohup.out #TODO: upload this log to cloud
+        - ls -1 build/reports/tests/integrationTest/ | xargs -t -n1 -I{} aws s3 cp {} s3://mongoose-ci-logs/${COMMIT}/
+        - aws s3 cp build/pravega_nohup.out s3://mongoose-ci-logs/${COMMIT}/pravega_nohup_robotest.out
+        # - cat build/pravega_nohup.out #TODO: upload this log to cloud
         - ls -1 build/robotest/log.html| html2text #TODO: upload html-s to cloud
         #build/robotest/*.html
 
