@@ -39,11 +39,11 @@ before_install:
   # prepare temp docker image for passing files
 #  - docker build ...
 stages:
-#  - build
-#  - unit tests
-#  - integration tests
+  - build
+  - unit tests
+  - integration tests
 #  - build docker image
-  - system tests
+#  - system tests
 #  - release
 
 # As Travis doesn't allow passing files between stages, two things were done:
@@ -53,8 +53,8 @@ stages:
 jobs:
   include:
 
-#    - stage: build
-#      script: "./gradlew clean jar"
+    - stage: build
+      script: "./gradlew clean jar"
 
 #build:
 #  stage: build
@@ -79,12 +79,12 @@ jobs:
       script:
         #- ./gradlew pravegaExtract
         #- nohup build/pravega_/bin/pravega-standalone 1,2 > build/pravega_nohup.out &
-        - docker run -d -e HOST_IP=${SERVICE_HOST} -p 9090:9090 -p 12345:12345 pravega/pravega:latest standalone
+        - docker run -d -e HOST_IP=${SERVICE_HOST} -p 9090:9090 -p 12345:12345 pravega/pravega:latest standalone 1,2 > build/contName.txt
         - sleep 15
         - docker ps
         - ./gradlew integrationTest
       after_failure:
-        - docker logs
+        - docker logs "$(cat build/contName.txt)" > build/pravega_nohup.out
         - ls -1 build/reports/tests/integrationTest/ | xargs -t -n1 -I{} aws s3 cp {} s3://mongoose-ci-logs/${COMMIT}/
         - aws s3 cp build/pravega_nohup.out s3://mongoose-ci-logs/${COMMIT}/pravega_nohup_integration.out
         #- cat build/pravega_nohup.out #TODO: upload this log to cloud
@@ -98,7 +98,8 @@ jobs:
         - ./gradlew dockerBuildImage
         - export VERSION=$(cat build.gradle | grep version\ = | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
         - docker save ${IMAGE_NAME}:${VERSION} > ${IMAGE_FILE_NAME}
-        #- cat "${IMAGE_FILE_NAME}" #TODO: upload this tar artifact to cloud
+        #- cat "${IMAGE_FILE_NAME}" #TODO: upload this tar artifact to cloud and download?
+        #tradeof between common sense and the amount of data we upload to/download from s3.
 #
 
     - stage: System tests
@@ -128,7 +129,7 @@ jobs:
         # Run Pravega
         #- ./gradlew pravegaExtract
         #- nohup build/pravega_/bin/pravega-standalone 1,2 > build/pravega_nohup.out &
-        - docker run -d -e HOST_IP=${SERVICE_HOST} -p 9090:9090 -p 12345:12345 pravega/pravega:latest standalone
+        - docker run -d -e HOST_IP=${SERVICE_HOST} -p 9090:9090 -p 12345:12345 pravega/pravega:latest standalone > build/contName.txt
         - sleep 15
         # Run the tests
         - robot --outputdir build/robotest --suite api.storage --include create_event_stream src/test/robot
@@ -140,10 +141,12 @@ jobs:
         - robot --outputdir build/robotest --suite api.storage --include read_event_streams src/test/robot
 #        - robot --outputdir build/robotest --suite api.storage --include read_all_event_streams src/test/robot
       after_failure:
+        - docker logs "$(cat build/contName.txt)" > build/pravega_nohup.out
         - ls -1 build/reports/tests/integrationTest/ | xargs -t -n1 -I{} aws s3 cp {} s3://mongoose-ci-logs/${COMMIT}/
         - aws s3 cp build/pravega_nohup.out s3://mongoose-ci-logs/${COMMIT}/pravega_nohup_robotest.out
         # - cat build/pravega_nohup.out #TODO: upload this log to cloud
-        - ls -1 build/robotest/log.html| html2text #TODO: upload html-s to cloud
+        - ls -1 build/robotest/ | xargs -t -n1 -I{} aws s3 cp {} s3://mongoose-ci-logs/${COMMIT}/
+        #- ls -1 build/robotest/log.html| html2text #TODO: upload html-s to cloud
         #build/robotest/*.html
 
 #test_read_byte_streams:
