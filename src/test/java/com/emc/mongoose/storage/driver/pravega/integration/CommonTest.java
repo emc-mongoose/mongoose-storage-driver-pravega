@@ -83,6 +83,7 @@ public class CommonTest {
 			config.val("storage-driver-control-scope", true);
 			config.val("storage-driver-control-stream", true);
 			config.val("storage-driver-control-timeoutMillis", 10_000);
+			config.val("storage-driver-create-timestamp", false);
 			config.val("storage-driver-event-transaction", false);
 			config.val("storage-driver-event-key-enabled", true);
 			config.val("storage-driver-event-key-count", 0);
