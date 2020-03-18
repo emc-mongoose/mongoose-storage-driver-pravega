@@ -26,6 +26,8 @@ Create Event Stream Test
     ...  --load-op-limit-count=${count_limit}
     ...  --storage-driver-limit-concurrency=1000
     ...  --storage-driver-threads=10
+    ...  --load-batch-size=1000
+    ...  --storage-driver-limit-queue-input=1000
     ...  --storage-namespace=scope1
     ...  --storage-net-node-addrs=${node_addr}
     &{env_params} =  Create Dictionary
@@ -76,7 +78,7 @@ Read All Byte Streams Test
     [Tags]  read_all_byte_streams
     ${node_addr} =  Get Environment Variable  SERVICE_HOST  127.0.0.1
     ${step_id} =  Set Variable  read_all_byte_streams_test
-    ${count_limit} =  Set Variable  100
+    ${count_limit} =  Set Variable  10
     Remove Directory  ${LOG_DIR}/${step_id}  recursive=True
     ${args} =  Catenate  SEPARATOR= \\\n\t
     ...  --load-step-id=${step_id}
@@ -88,7 +90,7 @@ Read All Byte Streams Test
     &{env_params} =  Create Dictionary  SCOPE_NAME=scope4
     ${std_out} =  Execute Mongoose Scenario  ${DATA_DIR}  ${env_params}  ${args}
     Log  ${std_out}
-    Validate Metrics Total Log File  ${step_id}  READ  ${count_limit}  0  104857600
+    Validate Metrics Total Log File  ${step_id}  READ  ${count_limit}  0  10485760
 
 Create Event Transaction Stream Test
     [Tags]  create_event_transaction_stream

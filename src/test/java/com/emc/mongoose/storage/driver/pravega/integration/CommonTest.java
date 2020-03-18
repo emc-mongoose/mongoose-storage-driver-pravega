@@ -29,7 +29,7 @@ public class CommonTest {
 
 	static {
 		try {
-			DATA_INPUT = DataInput.instance(null, "7a42d9c483244167", new SizeInBytes("4MB"), 16, true);
+			DATA_INPUT = DataInput.instance(null, "7a42d9c483244167", new SizeInBytes("4MB"), 16, false);
 		} catch (final IOException e) {
 			throw new AssertionError(e);
 		}
@@ -58,7 +58,7 @@ public class CommonTest {
 							.ifPresent(configSchemas::add);
 			val configSchema = TreeUtil.reduceForest(configSchemas);
 			val config = new BasicConfig("-", configSchema);
-			config.val("load-batch-size", 4096);
+			config.val("load-batch-size", 1000);
 			config.val("storage-net-reuseAddr", true);
 			config.val("storage-net-bindBacklogSize", 0);
 			config.val("storage-net-keepAlive", true);
@@ -76,9 +76,9 @@ public class CommonTest {
 			config.val("storage-net-node-conn-pooling", true);
 			config.val("storage-net-uri-schema", "tcp");
 
-			config.val("storage-auth-uid", CREDENTIAL.getUid());
+			config.val("storage-auth-uid", null);
 			config.val("storage-auth-token", null);
-			config.val("storage-auth-secret", CREDENTIAL.getSecret());
+			config.val("storage-auth-secret", null);
 
 			config.val("storage-driver-control-scope", true);
 			config.val("storage-driver-control-stream", true);
@@ -94,7 +94,7 @@ public class CommonTest {
 			config.val("storage-driver-scaling-segments", 1);
 			config.val("storage-driver-stream-data", "events");
 			config.val("storage-driver-threads", 0);
-			config.val("storage-driver-limit-queue-input", 1_000_000);
+			config.val("storage-driver-limit-queue-input", 1_000);
 			config.val("storage-driver-limit-concurrency", 1);
 			config.val("storage-namespace", "goose");
 			return config;

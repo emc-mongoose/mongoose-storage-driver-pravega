@@ -57,8 +57,8 @@ ext {
 		grpc                     : "1.17.1",
 		guava                    : "28.1-jre",
 		log4j                    : "2.8.2",
-		mongooseBase             : "4.2.17",
-		mongooseStorageDriverPreempt: "4.2.22",
+		mongooseBase             : "4.2.18",
+		mongooseStorageDriverPreempt: "4.2.23",
 		netty                    : "4.1.45.Final",
 		nettyTcNative            : "2.0.25.Final",
 		protobuf                 : "3.5.1",
@@ -96,27 +96,24 @@ task clonePravegaRepo {
 		}
 		if(!destDir.exists()) {
 			def gitRepo = Grgit.clone {
-				uri = "https://github.com/emc-mongoose/pravega.git"
+				uri = "https://github.com/pravega/pravega.git"
 				dir = pravegaSrcDir
 			}
-			gitRepo.checkout {
-				branch = "origin/netty-no-flush-plus-more-optimization"
-			}
-			/*gitRepo.reset {
+			gitRepo.reset {
 				commit = pravegaCommit
 				mode = "hard"
-			}*/
+			}
 		}
 	}
 }
 task pravegaClientJars(type: Exec, dependsOn: clonePravegaRepo) {
 	workingDir pravegaSrcDir
-	commandLine "./gradlew", "-PpravegaVersion=${pravegaVersion.substring(0, pravegaVersion.length())}", ":client:jar"
+	commandLine "./gradlew", "-PpravegaVersion=${pravegaVersion}", ":client:jar"
 }
 compileJava.dependsOn += pravegaClientJars
 task pravegaDistInstall(type: Exec, dependsOn: clonePravegaRepo) {
 	workingDir pravegaSrcDir
-	commandLine "./gradlew", "-PpravegaVersion=${pravegaVersion.substring(0, pravegaVersion.length())}", "distribution", "install"
+	commandLine "./gradlew", "-PpravegaVersion=${pravegaVersion}", "distribution", "install"
 }
 task pravegaExtract(dependsOn: pravegaDistInstall) {
 	doLast {
