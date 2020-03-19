@@ -88,6 +88,7 @@ public class CommonTest {
 			config.val("storage-driver-event-key-enabled", true);
 			config.val("storage-driver-event-key-count", 0);
 			config.val("storage-driver-event-timeoutMillis", 100);
+			config.val("storage-driver-read-tail", false);
 			config.val("storage-driver-scaling-type", "fixed");
 			config.val("storage-driver-scaling-rate", 0);
 			config.val("storage-driver-scaling-factor", 0);
