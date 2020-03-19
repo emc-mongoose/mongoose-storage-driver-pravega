@@ -33,15 +33,16 @@ public class PravegaPathReadTest {
 		final int readerTimeoutMs = 100;
 		final StreamManager streamManager = StreamManager.create(controllerURI);
 		final boolean scopeIsNew = streamManager.createScope(scope);
-		/*writer*/
+
+		//start of writer
 		StreamConfiguration streamConfig = StreamConfiguration.builder()
 						.scalingPolicy(ScalingPolicy.fixed(1))
 						.build();
 		final boolean streamIsNew = streamManager.createStream(scope, streamName, streamConfig);
 
 		try (val clientFactory = EventStreamClientFactory.withScope(scope,
-				ClientConfig.builder().controllerURI(controllerURI).build());
-			 EventStreamWriter<String> writer = clientFactory.createEventWriter(streamName,
+						ClientConfig.builder().controllerURI(controllerURI).build());
+						EventStreamWriter<String> writer = clientFactory.createEventWriter(streamName,
 										new JavaSerializer<String>(),
 										EventWriterConfig.builder().build())) {
 			writer.writeEvent(routingKey, message1);
@@ -54,9 +55,10 @@ public class PravegaPathReadTest {
 			System.out.format("Writing message: '%s' with routing-key: '%s' to stream '%s / %s'%n",
 							message3, routingKey, scope, streamName);
 		}
-		/*end of writer*/
-		/*start of reader*/
-		//it's random for now, but to use offsets we'll need to use the same readerGroup name.
+		// end of writer
+
+		// start of reader
+		// it's random for now, but to use offsets we'll need to use the same readerGroup name.
 		final String readerGroup = UUID.randomUUID().toString().replace("-", "");
 		final ReaderGroupConfig readerGroupConfig = ReaderGroupConfig.builder()
 						.stream(Stream.of(scope, streamName))
@@ -66,7 +68,7 @@ public class PravegaPathReadTest {
 		}
 
 		try (val clientFactory = EventStreamClientFactory.withScope(scope,
-				ClientConfig.builder().controllerURI(controllerURI).build());
+						ClientConfig.builder().controllerURI(controllerURI).build());
 						EventStreamReader<String> reader = clientFactory.createReader("reader",
 										readerGroup,
 										new JavaSerializer<String>(),

@@ -35,9 +35,8 @@ public class PravegaEventReadTest {
 						.scalingPolicy(ScalingPolicy.fixed(1))
 						.build();
 		streamManager.createStream(scopeName, streamName, streamConfig);
-		try (
-						val clientFactory = EventStreamClientFactory.withScope(scopeName,
-								ClientConfig.builder().controllerURI(controllerURI).build());
+		try (val clientFactory = EventStreamClientFactory.withScope(scopeName,
+						ClientConfig.builder().controllerURI(controllerURI).build());
 						val writer = clientFactory.createEventWriter(
 										streamName, new JavaSerializer<>(), EventWriterConfig.builder().build())) {
 			writer.writeEvent(routingKey, testEvent);
@@ -57,8 +56,7 @@ public class PravegaEventReadTest {
 		try (val readerGroupManager = ReaderGroupManager.withScope(scopeName, controllerURI)) {
 			readerGroupManager.createReaderGroup(readerGroup, readerGroupConfig);
 		}
-		try (
-				val clientFactory = EventStreamClientFactory.withScope(scopeName,
+		try (val clientFactory = EventStreamClientFactory.withScope(scopeName,
 						ClientConfig.builder().controllerURI(controllerURI).build());
 						val reader = clientFactory.createReader(
 										"reader", readerGroup, new JavaSerializer<>(), ReaderConfig.builder().build())) {

@@ -162,7 +162,7 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
 		}
 
 		try (val clientFactory = EventStreamClientFactory.withScope(scope,
-				ClientConfig.builder().controllerURI(controllerURI).build());
+						ClientConfig.builder().controllerURI(controllerURI).build());
 			 EventStreamReader<ByteBuffer> reader = clientFactory.createReader(
 										"reader",
 										readerGroup,
