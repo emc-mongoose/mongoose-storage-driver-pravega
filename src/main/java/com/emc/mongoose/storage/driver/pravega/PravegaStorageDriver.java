@@ -90,6 +90,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadFactory;
@@ -141,7 +142,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	private static final int TIMESTAMP_LENGTH = 8;
 
 	Queue<EventStreamReader<ByteBuffer>> createEventStreamReaderPool(final String unused) {
-		return new ArrayBlockingQueue<>(ioWorkerCount);
+		return new LinkedBlockingQueue<>(ioWorkerCount);
 	}
 
 	@Value
@@ -466,8 +467,9 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		if (BYTES.equals(streamDataType)) {
 			items = listStreams(itemFactory, path, prefix, idRadix, lastPrevItem, count);
 		} else {
-			items = makeEventItems(itemFactory, path, prefix, lastPrevItem, 1);
-			// as we don't know how many items in the stream, we allocate memory for 1 item
+			items = makeEventItems(itemFactory, path, prefix, lastPrevItem, count);
+			// as we don't know how many items in the stream, we allocate memory for 1 batch of ops,
+			// set pending status for op if we know that it neither failed nor succeeded and then recycle it
 		}
 		return items;
 	}
@@ -887,6 +889,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				var evtReader_ = evtReaderPool.poll();
 				if(null == evtReader_) {
 					evtReader_ = clientFactory.createReader("reader-" + (System.nanoTime()), evtReaderGroupName, evtDeserializer, evtReaderConfig);
+					Loggers.MSG.info("{}: created a new reader in {} {}", stepId, Thread.currentThread().getName(), evtReader_.toString());
 				}
 
 				val evtReader = evtReader_;
@@ -939,6 +942,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				// means that reader doesn't own any segments, so it can't read anything
 				Loggers.MSG.debug("{}: empty reader. No EventSegmentReader assigned", stepId);
 			}
+			// received an empty answer, so don't count the operation anywhere and just do the recycling
 			completeOperation(evtOp, PENDING);
 			} else {
 				val bytesDone = evtData.remaining();

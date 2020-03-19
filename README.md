@@ -258,9 +258,10 @@ To achieve maximum efficiency the main point to be considered is `auto-scaling`.
 threads is amount of segments in the stream, which is constant during the reading. With auto-scaling enabled, it is yet 
 to be found out what the best match is.
 
-Another important thing to notice is that there is always a single failed event in the metrics. This isn't a corrupted 
-event but a nuisance caused by the fact that we don't know the amount of events in the stream. So, unless you actually see
-log messages about corrupted events - never mind the single failed event.
+There are two ways reading can be done:
+
+ - Set the count/time limit to stop reading after a certain moment
+ - Don't specify any options to stop reading, in this case driver works endlessly unless explicitly stopped (e.g. ctrl+c)
 
 ### 5.1.3. Update
 
