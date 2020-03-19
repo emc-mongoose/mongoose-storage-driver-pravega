@@ -1,6 +1,8 @@
 ---
 storage:
   driver:
+    create:
+      timestamp: false
     control:
       scope: true
       stream: true
@@ -11,6 +13,8 @@ storage:
         enabled: false
         count: 0
       timeoutMillis: 100
+    read:
+      tail: boolean
     scaling:
       type: fixed
       rate: 0

@@ -8,7 +8,6 @@ import com.emc.mongoose.base.item.op.data.DataOperationImpl;
 import com.emc.mongoose.base.storage.Credential;
 import com.emc.mongoose.base.storage.driver.StorageDriver;
 import com.emc.mongoose.storage.driver.pravega.PravegaStorageDriver;
-import com.github.akurilov.commons.io.Output;
 import com.github.akurilov.commons.io.collection.ListOutput;
 import com.github.akurilov.commons.system.SizeInBytes;
 import lombok.val;
