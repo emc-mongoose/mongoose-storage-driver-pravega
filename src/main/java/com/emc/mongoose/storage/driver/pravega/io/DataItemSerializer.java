@@ -48,7 +48,7 @@ public final class DataItemSerializer<I extends DataItem>
 			final var dstBuff = useDirectMem ? ByteBuffer.allocateDirect((int) dataItemSize) : // will crash if not enough memory
 							ByteBuffer.allocate((int) dataItemSize); // will throw OOM error if not enough memory
 			if (shouldRecordTime) {
-				dstBuff.putLong(System.currentTimeMillis()); //adding timestamp as first 8 bytes
+				dstBuff.putLong(System.currentTimeMillis()); // adding timestamp as first 8 bytes
 			}
 			while (dstBuff.remaining() > 0) {
 				dataItem.read(dstBuff);
