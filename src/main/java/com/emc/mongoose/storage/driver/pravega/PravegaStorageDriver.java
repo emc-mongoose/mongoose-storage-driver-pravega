@@ -873,7 +873,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				val evtReader = evtReader_;
 				for(var i = 0; i < opsCount; i ++) {
 					readEvent(readerGroupManager, evtReaderGroupName, evtReader, evtOps.get(i));
-					//in multistream case readerGroup and associated reader might be different for each op
+					// in multistream case readerGroup and associated reader might be different for each op
 				}
 				evtReaderPool.offer(evtReader);
 			} catch(final Throwable e) {
@@ -903,11 +903,11 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		if (null == evtData) {
 			val streamPos = evtRead.getPosition();
 			if (((PositionImpl)streamPos).getOwnedSegments().isEmpty()) {
-				//means that reader doesn't own any segments, so it can't read anything
+				// means that reader doesn't own any segments, so it can't read anything
 				Loggers.MSG.debug("{}: empty reader. No EventSegmentReader assigned", stepId);
 			}
-			//received an empty answer, so don't count the operation anywhere and just do the recycling
-			completeOperation(evtOp,PENDING);
+			// received an empty answer, so don't count the operation anywhere and just do the recycling
+			completeOperation(evtOp, PENDING);
 			} else {
 				val bytesDone = evtData.remaining();
 				val evtItem = evtOp.item();
