@@ -33,7 +33,7 @@ Create Event Stream Test
     &{env_params} =  Create Dictionary
     ${std_out} =  Execute Mongoose Scenario  ${DATA_DIR}  ${env_params}  ${args}
     Log  ${std_out}
-    Validate Metrics Total Log File  ${step_id}  CREATE  ${count_limit}  0  1048576000
+    Validate Metrics Total Log File  ${step_id}  CREATE  ${count_limit}  0  104857600
 
 Create Byte Streams Test
     [Tags]  create_byte_streams
