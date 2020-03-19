@@ -2,7 +2,8 @@ package com.emc.mongoose.storage.driver.pravega.integration;
 
 import com.emc.mongoose.storage.driver.pravega.util.PravegaNode;
 
-import io.pravega.client.ClientFactory;
+import io.pravega.client.ClientConfig;
+import io.pravega.client.EventStreamClientFactory;
 import io.pravega.client.admin.ReaderGroupManager;
 import io.pravega.client.admin.StreamManager;
 import io.pravega.client.stream.*;
@@ -35,7 +36,8 @@ public class PravegaEventReadTest {
 						.build();
 		streamManager.createStream(scopeName, streamName, streamConfig);
 		try (
-						val clientFactory = ClientFactory.withScope(scopeName, controllerURI);
+						val clientFactory = EventStreamClientFactory.withScope(scopeName,
+								ClientConfig.builder().controllerURI(controllerURI).build());
 						val writer = clientFactory.createEventWriter(
 										streamName, new JavaSerializer<>(), EventWriterConfig.builder().build())) {
 			writer.writeEvent(routingKey, testEvent);
@@ -56,7 +58,8 @@ public class PravegaEventReadTest {
 			readerGroupManager.createReaderGroup(readerGroup, readerGroupConfig);
 		}
 		try (
-						val clientFactory = ClientFactory.withScope(scopeName, controllerURI);
+				val clientFactory = EventStreamClientFactory.withScope(scopeName,
+						ClientConfig.builder().controllerURI(controllerURI).build());
 						val reader = clientFactory.createReader(
 										"reader", readerGroup, new JavaSerializer<>(), ReaderConfig.builder().build())) {
 			val event1 = reader.readNextEvent(readerTimeoutMs);

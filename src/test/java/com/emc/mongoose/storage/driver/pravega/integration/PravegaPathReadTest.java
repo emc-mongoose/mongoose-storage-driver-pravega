@@ -1,12 +1,14 @@
 package com.emc.mongoose.storage.driver.pravega.integration;
 
 import com.emc.mongoose.storage.driver.pravega.util.PravegaNode;
-import io.pravega.client.ClientFactory;
+import io.pravega.client.ClientConfig;
+import io.pravega.client.EventStreamClientFactory;
 import io.pravega.client.admin.ReaderGroupManager;
 import io.pravega.client.admin.StreamManager;
 import io.pravega.client.stream.*;
 import io.pravega.client.stream.impl.JavaSerializer;
 
+import lombok.val;
 import org.junit.Test;
 
 import java.net.URI;
@@ -37,8 +39,9 @@ public class PravegaPathReadTest {
 						.build();
 		final boolean streamIsNew = streamManager.createStream(scope, streamName, streamConfig);
 
-		try (final ClientFactory clientFactory = ClientFactory.withScope(scope, controllerURI);
-						EventStreamWriter<String> writer = clientFactory.createEventWriter(streamName,
+		try (val clientFactory = EventStreamClientFactory.withScope(scope,
+				ClientConfig.builder().controllerURI(controllerURI).build());
+			 EventStreamWriter<String> writer = clientFactory.createEventWriter(streamName,
 										new JavaSerializer<String>(),
 										EventWriterConfig.builder().build())) {
 			writer.writeEvent(routingKey, message1);
@@ -62,7 +65,8 @@ public class PravegaPathReadTest {
 			readerGroupManager.createReaderGroup(readerGroup, readerGroupConfig);
 		}
 
-		try (final ClientFactory clientFactory = ClientFactory.withScope(scope, controllerURI);
+		try (val clientFactory = EventStreamClientFactory.withScope(scope,
+				ClientConfig.builder().controllerURI(controllerURI).build());
 						EventStreamReader<String> reader = clientFactory.createReader("reader",
 										readerGroup,
 										new JavaSerializer<String>(),

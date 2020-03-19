@@ -274,31 +274,50 @@ Not supported.
 ### 5.1.5. End-to-end Latency
 
 The end-to-end latency is a time span between the CREATE and READ operations executed for the same item. The end-to-end 
-latency may be measured using Mongoose's 
-[Pipeline Load extension](https://github.com/emc-mongoose/mongoose-load-step-pipeline) which is included into this 
-extension's docker image. To do this, it's necessary to produce the raw operations trace data.
+latency may be measured using e2e latency mode:
 
-Scenario example:
-<https://github.com/emc-mongoose/mongoose-storage-driver-pravega/blob/master/src/test/robot/api/storage/data/e2e_latency.js>
+1. Start writing the messages to a stream with enabled timestamps recording. Example command:
 
-Command line example:
-```bash
-docker run \
-    --network host \
-    --volume "$(pwd)"/src/test/robot/api/storage/data:/root \
-    --volume /tmp/log:/root/.mongoose/<BASE_VERSION>/log \
-    emcmongoose/mongoose-storage-driver-pravega \
-    --storage-namespace=scope1 \
-    --item-output-path=stream1 \
-    --run-scenario=/root/e2e_latency.js \
-    --load-step-id=e2e_latency \
-    --item-data-size=10KB \
-    --load-op-limit-count=100000 \
-    --output-metrics-trace-persist
+```   docker run \
+       --network host \
+       emcmongoose/mongoose-storage-driver-pravega \
+       --storage-namespace=scope1 \
+       --load-service-threads=1 \
+       --storage-driver-limit-concurrency=0
+       --item-data-size=10B \
+       --item-output-path=stream1 \
+       --load-batch-size=1000 \
+       --storage-driver-limit-queue-input=1000 \
+       --storage-driver-create-timestamp \
+       --load-op-limit-rate=100000
 ```
 
-Once the raw operations trace data is obtained, it may be used to produce the end-to-end latency data using the tool:
-<https://github.com/emc-mongoose/e2e-latency-generator>
+The last parameter is needed to make writing slower than reading, as it is not always the case. While using e2e latency 
+mode the maximum throughput is not the main point of interest, so this behaviour can be allowed.
+
+2. Start the tail read from the same topic:
+
+```  docker run \
+      --network host \
+      emcmongoose/mongoose-storage-driver-pravega \
+      --storage-namespace=scope1 \
+      --load-batch-size=1000 \
+      --load-service-threads=1 \
+      --storage-driver-limit-concurrency=0 \
+      --load-op-type=read \
+      --item-input-path=stream1 \
+      --storage-driver-read-tail \
+      --load-op-recycle \
+      --load-step-id=e2e_test
+```
+
+3. Check the end-to-end time data in the `log/e2e_test/op.trace.csv` log file. The data is in the CSV format with 3 columns:
+
+* internal message id
+* event payload size
+* end-to-end time in milliseconds
+
+***Note***: the end-to-end time data will not be aggregated in the distributed mode.
 
 ## 5.2. Byte Stream Operations
 

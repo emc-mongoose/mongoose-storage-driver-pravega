@@ -99,7 +99,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import io.pravega.client.stream.impl.Credentials;
 import io.pravega.client.stream.impl.DefaultCredentials;
 import io.pravega.client.stream.impl.PositionImpl;
-import io.pravega.client.stream.impl.ReaderGroupImpl;
 import io.pravega.client.stream.impl.StreamImpl;
 import io.pravega.common.util.AsyncIterator;
 import lombok.Value;
@@ -325,7 +324,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		val createConfig = driverConfig.configVal("create");
 		this.recordWriteTimeFlag = createConfig.boolVal("timestamp");
 		if (recordWriteTimeFlag) {
-			Loggers.ERR.warn("{}: Make sure that event size is not smaller than 8 bytes ", stepId);
+			Loggers.ERR.error("{}: Make sure that event size is not smaller than 8 bytes", stepId);
 		}
 		evtSerializer = new DataItemSerializer<>(false, recordWriteTimeFlag);
 		val controlConfig = driverConfig.configVal("control");
@@ -468,7 +467,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 			items = listStreams(itemFactory, path, prefix, idRadix, lastPrevItem, count);
 		} else {
 			items = makeEventItems(itemFactory, path, prefix, lastPrevItem, 1);
-			//as we don't know how many items in the stream, we allocate memory for 1 item
+			// as we don't know how many items in the stream, we allocate memory for 1 item
 		}
 		return items;
 	}
@@ -895,7 +894,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				val evtReader = evtReader_;
 				for(var i = 0; i < opsCount; i ++) {
 					readEvent(readerGroupManager, evtReaderGroupName, evtReader, evtOps.get(i));
-					//in multistream case readerGroup and associated reader might be different for each op
+					// in multistream case readerGroup and associated reader might be different for each op
 				}
 				evtReaderPool.offer(evtReader);
 			} catch(final Throwable e) {
@@ -924,7 +923,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		val evtData = evtRead.getEvent();
 		if (tailReadFlag) {
 			val timestampBuffer = ByteBuffer.allocate(TIMESTAMP_LENGTH);
-			timestampBuffer.put(evtData.array(),0,TIMESTAMP_LENGTH);
+			timestampBuffer.put(evtData.array(), 0, TIMESTAMP_LENGTH);
 			timestampBuffer.flip();
 			val e2eTimeMillis = System.currentTimeMillis() - timestampBuffer.getLong();
 			val msgId = evtOp.item().name();
@@ -939,10 +938,10 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		if (null == evtData) {
 			val streamPos = evtRead.getPosition();
 			if (((PositionImpl)streamPos).getOwnedSegments().isEmpty()) {
-				//means that reader doesn't own any segments, so it can't read anything
+				// means that reader doesn't own any segments, so it can't read anything
 				Loggers.MSG.debug("{}: empty reader. No EventSegmentReader assigned", stepId);
 			}
-			completeOperation(evtOp,PENDING);
+			completeOperation(evtOp, PENDING);
 			} else {
 				val bytesDone = evtData.remaining();
 				val evtItem = evtOp.item();
