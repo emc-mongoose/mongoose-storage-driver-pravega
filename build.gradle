@@ -377,6 +377,16 @@ task dockerBuildImage(type: DockerBuildImage) {
 		"emcmongoose/${project.name}:testing",
 	]
 }
+
+task dockerBuildPravegaStandaloneImage(type: DockerBuildImage) {
+	inputDir = project.projectDir
+	dockerFile = project.file("ci${File.separator}docker${File.separator}Dockerfile.customRAMPravega")
+	imageId = "pravegaStandalone"
+	tags = [
+			"pravegaStandalone:${version}",
+	]
+}
+
 task dockerPushProductionImage(type: DockerPushImage) {
 	imageName = "emcmongoose/${project.name}".toString()
 	tag = "emcmongoose/${project.name}:${version}".toString()

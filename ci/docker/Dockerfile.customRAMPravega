@@ -1,0 +1,3 @@
+FROM pravega/pravega:latest
+
+RUN sed -i 's/-Xmx4g/-Xmx3200m/' /opt/pravega/bin/pravega-standalone

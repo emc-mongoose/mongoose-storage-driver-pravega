@@ -32,6 +32,7 @@ before_script:
   - export GCC_LIBS_SHA256=400e2ecb1b2dfb40e09cdb6805f0075cbc88e6fcef9b73f23c64a6e709dcd61b
   - export ZLIB_URL="https://archive.archlinux.org/packages/z/zlib/zlib-1%3A1.2.11-3-x86_64.pkg.tar.xz"
   - export ZLIB_SHA256=17aede0b9f8baa789c5aa3f358fbf8c68a5f1228c5e6cba1a5dd34102ef4d4e5
+  - export VERSION=$(cat build.gradle | grep version\ = | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
   - curl -Lks https://alpine-pkgs.sgerrand.com/sgerrand.rsa.pub -o /etc/apk/keys/sgerrand.rsa.pub
   - curl -Lks ${ALPINE_GLIBC_REPO}/${GLIBC_VER}/glibc-${GLIBC_VER}.apk > /tmp/${GLIBC_VER}.apk
   - apk add --allow-untrusted /tmp/${GLIBC_VER}.apk
@@ -85,7 +86,6 @@ build_docker_image:
   stage: build_docker_image
   script:
     - ./gradlew dockerBuildImage
-    - export VERSION=$(cat build.gradle | grep version\ = | sed -n 's/.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
     - docker save ${IMAGE_NAME}:${VERSION} > ${IMAGE_FILE_NAME}
   artifacts:
     paths:
@@ -112,7 +112,9 @@ build_docker_image:
     # Run Pravega
     #- ./gradlew pravegaExtract
     #- nohup build/pravega_/bin/pravega-standalone 1,2 > build/pravega_nohup.out &
-    - docker run -d -e HOST_IP=${SERVICE_HOST} -p 9090:9090 -p 12345:12345 pravega/pravega:latest standalone
+    - ./gradlew dockerBuildPravegaStandaloneImage
+    - docker images
+    - docker run -d -e HOST_IP=${SERVICE_HOST} -p 9090:9090 -p 12345:12345 pravegaStandalone:${VERSION} standalone
     - sleep 15
     # Run the tests
     - robot --outputdir build/robotest --suite ${SUITE} --include ${TEST} src/test/robot

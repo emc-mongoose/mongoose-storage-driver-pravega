@@ -27,6 +27,7 @@ Create Event Stream Test
     ...  --storage-driver-limit-concurrency=1000
     ...  --storage-driver-threads=10
     ...  --load-batch-size=1000
+    ...  --item-data-size=1KB
     ...  --storage-driver-limit-queue-input=1000
     ...  --storage-namespace=scope1
     ...  --storage-net-node-addrs=${node_addr}
@@ -46,6 +47,7 @@ Create Byte Streams Test
     ...  --load-op-limit-count=${count_limit}
     ...  --storage-driver-limit-concurrency=10
     ...  --storage-driver-threads=10
+    ...  --item-data-size=1KB
     ...  --storage-driver-stream-data=bytes
     ...  --storage-namespace=scope2
     ...  --storage-net-node-addrs=${node_addr}
@@ -65,6 +67,7 @@ Read Event Streams Test
     ...  --load-op-recycle=true
     ...  --load-op-limit-count=${count_limit}
     ...  --storage-driver-limit-concurrency=1000
+    ...  --item-data-size=1KB
     ...  --storage-driver-threads=2
     ...  --storage-namespace=scope_event_streams
     ...  --storage-net-node-addrs=${node_addr}
