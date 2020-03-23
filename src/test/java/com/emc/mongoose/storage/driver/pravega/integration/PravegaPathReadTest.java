@@ -1,12 +1,14 @@
 package com.emc.mongoose.storage.driver.pravega.integration;
 
 import com.emc.mongoose.storage.driver.pravega.util.PravegaNode;
-import io.pravega.client.ClientFactory;
+import io.pravega.client.ClientConfig;
+import io.pravega.client.EventStreamClientFactory;
 import io.pravega.client.admin.ReaderGroupManager;
 import io.pravega.client.admin.StreamManager;
 import io.pravega.client.stream.*;
 import io.pravega.client.stream.impl.JavaSerializer;
 
+import lombok.val;
 import org.junit.Test;
 
 import java.net.URI;
@@ -31,13 +33,15 @@ public class PravegaPathReadTest {
 		final int readerTimeoutMs = 100;
 		final StreamManager streamManager = StreamManager.create(controllerURI);
 		final boolean scopeIsNew = streamManager.createScope(scope);
-		/*writer*/
+
+		//start of writer
 		StreamConfiguration streamConfig = StreamConfiguration.builder()
 						.scalingPolicy(ScalingPolicy.fixed(1))
 						.build();
 		final boolean streamIsNew = streamManager.createStream(scope, streamName, streamConfig);
 
-		try (final ClientFactory clientFactory = ClientFactory.withScope(scope, controllerURI);
+		try (val clientFactory = EventStreamClientFactory.withScope(scope,
+						ClientConfig.builder().controllerURI(controllerURI).build());
 						EventStreamWriter<String> writer = clientFactory.createEventWriter(streamName,
 										new JavaSerializer<String>(),
 										EventWriterConfig.builder().build())) {
@@ -51,9 +55,10 @@ public class PravegaPathReadTest {
 			System.out.format("Writing message: '%s' with routing-key: '%s' to stream '%s / %s'%n",
 							message3, routingKey, scope, streamName);
 		}
-		/*end of writer*/
-		/*start of reader*/
-		//it's random for now, but to use offsets we'll need to use the same readerGroup name.
+		// end of writer
+
+		// start of reader
+		// it's random for now, but to use offsets we'll need to use the same readerGroup name.
 		final String readerGroup = UUID.randomUUID().toString().replace("-", "");
 		final ReaderGroupConfig readerGroupConfig = ReaderGroupConfig.builder()
 						.stream(Stream.of(scope, streamName))
@@ -62,7 +67,8 @@ public class PravegaPathReadTest {
 			readerGroupManager.createReaderGroup(readerGroup, readerGroupConfig);
 		}
 
-		try (final ClientFactory clientFactory = ClientFactory.withScope(scope, controllerURI);
+		try (val clientFactory = EventStreamClientFactory.withScope(scope,
+						ClientConfig.builder().controllerURI(controllerURI).build());
 						EventStreamReader<String> reader = clientFactory.createReader("reader",
 										readerGroup,
 										new JavaSerializer<String>(),

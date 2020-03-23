@@ -1,6 +1,8 @@
 ---
 storage:
   driver:
+    create:
+      timestamp: boolean
     control:
       scope: boolean
       stream: boolean
@@ -11,6 +13,8 @@ storage:
         enabled: boolean
         count: long
       timeoutMillis: long
+    read:
+      tail: boolean
     scaling:
       type: string
       rate: int

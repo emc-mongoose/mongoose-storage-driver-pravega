@@ -50,6 +50,8 @@ import io.pravega.client.ByteStreamClientFactory;
 import io.pravega.client.ClientConfig;
 import io.pravega.client.EventStreamClientFactory;
 import io.pravega.client.admin.ReaderGroupManager;
+import io.pravega.client.admin.StreamInfo;
+import io.pravega.client.admin.StreamManager;
 import io.pravega.client.byteStream.ByteStreamReader;
 import io.pravega.client.byteStream.impl.ByteStreamClientImpl;
 import io.pravega.client.netty.impl.ConnectionFactory;
@@ -64,6 +66,7 @@ import io.pravega.client.stream.ScalingPolicy;
 import io.pravega.client.stream.Serializer;
 import io.pravega.client.stream.Stream;
 import io.pravega.client.stream.StreamConfiguration;
+import io.pravega.client.stream.StreamCut;
 import io.pravega.client.stream.TransactionalEventStreamWriter;
 import io.pravega.client.stream.TxnFailedException;
 import io.pravega.client.stream.impl.Controller;
@@ -87,6 +90,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadFactory;
@@ -96,7 +100,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import io.pravega.client.stream.impl.Credentials;
 import io.pravega.client.stream.impl.DefaultCredentials;
 import io.pravega.client.stream.impl.PositionImpl;
-import io.pravega.client.stream.impl.ReaderGroupImpl;
+import io.pravega.client.stream.impl.StreamImpl;
 import io.pravega.common.util.AsyncIterator;
 import lombok.Value;
 import lombok.val;
@@ -115,8 +119,10 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	protected final long controlApiTimeoutMillis;
 	protected final boolean transactionMode;
 	protected final long evtOpTimeoutMillis;
-	protected final Serializer<I> evtSerializer = new DataItemSerializer<>(false);
+	protected final Serializer<I> evtSerializer;
 	protected final Serializer<ByteBuffer> evtDeserializer = new ByteBufferSerializer();
+	private final boolean recordWriteTimeFlag;
+	private final boolean tailReadFlag;
 	protected final EventWriterConfig evtWriterConfig;
 	protected final ReaderConfig evtReaderConfig = ReaderConfig
 					.builder()
@@ -133,9 +139,10 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	private final boolean controlScopeFlag;
 	private final boolean controlStreamFlag;
 	private final Credentials cred;
+	private static final int TIMESTAMP_LENGTH = 8;
 
 	Queue<EventStreamReader<ByteBuffer>> createEventStreamReaderPool(final String unused) {
-		return new ArrayBlockingQueue<>(ioWorkerCount);
+		return new LinkedBlockingQueue<>(ioWorkerCount);
 	}
 
 	@Value
@@ -177,7 +184,6 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 			final StreamConfiguration streamConfig = StreamConfiguration
 				.builder()
 				.scalingPolicy(scalingPolicy)
-				.scope(scopeName)
 				.build();
 			if(controlScopeFlag) {
 				try {
@@ -316,10 +322,18 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		super(stepId, dataInput, storageConfig, verifyFlag, BYTES.equals(streamDataType) ? 1 : batchSize);
 		this.concurrencyThrottle = new Semaphore(concurrencyLimit > 0 ? concurrencyLimit : Integer.MAX_VALUE, true);
 		val driverConfig = storageConfig.configVal("driver");
+		val createConfig = driverConfig.configVal("create");
+		this.recordWriteTimeFlag = createConfig.boolVal("timestamp");
+		if (recordWriteTimeFlag) {
+			Loggers.ERR.error("{}: Make sure that event size is not smaller than 8 bytes", stepId);
+		}
+		evtSerializer = new DataItemSerializer<>(false, recordWriteTimeFlag);
 		val controlConfig = driverConfig.configVal("control");
 		this.controlApiTimeoutMillis = controlConfig.longVal("timeoutMillis");
 		this.controlScopeFlag = controlConfig.boolVal("scope");
 		this.controlStreamFlag = controlConfig.boolVal("stream");
+		val readConfig = driverConfig.configVal("read");
+		this.tailReadFlag = readConfig.boolVal("tail");
 		val scalingConfig = driverConfig.configVal("scaling");
 		this.scalingPolicy = PravegaScalingConfig.scalingPolicy(scalingConfig);
 		val netConfig = storageConfig.configVal("net");
@@ -453,8 +467,9 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		if (BYTES.equals(streamDataType)) {
 			items = listStreams(itemFactory, path, prefix, idRadix, lastPrevItem, count);
 		} else {
-			items = makeEventItems(itemFactory, path, prefix, lastPrevItem, 1);
-			//as we don't know how many items in the stream, we allocate memory for 1 item
+			items = makeEventItems(itemFactory, path, prefix, lastPrevItem, count);
+			// as we don't know how many items in the stream, we allocate memory for 1 batch of ops,
+			// set pending status for op if we know that it neither failed nor succeeded and then recycle it
 		}
 		return items;
 	}
@@ -470,7 +485,6 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		if (streamIterator == null) {
 			val scopeName = path.startsWith(SLASH) ? path.substring(1) : path;
 			streamIterator = controller.listStreams(scopeName);
-
 		}
 
 		final int prefixLength = (prefix == null || prefix.isEmpty()) ? 0 : prefix.length();
@@ -480,7 +494,6 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 			while (i < count) {
 				val stream = streamIterator.getNext().get(controlApiTimeoutMillis, MILLISECONDS);
 				if (null == stream) {
-
 					if (i == 0) {
 						streamIterator = null;
 						throw new EOFException("End of stream listing");
@@ -845,9 +858,19 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				val endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
 				val clientConfig = clientConfigCache.computeIfAbsent(endpointUri, this::createClientConfig);
 				val streamName = extractStreamName(anyEvtOp.dstPath());
+				Stream stream = new StreamImpl(scopeName, streamName);
 				val readerGroupConfigBuilder = evtReaderGroupConfigBuilder.get();
 				val readerGroupConfig = evtReaderGroupConfigCache.computeIfAbsent(
-					scopeName + SLASH + streamName, key -> readerGroupConfigBuilder.stream(key).build());
+					scopeName + SLASH + streamName, key -> {
+							StreamManager streamManager = StreamManager.create(clientConfig);
+							StreamInfo streamInfo = streamManager.getStreamInfo(scopeName, streamName);
+							StreamCut streamCut = tailReadFlag ? streamInfo.getTailStreamCut() : streamInfo.getHeadStreamCut();
+							return readerGroupConfigBuilder
+								.stream(Stream.of(scopeName, streamName),
+									streamCut,
+									StreamCut.UNBOUNDED)
+								.build();
+						});
 				val readerGroupManagerCreateFunc = evtReaderGroupManagerCreateFuncCache.computeIfAbsent(
 					clientConfig, ReaderGroupManagerCreateFunctionImpl::new);
 				val clientFactoryCreateFunc = clientFactoryCreateFuncCache.computeIfAbsent(
@@ -866,11 +889,13 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				var evtReader_ = evtReaderPool.poll();
 				if(null == evtReader_) {
 					evtReader_ = clientFactory.createReader("reader-" + (System.nanoTime()), evtReaderGroupName, evtDeserializer, evtReaderConfig);
+					Loggers.MSG.info("{}: created a new reader in {} {}", stepId, Thread.currentThread().getName(), evtReader_.toString());
 				}
+
 				val evtReader = evtReader_;
 				for(var i = 0; i < opsCount; i ++) {
 					readEvent(readerGroupManager, evtReaderGroupName, evtReader, evtOps.get(i));
-					//in multistream case readerGroup and associated reader might be different for each op
+					// in multistream case readerGroup and associated reader might be different for each op
 				}
 				evtReaderPool.offer(evtReader);
 			} catch(final Throwable e) {
@@ -897,23 +922,28 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		evtOp.finishResponse();
 		val evtRead = evtRead_;
 		val evtData = evtRead.getEvent();
+		if (tailReadFlag) {
+			val timestampBuffer = ByteBuffer.allocate(TIMESTAMP_LENGTH);
+			timestampBuffer.put(evtData.array(), 0, TIMESTAMP_LENGTH);
+			timestampBuffer.flip();
+			val e2eTimeMillis = System.currentTimeMillis() - timestampBuffer.getLong();
+			val msgId = evtOp.item().name();
+			val msgSize = evtOp.item().size();
+			if(e2eTimeMillis > 0) {
+				Loggers.OP_TRACES.info(new EndToEndLogMessage(msgId, msgSize, e2eTimeMillis));
+			} else {
+				Loggers.ERR.warn("{}: publish time is in the future for the message \"{}\"", stepId, msgId);
+			}
+		}
+
 		if (null == evtData) {
 			val streamPos = evtRead.getPosition();
 			if (((PositionImpl)streamPos).getOwnedSegments().isEmpty()) {
-				//means that reader doesn't own any segments, so it can't read anything
+				// means that reader doesn't own any segments, so it can't read anything
 				Loggers.MSG.debug("{}: empty reader. No EventSegmentReader assigned", stepId);
-				completeOperation(evtOp,PENDING);
-			} else {
-				val leftBytesForReaderGroup = ((ReaderGroupImpl)(readerGroupManager.getReaderGroup(evtReaderGroupName))).unreadBytes();
-				if (leftBytesForReaderGroup == 0) {
-					//end of all segments. unreadBytes() has a 20-30 sec delay.
-					completeOperation(evtOp,FAIL_TIMEOUT);
-					Loggers.MSG.info("{}: no more events for RG {}", stepId, evtReaderGroupName);
-				} else {
-					//end of one of the segments
-					completeOperation(evtOp,PENDING);
-				}
 			}
+			// received an empty answer, so don't count the operation anywhere and just do the recycling
+			completeOperation(evtOp, PENDING);
 			} else {
 				val bytesDone = evtData.remaining();
 				val evtItem = evtOp.item();

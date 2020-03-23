@@ -21,7 +21,8 @@ import com.github.akurilov.commons.system.SizeInBytes;
 import com.github.akurilov.confuse.Config;
 import com.github.akurilov.confuse.SchemaProvider;
 import com.github.akurilov.confuse.impl.BasicConfig;
-import io.pravega.client.ClientFactory;
+import io.pravega.client.ClientConfig;
+import io.pravega.client.EventStreamClientFactory;
 import io.pravega.client.admin.ReaderGroupManager;
 import io.pravega.client.stream.*;
 import java.io.IOException;
@@ -92,10 +93,12 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
 			config.val("storage-driver-control-scope", true);
 			config.val("storage-driver-control-stream", true);
 			config.val("storage-driver-control-timeoutMillis", 10_000);
+			config.val("storage-driver-create-timestamp", false);
 			config.val("storage-driver-event-transaction", false);
 			config.val("storage-driver-event-key-enabled", true);
 			config.val("storage-driver-event-key-count", 0);
 			config.val("storage-driver-event-timeoutMillis", 100);
+			config.val("storage-driver-read-tail", false);
 			config.val("storage-driver-scaling-type", "fixed");
 			config.val("storage-driver-scaling-rate", 0);
 			config.val("storage-driver-scaling-factor", 0);
@@ -159,8 +162,9 @@ public class DataOperationsTest extends PravegaStorageDriver<DataItem, DataOpera
 			readerGroupManager.createReaderGroup(readerGroup, readerGroupConfig);
 		}
 
-		try (final ClientFactory clientFactory = ClientFactory.withScope(scope, controllerURI);
-						EventStreamReader<ByteBuffer> reader = clientFactory.createReader(
+		try (val clientFactory = EventStreamClientFactory.withScope(scope,
+						ClientConfig.builder().controllerURI(controllerURI).build());
+			 EventStreamReader<ByteBuffer> reader = clientFactory.createReader(
 										"reader",
 										readerGroup,
 										new ByteBufferSerializer(),
