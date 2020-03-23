@@ -156,9 +156,11 @@ docker run \
 |:-----------------------------------|:----------------|:--------------|:-------------------------------------------------|
 | storage-driver-control-scope       | boolean         | true          | Allow to try to create scope
 | storage-driver-control-timeoutMillis | integer       | 2000         | The timeout for any Pravega Controller API call
+| storage-driver-create-timestamp    | boolean         | false         | Should write 8 bytes at the beginning of each event. Required for the e2e latency mode as there is no current option to pass metadata with the event.
 | storage-driver-event-key-enabled   | boolean         | false         | Specifies if Mongoose should generate its own routing key during the events creation
 | storage-driver-event-key-count     | integer         | 0             | Specifies a max count of unique routing keys to use during the events creation (may be considered as a routing key period). 0 value means to use unique routing key for each new event
 | storage-driver-event-timeoutMillis | integer         | 100           | The event read timeout in milliseconds
+| storage-driver-read-tail           | boolean         | false         | Enables tail read. Catch-up read by default.
 | storage-driver-scaling-type        | enum | "fixed"  | The scaling policy type to use (fixed/event_rate/kbyte_rate). [See the Pravega documentation](http://pravega.io/docs/latest/terminology/) for details
 | storage-driver-scaling-rate        | integer         | 0             | The scaling policy target rate. May be measured in events per second either kilobytes per second depending on the scaling policy type
 | storage-driver-scaling-factor      | integer         | 0             | The scaling policy factor. From the Pravega javadoc: *the maximum number of splits of a segment for a scale-up event.*
