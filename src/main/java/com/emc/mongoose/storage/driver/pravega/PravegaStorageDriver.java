@@ -87,6 +87,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadFactory;
@@ -135,7 +136,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	private final Credentials cred;
 
 	Queue<EventStreamReader<ByteBuffer>> createEventStreamReaderPool(final String unused) {
-		return new ArrayBlockingQueue<>(ioWorkerCount);
+		return new LinkedBlockingQueue<>(ioWorkerCount);
 	}
 
 	@Value
@@ -453,8 +454,9 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		if (BYTES.equals(streamDataType)) {
 			items = listStreams(itemFactory, path, prefix, idRadix, lastPrevItem, count);
 		} else {
-			items = makeEventItems(itemFactory, path, prefix, lastPrevItem, 1);
-			//as we don't know how many items in the stream, we allocate memory for 1 item
+			items = makeEventItems(itemFactory, path, prefix, lastPrevItem, count);
+			// as we don't know how many items in the stream, we allocate memory for 1 batch of ops,
+			// set pending status for op if we know that it neither failed nor succeeded and then recycle it
 		}
 		return items;
 	}
@@ -866,11 +868,12 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				var evtReader_ = evtReaderPool.poll();
 				if(null == evtReader_) {
 					evtReader_ = clientFactory.createReader("reader-" + (System.nanoTime()), evtReaderGroupName, evtDeserializer, evtReaderConfig);
+					Loggers.MSG.info("{}: created a new reader in {} {}", stepId, Thread.currentThread().getName(), evtReader_.toString());
 				}
 				val evtReader = evtReader_;
 				for(var i = 0; i < opsCount; i ++) {
 					readEvent(readerGroupManager, evtReaderGroupName, evtReader, evtOps.get(i));
-					//in multistream case readerGroup and associated reader might be different for each op
+					// in multistream case readerGroup and associated reader might be different for each op
 				}
 				evtReaderPool.offer(evtReader);
 			} catch(final Throwable e) {
@@ -900,20 +903,11 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		if (null == evtData) {
 			val streamPos = evtRead.getPosition();
 			if (((PositionImpl)streamPos).getOwnedSegments().isEmpty()) {
-				//means that reader doesn't own any segments, so it can't read anything
+				// means that reader doesn't own any segments, so it can't read anything
 				Loggers.MSG.debug("{}: empty reader. No EventSegmentReader assigned", stepId);
-				completeOperation(evtOp,PENDING);
-			} else {
-				val leftBytesForReaderGroup = ((ReaderGroupImpl)(readerGroupManager.getReaderGroup(evtReaderGroupName))).unreadBytes();
-				if (leftBytesForReaderGroup == 0) {
-					//end of all segments. unreadBytes() has a 20-30 sec delay.
-					completeOperation(evtOp,FAIL_TIMEOUT);
-					Loggers.MSG.info("{}: no more events for RG {}", stepId, evtReaderGroupName);
-				} else {
-					//end of one of the segments
-					completeOperation(evtOp,PENDING);
-				}
 			}
+			// received an empty answer, so don't count the operation anywhere and just do the recycling
+			completeOperation(evtOp, PENDING);
 			} else {
 				val bytesDone = evtData.remaining();
 				val evtItem = evtOp.item();
