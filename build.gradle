@@ -377,13 +377,17 @@ task dockerBuildImage(type: DockerBuildImage) {
 		"emcmongoose/${project.name}:testing",
 	]
 }
-
+/*
+docker {
+	url = "tcp://docker:2375"
+	certPath = new File(System.env.DOCKER_CERT_PATH)
+}*/
 task dockerBuildPravegaStandaloneImage(type: DockerBuildImage) {
-	inputDir = project.projectDir
-	dockerFile = project.file("ci${File.separator}docker${File.separator}Dockerfile.customRAMPravega")
+	inputDir = rootProject.projectDir
+	dockerFile = project.file("ci${File.separator}docker${File.separator}Dockerfile.custom-ram-pravega")
 	imageId = "pravegaStandalone"
 	tags = [
-			"pravegaStandalone:${version}",
+			"pravega-standalone:${version}",
 	]
 }
 

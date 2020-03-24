@@ -114,7 +114,7 @@ build_docker_image:
     #- nohup build/pravega_/bin/pravega-standalone 1,2 > build/pravega_nohup.out &
     - ./gradlew dockerBuildPravegaStandaloneImage
     - docker images
-    - docker run -d -e HOST_IP=${SERVICE_HOST} -p 9090:9090 -p 12345:12345 pravegaStandalone:${VERSION} standalone
+    - docker run -d -e HOST_IP=${SERVICE_HOST} -p 9090:9090 -p 12345:12345 pravega-standalone:${VERSION} standalone
     - sleep 15
     # Run the tests
     - robot --outputdir build/robotest --suite ${SUITE} --include ${TEST} src/test/robot
