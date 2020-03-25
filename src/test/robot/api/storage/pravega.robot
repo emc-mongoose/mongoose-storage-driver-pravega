@@ -35,7 +35,7 @@ Create Event Stream Test
     &{env_params} =  Create Dictionary
     ${std_out} =  Execute Mongoose Scenario  ${DATA_DIR}  ${env_params}  ${args}
     Log  ${std_out}
-    Validate Metrics Total Log File  ${step_id}  CREATE  ${count_limit}  0  102400
+    Validate Metrics Total Log File  ${step_id}  CREATE  ${count_limit}  0  1024000
 
 Create Byte Streams Test
     [Tags]  create_byte_streams
@@ -144,7 +144,7 @@ Create Event Transaction Stream Test
     ${args} =  Catenate  SEPARATOR= \\\n\t
     ...  --storage-namespace=scope5
     ...  --storage-driver-event-transaction
-    ...  --storage-driver-limit-concurrency=10
+    ...  --storage-driver-limit-concurrency=1000
     ...  --storage-driver-threads=10
     ...  --storage-net-node-addrs=${node_addr}
     ...  --load-op-limit-count=${count_limit}
