@@ -1,5 +1,17 @@
 var sharedConfig = {
-	"namespace": SCOPE_NAME
+	"namespace": SCOPE_NAME,
+	"load": {
+		 "op": {
+			"limit": {
+				"rate": 2000
+			}
+		 }
+	},
+	"item": {
+		"data": {
+			"size": "1KB"
+		}
+	}
 }
 
 PreconditionLoad
@@ -15,9 +27,9 @@ ReadLoad
 			}
 		},
 		"load": {
-            "op": {
-                "recycle": true
-		    }
+			"op": {
+				"recycle": true
+			}
 		}
 	})
 	.run();

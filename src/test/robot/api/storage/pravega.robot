@@ -26,9 +26,10 @@ Create Event Stream Test
     ...  --load-op-limit-count=${count_limit}
     ...  --storage-driver-limit-concurrency=1000
     ...  --storage-driver-threads=10
-    ...  --load-batch-size=1000
+    ...  --load-batch-size=100
     ...  --item-data-size=1KB
     ...  --storage-driver-limit-queue-input=1000
+    ...  --load-op-limit-rate=2000
     ...  --storage-namespace=scope1
     ...  --storage-net-node-addrs=${node_addr}
     &{env_params} =  Create Dictionary
@@ -48,6 +49,7 @@ Create Byte Streams Test
     ...  --storage-driver-limit-concurrency=10
     ...  --storage-driver-threads=10
     ...  --item-data-size=1KB
+    ...  --load-op-limit-rate=2000
     ...  --storage-driver-stream-data=bytes
     ...  --storage-namespace=scope2
     ...  --storage-net-node-addrs=${node_addr}
@@ -149,6 +151,7 @@ Create Event Transaction Stream Test
     ...  --load-step-id=${step_id}
     ...  --load-batch-size=1234
     ...  --item-data-size=123
+    ...  --load-op-limit-rate=10000
     &{env_params} =  Create Dictionary
     ${std_out} =  Execute Mongoose Scenario  ${DATA_DIR}  ${env_params}  ${args}
     Log  ${std_out}
