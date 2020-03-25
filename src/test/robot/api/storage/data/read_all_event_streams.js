@@ -1,5 +1,11 @@
 var sharedConfig = {
 	"namespace": SCOPE_NAME
+	"item": {
+	    "data": {
+	        "size": "1KB"
+	    }
+	}
+
 }
 
 PreconditionLoad
