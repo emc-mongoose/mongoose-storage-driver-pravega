@@ -11,7 +11,7 @@ PreconditionLoad
 		"load": {
 			"op": {
 				"limit": {
-					"rate": 2000
+					"rate": 200
 				}
 		 	}
 		}
@@ -28,7 +28,7 @@ ReadLoad
 		"load": {
 			"op": {
 				"limit": {
-					"rate": 2000
+					"rate": 200
 				}
 		 	}
 		}

@@ -1,5 +1,7 @@
 var sharedConfig = {
-	"namespace": SCOPE_NAME,
+	"storage": {
+		"namespace": SCOPE_NAME
+	},
 	"load": {
 		 "op": {
 			"limit": {
