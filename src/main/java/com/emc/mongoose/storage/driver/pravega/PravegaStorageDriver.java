@@ -178,7 +178,6 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 			final StreamConfiguration streamConfig = StreamConfiguration
 				.builder()
 				.scalingPolicy(scalingPolicy)
-				.scope(scopeName)
 				.build();
 			if(controlScopeFlag) {
 				try {
