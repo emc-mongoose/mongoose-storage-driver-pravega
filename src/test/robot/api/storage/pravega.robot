@@ -71,7 +71,7 @@ Read Event Streams Test
     ...  --storage-driver-limit-concurrency=1000
     ...  --item-data-size=1KB
     ...  --storage-driver-threads=2
-    ...  --storage-namespace=scope_event_streams
+    ...  --storage-namespace=scope10
     ...  --storage-net-node-addrs=${node_addr}
     ...  --run-scenario=${MONGOOSE_CONTAINER_DATA_DIR}/read.js
     &{env_params} =  Create Dictionary  ITEM_LIST_FILE=${MONGOOSE_CONTAINER_DATA_DIR}/${step_id}.csv
@@ -82,7 +82,7 @@ Read Event Streams Test
 Read All Event Streams Test
     [Tags]  read_all_event_streams
     ${node_addr} =  Get Environment Variable  SERVICE_HOST  127.0.0.1
-    ${step_id} =  Set Variable  read_all_byte_streams_test
+    ${step_id} =  Set Variable  read_all_event_streams_test
     ${count_limit} =  Set Variable  10
     Remove Directory  ${LOG_DIR}/${step_id}  recursive=True
     ${args} =  Catenate  SEPARATOR= \\\n\t
@@ -92,7 +92,7 @@ Read All Event Streams Test
     ...  --storage-driver-threads=2
     ...  --storage-net-node-addrs=${node_addr}
     ...  --run-scenario=${MONGOOSE_CONTAINER_DATA_DIR}/read_all_event_streams.js
-    &{env_params} =  Create Dictionary  SCOPE_NAME=scope_all_event_streams
+    &{env_params} =  Create Dictionary  SCOPE_NAME=scope11
     ${std_out} =  Execute Mongoose Scenario  ${DATA_DIR}  ${env_params}  ${args}
     Log  ${std_out}
     Validate Metrics Total Log File  ${step_id}  READ  ${count_limit}  0  10240
