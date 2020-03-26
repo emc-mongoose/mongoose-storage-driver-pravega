@@ -70,7 +70,7 @@ Read Event Streams Test
     ...  --load-op-limit-count=${count_limit}
     ...  --storage-driver-limit-concurrency=1000
     ...  --item-data-size=1KB
-    ...  --storage-driver-threads=2
+    ...  --storage-driver-threads=1
     ...  --storage-namespace=scope10
     ...  --storage-net-node-addrs=${node_addr}
     ...  --run-scenario=${MONGOOSE_CONTAINER_DATA_DIR}/read.js
@@ -89,7 +89,7 @@ Read All Event Streams Test
     ...  --load-step-id=${step_id}
     ...  --load-op-limit-count=${count_limit}
     ...  --storage-driver-limit-concurrency=1000
-    ...  --storage-driver-threads=2
+    ...  --storage-driver-threads=1
     ...  --storage-net-node-addrs=${node_addr}
     ...  --run-scenario=${MONGOOSE_CONTAINER_DATA_DIR}/read_all_event_streams.js
     &{env_params} =  Create Dictionary  SCOPE_NAME=scope11
