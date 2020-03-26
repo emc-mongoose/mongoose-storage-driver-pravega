@@ -49,7 +49,7 @@ Create Byte Streams Test
     ...  --storage-driver-limit-concurrency=10
     ...  --storage-driver-threads=10
     ...  --item-data-size=1KB
-    ...  --load-op-limit-rate=2000
+    ...  --load-op-limit-rate=200
     ...  --storage-driver-stream-data=bytes
     ...  --storage-namespace=scope2
     ...  --storage-net-node-addrs=${node_addr}
@@ -95,7 +95,7 @@ Read All Event Streams Test
     &{env_params} =  Create Dictionary  SCOPE_NAME=scope_all_event_streams
     ${std_out} =  Execute Mongoose Scenario  ${DATA_DIR}  ${env_params}  ${args}
     Log  ${std_out}
-    Validate Metrics Total Log File  ${step_id}  READ  ${count_limit}  0  10485760
+    Validate Metrics Total Log File  ${step_id}  READ  ${count_limit}  0  10240
 
 Read Byte Streams Test
     [Tags]  read_byte_streams
@@ -151,7 +151,6 @@ Create Event Transaction Stream Test
     ...  --load-step-id=${step_id}
     ...  --load-batch-size=1234
     ...  --item-data-size=123
-    ...  --load-op-limit-rate=10000
     &{env_params} =  Create Dictionary
     ${std_out} =  Execute Mongoose Scenario  ${DATA_DIR}  ${env_params}  ${args}
     Log  ${std_out}
