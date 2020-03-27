@@ -1,0 +1,5 @@
+ARG VERSION
+
+FROM emcmongoose/mongoose-storage-driver-pravega:${VERSION}
+
+RUN sed -i 's/java/java -Xmx1700m/' /opt/mongoose/entrypoint_storage_driver_pravega.sh

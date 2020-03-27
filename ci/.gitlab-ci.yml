@@ -113,6 +113,7 @@ build_docker_image:
     #- ./gradlew pravegaExtract
     #- nohup build/pravega_/bin/pravega-standalone 1,2 > build/pravega_nohup.out &
     - ./gradlew dockerBuildPravegaStandaloneImage
+    - ./gradlew dockerBuildMongooseForStandaloneImage
     - docker images
     - docker run -d -e HOST_IP=${SERVICE_HOST} -p 9090:9090 -p 12345:12345 pravega-standalone:${VERSION} standalone
     - sleep 15
@@ -151,17 +152,17 @@ test_create_byte_streams:
 #    SUITE: api.storage
 #    TEST: read_all_byte_streams
 
-test_read_event_streams:
+test_read_event_streams_path:
   extends: .test_robot
   variables:
     SUITE: api.storage
-    TEST: read_event_streams
+    TEST: read_event_streams_path
 
-test_read_all_event_streams:
+test_read_event_streams_file:
   extends: .test_robot
   variables:
     SUITE: api.storage
-    TEST: read_all_event_streams
+    TEST: read_all_event_streams_file
 
 test_create_event_transaction_stream:
   extends: .test_robot
