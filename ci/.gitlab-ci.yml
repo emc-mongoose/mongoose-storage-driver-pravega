@@ -162,7 +162,7 @@ test_read_event_streams_file:
   extends: .test_robot
   variables:
     SUITE: api.storage
-    TEST: read_all_event_streams_file
+    TEST: read_event_streams_file
 
 test_create_event_transaction_stream:
   extends: .test_robot

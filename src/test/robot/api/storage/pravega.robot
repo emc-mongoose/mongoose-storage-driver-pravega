@@ -61,7 +61,7 @@ Create Byte Streams Test
 Read Event Streams File Test
     [Tags]  read_event_streams_file
     ${node_addr} =  Get Environment Variable  SERVICE_HOST  127.0.0.1
-    ${step_id} =  Set Variable  read_event_streams_test
+    ${step_id} =  Set Variable  read_event_streams_test_file
     ${count_limit} =  Set Variable  50
     Remove Directory  ${LOG_DIR}/${step_id}  recursive=True
     ${args} =  Catenate  SEPARATOR= \\\n\t
@@ -80,9 +80,9 @@ Read Event Streams File Test
     Validate Metrics Total Log File  ${step_id}  READ  ${count_limit}  0  5120
 
 Read Event Streams Path Test
-    [Tags]  read_all_event_streams_path
+    [Tags]  read_event_streams_path
     ${node_addr} =  Get Environment Variable  SERVICE_HOST  127.0.0.1
-    ${step_id} =  Set Variable  read_all_event_streams_test
+    ${step_id} =  Set Variable  read_event_streams_test_path
     ${count_limit} =  Set Variable  50
     Remove Directory  ${LOG_DIR}/${step_id}  recursive=True
     ${args} =  Catenate  SEPARATOR= \\\n\t
