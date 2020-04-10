@@ -123,6 +123,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	protected final Serializer<ByteBuffer> evtDeserializer = new ByteBufferSerializer();
 	private final boolean recordWriteTimeFlag;
 	private final boolean tailReadFlag;
+	private final boolean e2eReadModeFlag;
 	protected final EventWriterConfig evtWriterConfig;
 	protected final ReaderConfig evtReaderConfig = ReaderConfig
 					.builder()
@@ -333,7 +334,12 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		this.controlScopeFlag = controlConfig.boolVal("scope");
 		this.controlStreamFlag = controlConfig.boolVal("stream");
 		val readConfig = driverConfig.configVal("read");
-		this.tailReadFlag = readConfig.boolVal("tail");
+		var tempTailReadFlag = readConfig.boolVal("tail");
+		this.e2eReadModeFlag = readConfig.boolVal("e2eMode");
+		if (e2eReadModeFlag) {
+			tempTailReadFlag = true;
+		}
+		this.tailReadFlag = tempTailReadFlag;
 		val scalingConfig = driverConfig.configVal("scaling");
 		this.scalingPolicy = PravegaScalingConfig.scalingPolicy(scalingConfig);
 		val netConfig = storageConfig.configVal("net");
@@ -858,7 +864,6 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				val endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
 				val clientConfig = clientConfigCache.computeIfAbsent(endpointUri, this::createClientConfig);
 				val streamName = extractStreamName(anyEvtOp.dstPath());
-				Stream stream = new StreamImpl(scopeName, streamName);
 				val readerGroupConfigBuilder = evtReaderGroupConfigBuilder.get();
 				val readerGroupConfig = evtReaderGroupConfigCache.computeIfAbsent(
 					scopeName + SLASH + streamName, key -> {
@@ -922,7 +927,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		evtOp.finishResponse();
 		val evtRead = evtRead_;
 		val evtData = evtRead.getEvent();
-		if (tailReadFlag) {
+		if (e2eReadModeFlag) {
 			val timestampBuffer = ByteBuffer.allocate(TIMESTAMP_LENGTH);
 			timestampBuffer.put(evtData.array(), 0, TIMESTAMP_LENGTH);
 			timestampBuffer.flip();
