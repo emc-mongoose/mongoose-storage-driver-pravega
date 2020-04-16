@@ -160,6 +160,7 @@ docker run \
 | storage-driver-event-key-enabled   | boolean         | false         | Specifies if Mongoose should generate its own routing key during the events creation
 | storage-driver-event-key-count     | integer         | 0             | Specifies a max count of unique routing keys to use during the events creation (may be considered as a routing key period). 0 value means to use unique routing key for each new event
 | storage-driver-event-timeoutMillis | integer         | 100           | The event read timeout in milliseconds
+| storage-driver-read-e2eMode        | boolean         | false         | Enables e2e mode for read. This enables tail read as well as writing data to a csv file.
 | storage-driver-read-tail           | boolean         | false         | Enables tail read. Catch-up read by default.
 | storage-driver-scaling-type        | enum | "fixed"  | The scaling policy type to use (fixed/event_rate/kbyte_rate). [See the Pravega documentation](http://pravega.io/docs/latest/terminology/) for details
 | storage-driver-scaling-rate        | integer         | 0             | The scaling policy target rate. May be measured in events per second either kilobytes per second depending on the scaling policy type
@@ -298,7 +299,7 @@ latency may be measured using e2e latency mode:
 The last parameter is needed to make writing slower than reading, as it is not always the case. While using e2e latency 
 mode the maximum throughput is not the main point of interest, so this behaviour can be allowed.
 
-2. Start the tail read from the same topic:
+2. Start the e2eMode reading from the same stream:
 
 ```  docker run \
       --network host \
@@ -309,7 +310,7 @@ mode the maximum throughput is not the main point of interest, so this behaviour
       --storage-driver-limit-concurrency=0 \
       --load-op-type=read \
       --item-input-path=stream1 \
-      --storage-driver-read-tail \
+      --storage-driver-read-e2eMode \
       --load-op-recycle \
       --load-step-id=e2e_test
 ```
