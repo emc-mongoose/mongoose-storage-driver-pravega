@@ -68,7 +68,7 @@ Read Event Streams Test
     ...  --storage-driver-threads=1
     ...  --load-batch-size=1000
     ...  --storage-driver-limit-queue-input=1000
-    ...  --storage-namespace=scope_event_streams
+    ...  --storage-namespace=scope-event-stream
     ...  --storage-net-node-addrs=${node_addr}
     ...  --run-scenario=${MONGOOSE_CONTAINER_DATA_DIR}/read_event_streams.js
     &{env_params} =  Create Dictionary  ITEM_LIST_FILE=${MONGOOSE_CONTAINER_DATA_DIR}/${step_id}.csv
