@@ -2,7 +2,7 @@ PreconditionLoad
 	.config({
 		"item" : {
 			"output" : {
-				"path" : ITEM_LIST_FILE
+				"path" : ITEM_PATH
 			}
 		}
 	})
@@ -12,7 +12,7 @@ ReadLoad
 	.config({
 		"item" : {
 			"input" : {
-				"path" : ITEM_LIST_FILE
+				"path" : ITEM_PATH
 			}
 		},
 		"load" : {

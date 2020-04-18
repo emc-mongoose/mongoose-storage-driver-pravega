@@ -71,7 +71,7 @@ Read Event Streams Test
     ...  --storage-namespace=scope-event-stream
     ...  --storage-net-node-addrs=${node_addr}
     ...  --run-scenario=${MONGOOSE_CONTAINER_DATA_DIR}/read_event_streams.js
-    &{env_params} =  Create Dictionary  ITEM_LIST_FILE=${MONGOOSE_CONTAINER_DATA_DIR}/${step_id}.csv
+    &{env_params} =  Create Dictionary  ITEM_PATH=event-stream
     ${std_out} =  Execute Mongoose Scenario  ${DATA_DIR}  ${env_params}  ${args}
     Log  ${std_out}
     Validate Metrics Total Log File  ${step_id}  READ  ${count_limit}  0  102400
