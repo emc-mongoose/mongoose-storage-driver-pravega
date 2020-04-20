@@ -260,6 +260,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	private final Map<URI, ClientConfig> clientConfigCache = new ConcurrentHashMap<>();
 	// * controllers
 	private final Map<ClientConfig, Controller> controllerCache = new ConcurrentHashMap<>();
+	private final Map<ClientConfig, StreamManager> streamManagerCache = new ConcurrentHashMap<>();
 	// * scopes
 	private final Map<Controller, ScopeCreateFunction> scopeCreateFuncCache = new ConcurrentHashMap<>();
 	private final Map<String, StreamCreateFunction> streamCreateFuncCache = new ConcurrentHashMap<>();
@@ -433,6 +434,10 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 			.maxBackoffMillis(MAX_BACKOFF_MILLIS)
 			.build();
 		return new ControllerImpl(controllerConfig, bgExecutor);
+	}
+
+	StreamManager createStreamManager(final ClientConfig clientConfig) {
+		return StreamManager.create(clientConfig);
 	}
 
 	ConnectionFactory createConnectionFactory(final ClientConfig clientConfig) {
@@ -863,11 +868,11 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				val nodeAddr = anyEvtOp.nodeAddr();
 				val endpointUri = endpointCache.computeIfAbsent(nodeAddr, this::createEndpointUri);
 				val clientConfig = clientConfigCache.computeIfAbsent(endpointUri, this::createClientConfig);
+				val streamManager = streamManagerCache.computeIfAbsent(clientConfig, this::createStreamManager);
 				val streamName = extractStreamName(anyEvtOp.dstPath());
 				val readerGroupConfigBuilder = evtReaderGroupConfigBuilder.get();
 				val readerGroupConfig = evtReaderGroupConfigCache.computeIfAbsent(
 					scopeName + SLASH + streamName, key -> {
-							StreamManager streamManager = StreamManager.create(clientConfig);
 							StreamInfo streamInfo = streamManager.getStreamInfo(scopeName, streamName);
 							StreamCut streamCut = tailReadFlag ? streamInfo.getTailStreamCut() : streamInfo.getHeadStreamCut();
 							return readerGroupConfigBuilder
@@ -1262,6 +1267,8 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		clientConfigCache.clear();
 		closeAllWithTimeout(controllerCache.values());
 		controllerCache.clear();
+		closeAllWithTimeout(streamManagerCache.values());
+		streamManagerCache.clear();
 		endpointCache.clear();
 		bgExecutor.shutdownNow();
 	}
