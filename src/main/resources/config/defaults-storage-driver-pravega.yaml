@@ -14,6 +14,7 @@ storage:
         count: 0
       timeoutMillis: 100
     read:
+      e2eMode: false
       tail: false
     scaling:
       type: fixed

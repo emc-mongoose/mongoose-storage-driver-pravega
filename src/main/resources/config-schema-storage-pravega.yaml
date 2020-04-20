@@ -14,6 +14,7 @@ storage:
         count: long
       timeoutMillis: long
     read:
+      e2eMode: boolean
       tail: boolean
     scaling:
       type: string
