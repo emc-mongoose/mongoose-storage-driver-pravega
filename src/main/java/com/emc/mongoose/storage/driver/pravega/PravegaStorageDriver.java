@@ -55,7 +55,7 @@ import io.pravega.client.admin.StreamManager;
 import io.pravega.client.byteStream.ByteStreamReader;
 import io.pravega.client.byteStream.impl.ByteStreamClientImpl;
 import io.pravega.client.connection.impl.ConnectionFactory;
-import io.pravega.client.connection.impl.ConnectionPoolImpl;
+import io.pravega.client.connection.impl.SocketConnectionFactoryImpl;
 import io.pravega.client.stream.EventStreamReader;
 import io.pravega.client.stream.EventStreamWriter;
 import io.pravega.client.stream.EventWriterConfig;
@@ -440,8 +440,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	}
 
 	ConnectionFactory createConnectionFactory(final ClientConfig clientConfig) {
-		val connPool = new ConnectionPoolImpl(clientConfig);
-		return new ConnectionFactoryImpl(clientConfig, connPool, bgExecutor);
+		return new SocketConnectionFactoryImpl(clientConfig, bgExecutor);
 	}
 
 	<K, V> Map<K, V> createInstanceCache(final Object ignored) {
