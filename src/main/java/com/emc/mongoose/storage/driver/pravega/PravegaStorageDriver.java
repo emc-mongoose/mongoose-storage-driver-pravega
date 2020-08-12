@@ -248,7 +248,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 
 		@Override
 		public ByteStreamClientFactory apply(final Controller controller) {
-			return new ByteStreamClientImpl(scopeName, controller, connFactory);
+			return null; //new ByteStreamClientImpl(scopeName, controller, connFactory);
 		}
 	}
 
@@ -363,6 +363,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 			this.transactionMode = eventConfig.boolVal("transaction");
 		} else {
 			this.transactionMode = false;
+			throw new IllegalConfigurationException("ByteStreams are not currently supported. Contact the dev team.");
 		}
 		this.endpointAddrs = endpointAddrList.toArray(new String[endpointAddrList.size()]);
 		this.requestAuthTokenFunc = null; // do not use
