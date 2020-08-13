@@ -46,6 +46,7 @@ import com.emc.mongoose.storage.driver.preempt.PreemptStorageDriverBase;
 import com.github.akurilov.commons.concurrent.ContextAwareThreadFactory;
 import com.github.akurilov.commons.system.DirectMemUtil;
 import com.github.akurilov.confuse.Config;
+import io.grpc.ManagedChannelBuilder;
 import io.pravega.client.ByteStreamClientFactory;
 import io.pravega.client.ClientConfig;
 import io.pravega.client.EventStreamClientFactory;
@@ -84,7 +85,6 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.ServiceLoader;
 import java.util.UUID;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -428,12 +428,14 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	}
 
 	Controller createController(final ClientConfig clientConfig) {
+		val targetUri = clientConfig.getControllerURI().getHost() + ":" + clientConfig.getControllerURI().getPort();
 		val controllerConfig = ControllerImplConfig
 			.builder()
 			.clientConfig(clientConfig)
 			.maxBackoffMillis(MAX_BACKOFF_MILLIS)
 			.build();
-		return new ControllerImpl(controllerConfig, bgExecutor);
+		return new ControllerImpl(ManagedChannelBuilder.forTarget(targetUri),
+				controllerConfig, bgExecutor);
 	}
 
 	StreamManager createStreamManager(final ClientConfig clientConfig) {
