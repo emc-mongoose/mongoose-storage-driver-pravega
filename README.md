@@ -75,7 +75,7 @@ Mongoose and Pravega are using quite different concepts. So it's necessary to de
     * [Scaling policies](#515-manual-scaling)
     * Stream sealing
     * Routing keys
-    * Byte streams
+    * Byte streams (currently unsupported for Pravega 0.8+)
     * [Transactional events write](#5111-transactional) (batch mode)
 
 # 3. Deployment
@@ -327,6 +327,8 @@ mode the maximum throughput is not the main point of interest, so this behaviour
 
 Mongoose should perform the load operations on the *streams* when the configuration option `storage-driver-stream-data`
 is set to `bytes`. This means that the whole streams are being accounted as *items*.
+
+Currently, unsupported for Pravega 0.8+.
 
 ### 5.2.1. Create
 

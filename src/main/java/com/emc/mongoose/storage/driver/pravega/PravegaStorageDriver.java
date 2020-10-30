@@ -754,14 +754,14 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				var routingKey = (String) null;
 				try {
 					if (null == routingKeyFunc) {
-						for (var i = 0; i < opsCount; i++) {
-							evtOp = ops.get(i);
+						for (O op : ops) {
+							evtOp = op;
 							evtOp.startRequest();
 							txn.writeEvent(evtOp.item());
 						}
 					} else {
-						for (var i = 0; i < opsCount; i++) {
-							evtOp = ops.get(i);
+						for (O op : ops) {
+							evtOp = op;
 							evtItem = evtOp.item();
 							routingKey = routingKeyFunc.apply(evtItem);
 							evtOp.startRequest();
@@ -813,19 +813,18 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 								streamName,
 								(streamName_) -> clientFactory.createEventWriter(streamName, evtSerializer, evtWriterConfig));
 				if (null == routingKeyFunc) {
-					for (var i = 0; i < opsCount; i++) {
-						val evtOp = ops.get(i);
+					for (final O evtOp : ops) {
 						concurrencyThrottle.acquire();
 						evtOp.startRequest();
 						val evtWriteFuture = evtWriter.writeEvent(evtOp.item());
 						evtWriteFuture.handle((result, thrown) -> handleEventWrite(evtOp, thrown));
 						try {
 							evtOp.finishRequest();
-						} catch (final IllegalStateException ignored) {}
+						} catch (final IllegalStateException ignored) {
+						}
 					}
 				} else {
-					for (var i = 0; i < opsCount; i++) {
-						val evtOp = ops.get(i);
+					for (final O evtOp : ops) {
 						val evtItem = evtOp.item();
 						val routingKey = routingKeyFunc.apply(evtItem);
 						concurrencyThrottle.acquire();
@@ -834,7 +833,8 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 						evtWriteFuture.handle((result, thrown) -> handleEventWrite(evtOp, thrown));
 						try {
 							evtOp.finishRequest();
-						} catch (final IllegalStateException ignored) {}
+						} catch (final IllegalStateException ignored) {
+						}
 					}
 				}
 			} catch (final Throwable e) {
@@ -904,8 +904,8 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				}
 
 				val evtReader = evtReader_;
-				for(var i = 0; i < opsCount; i ++) {
-					readEvent(readerGroupManager, evtReaderGroupName, evtReader, evtOps.get(i));
+				for (O evtOp : evtOps) {
+					readEvent(readerGroupManager, evtReaderGroupName, evtReader, evtOp);
 					// in multistream case readerGroup and associated reader might be different for each op
 				}
 				evtReaderPool.offer(evtReader);
@@ -923,7 +923,8 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	throws IOException {
 		evtOp.startRequest();
 		evtOp.finishRequest();
-		// should we startRequest() after all preparations or at the beginning of the method in a multiStream case when we partially prepare objects inside this method?
+		// should we startRequest() after all preparations or at the beginning of the method in a multiStream case
+		// when we partially prepare objects inside this method?
 		var evtRead_ = evtReader.readNextEvent(evtOpTimeoutMillis);
 		while (evtRead_.isCheckpoint()) {
 			Loggers.MSG.debug("{}: stream checkpoint @ position {}", stepId, evtRead_.getPosition());
@@ -1097,8 +1098,8 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		I item;
 		O op;
 		try {
-			for (var i = 0; i < ops.size(); i++) {
-				op = ops.get(i);
+			for (O o : ops) {
+				op = o;
 				op.status(status);
 				item = op.item();
 				op.countBytesDone(item.size());
