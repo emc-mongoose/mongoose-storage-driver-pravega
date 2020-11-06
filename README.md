@@ -122,6 +122,8 @@ docker run \
     ...
 ```
 
+Use emcmongoose/mongoose-storage-driver-pravega:4.2.29 for pravega 0.7 or earlier. 
+
 ### 3.2.2. Distributed
 
 #### 3.2.2.1. Additional Node
@@ -328,7 +330,7 @@ mode the maximum throughput is not the main point of interest, so this behaviour
 Mongoose should perform the load operations on the *streams* when the configuration option `storage-driver-stream-data`
 is set to `bytes`. This means that the whole streams are being accounted as *items*.
 
-Currently, unsupported for Pravega 0.8+.
+Currently, unsupported for Pravega 0.8+. 
 
 ### 5.2.1. Create
 
