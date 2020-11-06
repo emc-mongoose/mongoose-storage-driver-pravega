@@ -43,7 +43,7 @@ repositories {
 }
 description = "Mongoose is a high-load storage performance testing tool"
 group = "com.github.emc-mongoose"
-version = "4.2.29"
+version = "4.2.30"
 sourceCompatibility = 11
 targetCompatibility = 11
 ext {
