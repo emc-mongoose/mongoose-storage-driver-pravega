@@ -487,3 +487,37 @@ java -jar mongoose-<MONGOOSE_BASE_VERSION>.jar \
     --storage-driver-limit-concurrency=10 \
     --item-output-path=goose-events-stream-0
 ```
+
+# 8. CI
+
+CI is located here: 
+
+## 8.1. CI Runner
+
+It is often the case that robotests are not completed successfully when shared ci runner is used.
+So, one can create and attach his own ci runner with higher resources.
+
+1. Start the runner:
+
+```bash
+docker run -d --name gitlab-runner --restart always \
+    -v /srv/gitlab-runner/config:/etc/gitlab-runner \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    gitlab/gitlab-runner:latest
+```
+
+2. Register the runner:
+
+```bash
+docker run --rm -it -v /srv/gitlab-runner/config:/etc/gitlab-runner gitlab/gitlab-runner register -n \
+    --url https://gitlab.com/ \
+    --registration-token <token> \
+    --executor "docker" \
+    --docker-image "docker:18.09.7" \
+    --description "mong-runner" \
+    --docker-privileged \
+    -- tag pravega
+```
+
+One main thing why it's duplicated here is to remind that as we build aan image using dind, we need to set 
+privileged mode for the internal docker process.
