@@ -254,10 +254,16 @@ docker run \
     --load-op-recycle  
 ```
 
-Right now only single stream reading is supported. Each thread user creates via `--storage-driver-threads` parameter will
+Right now only single-stream reading is supported. Each thread from `--storage-driver-threads` parameter will
 be taking a reader from a joint pool. All readers will be in the same readerGroup. So, it is user's responsibility to
 define an amount of threads the way that there aren't any readers with no EventSegmentReaders. Which happens when there 
 are no segments assigned to a reader as each segment is assigned to only one reader within a readerGroup. 
+
+It's important to know that Mongoose's Item generator is driver agnostic. So it has no knowledge about the fact that 
+reader can be reading basically nothing as it doesn't have an assigned EventSegmentReader, but it will still receive 
+its portion of Items. This way if you set e.g. 5 mongoose threads while having 1 stream segment `--load-batch-size=100`,
+you are not going to get 100 successful operations as part of them wouldn't retrieve any data. Considering this case you
+might want to use timeouts for automation instead of op-count.
 
 To achieve maximum efficiency the main point to be considered is `auto-scaling`. If it's disabled, then the best match of 
 threads is amount of segments in the stream, which is constant during the reading. With auto-scaling enabled, it is yet 
