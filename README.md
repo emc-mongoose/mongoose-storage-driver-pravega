@@ -75,7 +75,7 @@ Mongoose and Pravega are using quite different concepts. So it's necessary to de
     * [Scaling policies](#515-manual-scaling)
     * Stream sealing
     * Routing keys
-    * Byte streams
+    * Byte streams (currently unsupported for Pravega 0.8+)
     * [Transactional events write](#5111-transactional) (batch mode)
 
 # 3. Deployment
@@ -121,6 +121,8 @@ docker run \
     --storage-driver-limit-queue-input=10000 \
     ...
 ```
+
+Use emcmongoose/mongoose-storage-driver-pravega:4.2.29 for pravega 0.7 or earlier. 
 
 ### 3.2.2. Distributed
 
@@ -252,10 +254,16 @@ docker run \
     --load-op-recycle  
 ```
 
-Right now only single stream reading is supported. Each thread user creates via `--storage-driver-threads` parameter will
+Right now only single-stream reading is supported. Each thread from `--storage-driver-threads` parameter will
 be taking a reader from a joint pool. All readers will be in the same readerGroup. So, it is user's responsibility to
 define an amount of threads the way that there aren't any readers with no EventSegmentReaders. Which happens when there 
 are no segments assigned to a reader as each segment is assigned to only one reader within a readerGroup. 
+
+It's important to know that Mongoose's Item generator is driver agnostic. So it has no knowledge about the fact that 
+reader can be reading basically nothing as it doesn't have an assigned EventSegmentReader, but it will still receive 
+its portion of Items. This way if you set e.g. 5 mongoose threads while having 1 stream segment `--load-batch-size=100`,
+you are not going to get 100 successful operations as part of them wouldn't retrieve any data. Considering this case you
+might want to use timeouts for automation instead of op-count.
 
 To achieve maximum efficiency the main point to be considered is `auto-scaling`. If it's disabled, then the best match of 
 threads is amount of segments in the stream, which is constant during the reading. With auto-scaling enabled, it is yet 
@@ -327,6 +335,8 @@ mode the maximum throughput is not the main point of interest, so this behaviour
 
 Mongoose should perform the load operations on the *streams* when the configuration option `storage-driver-stream-data`
 is set to `bytes`. This means that the whole streams are being accounted as *items*.
+
+Currently, unsupported for Pravega 0.8+. 
 
 ### 5.2.1. Create
 
@@ -483,3 +493,37 @@ java -jar mongoose-<MONGOOSE_BASE_VERSION>.jar \
     --storage-driver-limit-concurrency=10 \
     --item-output-path=goose-events-stream-0
 ```
+
+# 8. CI
+
+CI is located here: 
+
+## 8.1. CI Runner
+
+It is often the case that robotests are not completed successfully when shared ci runner is used.
+So, one can create and attach his own ci runner with higher resources.
+
+1. Start the runner:
+
+```bash
+docker run -d --name gitlab-runner --restart always \
+    -v /srv/gitlab-runner/config:/etc/gitlab-runner \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    gitlab/gitlab-runner:latest
+```
+
+2. Register the runner:
+
+```bash
+docker run --rm -it -v /srv/gitlab-runner/config:/etc/gitlab-runner gitlab/gitlab-runner register -n \
+    --url https://gitlab.com/ \
+    --registration-token <token> \
+    --executor "docker" \
+    --docker-image "docker:18.09.7" \
+    --description "mong-runner" \
+    --docker-privileged \
+    -- tag pravega
+```
+
+One main thing why it's duplicated here is to remind that as we build aan image using dind, we need to set 
+privileged mode for the internal docker process.

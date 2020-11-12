@@ -63,7 +63,6 @@ Read Event Streams Test
     ${args} =  Catenate  SEPARATOR= \\\n\t
     ...  --load-step-id=${step_id}
     ...  --item-data-size=1KB
-    ...  --load-op-limit-count=${count_limit}
     ...  --storage-driver-limit-concurrency=1000
     ...  --storage-driver-threads=1
     ...  --load-batch-size=1000
@@ -71,7 +70,7 @@ Read Event Streams Test
     ...  --storage-namespace=scope-event-stream
     ...  --storage-net-node-addrs=${node_addr}
     ...  --run-scenario=${MONGOOSE_CONTAINER_DATA_DIR}/read_event_streams.js
-    &{env_params} =  Create Dictionary  ITEM_PATH=event-stream
+    &{env_params} =  Create Dictionary  ITEM_PATH=event-stream  OP_LIMIT=${count_limit}  TIME_LIMIT=30s
     ${std_out} =  Execute Mongoose Scenario  ${DATA_DIR}  ${env_params}  ${args}
     Log  ${std_out}
     Validate Metrics Total Log File  ${step_id}  READ  ${count_limit}  0  102400

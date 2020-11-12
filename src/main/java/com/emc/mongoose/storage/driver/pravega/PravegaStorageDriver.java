@@ -46,6 +46,7 @@ import com.emc.mongoose.storage.driver.preempt.PreemptStorageDriverBase;
 import com.github.akurilov.commons.concurrent.ContextAwareThreadFactory;
 import com.github.akurilov.commons.system.DirectMemUtil;
 import com.github.akurilov.confuse.Config;
+import io.grpc.ManagedChannelBuilder;
 import io.pravega.client.ByteStreamClientFactory;
 import io.pravega.client.ClientConfig;
 import io.pravega.client.EventStreamClientFactory;
@@ -54,9 +55,8 @@ import io.pravega.client.admin.StreamInfo;
 import io.pravega.client.admin.StreamManager;
 import io.pravega.client.byteStream.ByteStreamReader;
 import io.pravega.client.byteStream.impl.ByteStreamClientImpl;
-import io.pravega.client.netty.impl.ConnectionFactory;
-import io.pravega.client.netty.impl.ConnectionFactoryImpl;
-import io.pravega.client.netty.impl.ConnectionPoolImpl;
+import io.pravega.client.connection.impl.ConnectionFactory;
+import io.pravega.client.connection.impl.SocketConnectionFactoryImpl;
 import io.pravega.client.stream.EventStreamReader;
 import io.pravega.client.stream.EventStreamWriter;
 import io.pravega.client.stream.EventWriterConfig;
@@ -69,9 +69,9 @@ import io.pravega.client.stream.StreamConfiguration;
 import io.pravega.client.stream.StreamCut;
 import io.pravega.client.stream.TransactionalEventStreamWriter;
 import io.pravega.client.stream.TxnFailedException;
-import io.pravega.client.stream.impl.Controller;
-import io.pravega.client.stream.impl.ControllerImpl;
-import io.pravega.client.stream.impl.ControllerImplConfig;
+import io.pravega.client.control.impl.Controller;
+import io.pravega.client.control.impl.ControllerImpl;
+import io.pravega.client.control.impl.ControllerImplConfig;
 
 import java.io.EOFException;
 import java.io.IOException;
@@ -85,7 +85,6 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.ServiceLoader;
 import java.util.UUID;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -249,7 +248,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 
 		@Override
 		public ByteStreamClientFactory apply(final Controller controller) {
-			return new ByteStreamClientImpl(scopeName, controller, connFactory);
+			return null; //new ByteStreamClientImpl(scopeName, controller, connFactory);
 		}
 	}
 
@@ -364,6 +363,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 			this.transactionMode = eventConfig.boolVal("transaction");
 		} else {
 			this.transactionMode = false;
+			throw new IllegalConfigurationException("ByteStreams are not currently supported. Contact the dev team.");
 		}
 		this.endpointAddrs = endpointAddrList.toArray(new String[endpointAddrList.size()]);
 		this.requestAuthTokenFunc = null; // do not use
@@ -428,12 +428,14 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	}
 
 	Controller createController(final ClientConfig clientConfig) {
+		val targetUri = clientConfig.getControllerURI().getHost() + ":" + clientConfig.getControllerURI().getPort();
 		val controllerConfig = ControllerImplConfig
 			.builder()
 			.clientConfig(clientConfig)
 			.maxBackoffMillis(MAX_BACKOFF_MILLIS)
 			.build();
-		return new ControllerImpl(controllerConfig, bgExecutor);
+		return new ControllerImpl(ManagedChannelBuilder.forTarget(targetUri),
+				controllerConfig, bgExecutor);
 	}
 
 	StreamManager createStreamManager(final ClientConfig clientConfig) {
@@ -441,8 +443,7 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	}
 
 	ConnectionFactory createConnectionFactory(final ClientConfig clientConfig) {
-		val connPool = new ConnectionPoolImpl(clientConfig);
-		return new ConnectionFactoryImpl(clientConfig, connPool, bgExecutor);
+		return new SocketConnectionFactoryImpl(clientConfig, bgExecutor);
 	}
 
 	<K, V> Map<K, V> createInstanceCache(final Object ignored) {
@@ -753,14 +754,14 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				var routingKey = (String) null;
 				try {
 					if (null == routingKeyFunc) {
-						for (var i = 0; i < opsCount; i++) {
-							evtOp = ops.get(i);
+						for (O op : ops) {
+							evtOp = op;
 							evtOp.startRequest();
 							txn.writeEvent(evtOp.item());
 						}
 					} else {
-						for (var i = 0; i < opsCount; i++) {
-							evtOp = ops.get(i);
+						for (O op : ops) {
+							evtOp = op;
 							evtItem = evtOp.item();
 							routingKey = routingKeyFunc.apply(evtItem);
 							evtOp.startRequest();
@@ -812,19 +813,18 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 								streamName,
 								(streamName_) -> clientFactory.createEventWriter(streamName, evtSerializer, evtWriterConfig));
 				if (null == routingKeyFunc) {
-					for (var i = 0; i < opsCount; i++) {
-						val evtOp = ops.get(i);
+					for (final O evtOp : ops) {
 						concurrencyThrottle.acquire();
 						evtOp.startRequest();
 						val evtWriteFuture = evtWriter.writeEvent(evtOp.item());
 						evtWriteFuture.handle((result, thrown) -> handleEventWrite(evtOp, thrown));
 						try {
 							evtOp.finishRequest();
-						} catch (final IllegalStateException ignored) {}
+						} catch (final IllegalStateException ignored) {
+						}
 					}
 				} else {
-					for (var i = 0; i < opsCount; i++) {
-						val evtOp = ops.get(i);
+					for (final O evtOp : ops) {
 						val evtItem = evtOp.item();
 						val routingKey = routingKeyFunc.apply(evtItem);
 						concurrencyThrottle.acquire();
@@ -833,7 +833,8 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 						evtWriteFuture.handle((result, thrown) -> handleEventWrite(evtOp, thrown));
 						try {
 							evtOp.finishRequest();
-						} catch (final IllegalStateException ignored) {}
+						} catch (final IllegalStateException ignored) {
+						}
 					}
 				}
 			} catch (final Throwable e) {
@@ -903,8 +904,8 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 				}
 
 				val evtReader = evtReader_;
-				for(var i = 0; i < opsCount; i ++) {
-					readEvent(readerGroupManager, evtReaderGroupName, evtReader, evtOps.get(i));
+				for (O evtOp : evtOps) {
+					readEvent(readerGroupManager, evtReaderGroupName, evtReader, evtOp);
 					// in multistream case readerGroup and associated reader might be different for each op
 				}
 				evtReaderPool.offer(evtReader);
@@ -922,7 +923,8 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 	throws IOException {
 		evtOp.startRequest();
 		evtOp.finishRequest();
-		// should we startRequest() after all preparations or at the beginning of the method in a multiStream case when we partially prepare objects inside this method?
+		// should we startRequest() after all preparations or at the beginning of the method in a multiStream case
+		// when we partially prepare objects inside this method?
 		var evtRead_ = evtReader.readNextEvent(evtOpTimeoutMillis);
 		while (evtRead_.isCheckpoint()) {
 			Loggers.MSG.debug("{}: stream checkpoint @ position {}", stepId, evtRead_.getPosition());
@@ -1096,8 +1098,8 @@ public class PravegaStorageDriver<I extends DataItem, O extends DataOperation<I>
 		I item;
 		O op;
 		try {
-			for (var i = 0; i < ops.size(); i++) {
-				op = ops.get(i);
+			for (O o : ops) {
+				op = o;
 				op.status(status);
 				item = op.item();
 				op.countBytesDone(item.size());

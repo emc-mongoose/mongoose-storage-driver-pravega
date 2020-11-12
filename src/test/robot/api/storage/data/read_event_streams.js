@@ -4,7 +4,14 @@ PreconditionLoad
 			"output" : {
 				"path" : ITEM_PATH
 			}
-		}
+		},
+		"load" : {
+        	"op" : {
+        	    "limit": {
+        	        "count": OP_LIMIT
+        	    }
+        	}
+        }
 	})
 	.run();
 
@@ -18,6 +25,11 @@ ReadLoad
 		"load" : {
 			"op" : {
 				"recycle" : true
+			},
+			"step": {
+			    "limit": {
+			        "time": TIME_LIMIT
+			}
 			}
 		}
 	})
