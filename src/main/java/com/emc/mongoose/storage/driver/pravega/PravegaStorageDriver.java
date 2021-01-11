@@ -96,8 +96,8 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import io.pravega.client.stream.impl.Credentials;
-import io.pravega.client.stream.impl.DefaultCredentials;
+import io.pravega.shared.security.auth.Credentials;
+import io.pravega.shared.security.auth.DefaultCredentials;
 import io.pravega.client.stream.impl.PositionImpl;
 import io.pravega.client.stream.impl.StreamImpl;
 import io.pravega.common.util.AsyncIterator;
