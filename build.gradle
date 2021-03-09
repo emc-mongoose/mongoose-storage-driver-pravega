@@ -97,7 +97,7 @@ task clonePravegaRepo {
 		}
 		if(!destDir.exists()) {
 			def gitRepo = Grgit.clone {
-				uri = "https://github.com/pravega/pravega.git"
+				uri = pravegaUri
 				dir = pravegaSrcDir
 			}
 			gitRepo.reset {
