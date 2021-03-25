@@ -75,6 +75,7 @@ ext {
 	pravegaClientJarDir = "${pravegaSrcDir}${File.separator}client${File.separator}${buildLibsPath}"
 	pravegaCommonJarDir = "${pravegaSrcDir}${File.separator}common${File.separator}${buildLibsPath}"
 	pravegaSharedAuthpluginJarDir = "${pravegaSrcDir}${File.separator}shared${File.separator}authplugin${File.separator}${buildLibsPath}"
+	pravegaSharedSecurityPluginJarDir = "${pravegaSrcDir}${File.separator}shared${File.separator}security${File.separator}${buildLibsPath}"
 	pravegaSharedControllerApiJarDir = "${pravegaSrcDir}${File.separator}shared${File.separator}controller-api${File.separator}${buildLibsPath}"
 	pravegaSharedProtocolJarDir = "${pravegaSrcDir}${File.separator}shared${File.separator}protocol${File.separator}${buildLibsPath}"
 }
@@ -96,7 +97,7 @@ task clonePravegaRepo {
 		}
 		if(!destDir.exists()) {
 			def gitRepo = Grgit.clone {
-				uri = "https://github.com/pravega/pravega.git"
+				uri = pravegaUri
 				dir = pravegaSrcDir
 			}
 			gitRepo.reset {
@@ -166,6 +167,7 @@ dependencies {
 		files(
 			"${pravegaClientJarDir}${File.separator}pravega-client-${pravegaVersion}.jar",
 			"${pravegaCommonJarDir}${File.separator}pravega-common-${pravegaVersion}.jar",
+				"${pravegaSharedSecurityPluginJarDir}${File.separator}pravega-shared-security-${pravegaVersion}.jar",
 			"${pravegaSharedAuthpluginJarDir}${File.separator}pravega-shared-authplugin-${pravegaVersion}.jar",
 			"${pravegaSharedControllerApiJarDir}${File.separator}pravega-shared-controller-api-${pravegaVersion}.jar",
 			"${pravegaSharedProtocolJarDir}${File.separator}pravega-shared-protocol-${pravegaVersion}.jar",
