@@ -43,7 +43,7 @@ repositories {
 }
 description = "Mongoose is a high-load storage performance testing tool"
 group = "com.github.emc-mongoose"
-version = "4.2.30"
+version = "4.2.31"
 sourceCompatibility = 11
 targetCompatibility = 11
 ext {
@@ -57,8 +57,8 @@ ext {
 		grpc                     : "1.30.0",
 		guava                    : "28.1-jre",
 		log4j                    : "2.19.0",
-		mongooseBase             : "4.2.19",
-		mongooseStorageDriverPreempt: "4.2.23",
+		mongooseBase             : "4.3.3",
+		mongooseStorageDriverPreempt: "4.2.24",
 		netty                    : "4.1.45.Final",
 		nettyTcNative            : "2.0.25.Final",
 		protobuf                 : "3.5.1",
